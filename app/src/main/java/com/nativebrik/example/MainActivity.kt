@@ -31,10 +31,6 @@ class MainActivity : ComponentActivity() {
             context = this.applicationContext,
         )
 
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            this.nativebrik.experiment.record(throwable)
-        }
-
         setContent {
             NativebrikAndroidTheme {
                 NativebrikProvider(client = nativebrik) {

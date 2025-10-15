@@ -6,19 +6,17 @@ import com.nativebrik.sdk.VERSION
 import com.nativebrik.sdk.data.user.NativebrikUser
 import com.nativebrik.sdk.data.user.formatISO8601
 import com.nativebrik.sdk.data.user.getCurrentDate
-import com.nativebrik.sdk.schema.ListDecoder
-import com.nativebrik.sdk.schema.StringDecoder
 import com.nativebrik.sdk.schema.TriggerEventNameDefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import okio.withLock
 import java.time.ZonedDateTime
 import java.util.Timer
@@ -27,36 +25,20 @@ import kotlin.concurrent.fixedRateTimer
 
 private val CRASH_RECORD_KEY = "CRASH_RECORD_KEY"
 
-data class CrashRecord(
-    val reason: String?,
-    val callStacks: List<String>?
-) {
-    fun encode(): JsonObject {
-        val callStacks = this.callStacks?.map {
-            JsonPrimitive(it)
-        } ?: emptyList()
-        return JsonObject(mapOf(
-            "reason" to JsonPrimitive(this.reason),
-            "callStacks" to JsonArray(callStacks)
-        ))
-    }
+@Serializable
+internal data class ExceptionRecord(
+    val type: String?,
+    val message: String?,
+    val callStacks: List<StackFrame>?
+)
 
-    companion object {
-        fun decode(element: JsonElement?): CrashRecord? {
-            if (element == null) return null
-            if (element !is JsonObject) return null
-
-            return CrashRecord(
-                reason = StringDecoder.decode(element.jsonObject["name"]),
-                callStacks = ListDecoder.decode(element.jsonObject["callStacks"]) {
-                    StringDecoder.decode(
-                        it
-                    )
-                },
-            )
-        }
-    }
-}
+@Serializable
+internal data class StackFrame(
+    val fileName: String?,
+    val className: String?,
+    val methodName: String?,
+    val lineNumber: Int?,
+)
 
 
 internal data class TrackUserEvent(
@@ -87,14 +69,27 @@ internal data class TrackExperimentEvent(
     }
 }
 
+internal data class TrackCrashEvent(
+    val exceptionsList: List<ExceptionRecord>,
+) {
+    fun encode(): JsonObject {
+        return JsonObject(mapOf(
+            "typename" to JsonPrimitive("crash"),
+            "exceptions" to Json.encodeToJsonElement(this.exceptionsList),
+        ))
+    }
+}
+
 internal sealed class TrackEvent {
     class UserEvent(val event: TrackUserEvent) : TrackEvent()
     class ExperimentEvent(val event: TrackExperimentEvent) : TrackEvent()
+    class CrashEvent(val event: TrackCrashEvent) : TrackEvent()
 
     fun encode(): JsonObject {
         return when (this) {
             is UserEvent -> this.event.encode()
             is ExperimentEvent -> this.event.encode()
+            is CrashEvent -> this.event.encode()
         }
     }
 }
@@ -219,18 +214,26 @@ internal class TrackRepositoryImpl: TrackRepository {
     }
 
     private fun report() {
-        val data = this.user.preferences?.getString(CRASH_RECORD_KEY, "") ?: ""
+        val data = this.queueLock.withLock {
+            val data = this.user.preferences?.getString(CRASH_RECORD_KEY, "") ?: ""
+            if (data.isNotEmpty()) {
+                this.user.preferences?.edit()?.remove(CRASH_RECORD_KEY)?.commit()
+            }
+            data
+        }
         if (data.isEmpty()) {
             return
         }
-        this.user.preferences?.edit()?.remove(CRASH_RECORD_KEY)?.apply()
 
-        val json = Json.decodeFromString<JsonElement>(data)
-        val crashRecord = CrashRecord.decode(json) ?: return
-        val causedByNativebrik = crashRecord.callStacks?.any {
-            // support flutter
-            it.contains("com.nativebrik.sdk") || it.contains("package:nativebrik_bridge/")
-        } == true || crashRecord.reason?.contains("com.nativebrik.sdk") == true
+        val exceptionsList : List<ExceptionRecord>
+        try {
+            exceptionsList = Json.decodeFromString<List<ExceptionRecord>>(data)
+        }
+        catch (e: Exception) {
+            return // in case there was exception in json decoding we stop here
+        }
+
+        val causedByNativebrik = exceptionsList.isNotEmpty() //if list is empty all exceptions were filtered out so not from nativebrik
 
         this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
             name = TriggerEventNameDefs.N_ERROR_RECORD.name
@@ -240,8 +243,8 @@ internal class TrackRepositoryImpl: TrackRepository {
             buffer.add(TrackEvent.UserEvent(TrackUserEvent(
                 name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
             )))
+            buffer.add(TrackEvent.CrashEvent(TrackCrashEvent((exceptionsList))))
         }
-
         val self = this
         CoroutineScope(Dispatchers.IO).launch {
             self.sendAndFlush()
@@ -249,11 +252,34 @@ internal class TrackRepositoryImpl: TrackRepository {
     }
 
     override fun record(throwable: Throwable) {
-        val record = CrashRecord(
-            reason = throwable.message,
-            callStacks = throwable.stackTrace.map { it.toString() }
-        )
-        val data = Json.encodeToString(record.encode())
-        this.user.preferences?.edit()?.putString(CRASH_RECORD_KEY, data)?.apply()
+        // Loop on chained exceptions (up to 20 times max)
+        var counter = 0
+        var currentException : Throwable? = throwable
+        val exceptionsList = mutableListOf<ExceptionRecord>()
+
+        while (currentException != null && counter < 20) {
+            val stackFrames = currentException.stackTrace
+            val nativebrikFrames = stackFrames.filter { it.className.contains("com.nativebrik.sdk") || it.className.contains("package:nativebrik_bridge") }
+            if (nativebrikFrames.isNotEmpty()) {
+                exceptionsList.add(ExceptionRecord(
+                    type = currentException::class.simpleName,
+                    message = currentException.message,
+                    callStacks = nativebrikFrames.map {
+                        StackFrame(
+                            fileName = it.fileName,
+                            className = it.className,
+                            methodName = it.methodName,
+                            lineNumber = it.lineNumber
+                        )
+                    }
+                )
+                )
+            }
+            currentException = currentException.cause
+            counter ++
+        }
+
+        val data = Json.encodeToString(exceptionsList)
+        this.user.preferences?.edit()?.putString(CRASH_RECORD_KEY, data)?.commit()
     }
 }

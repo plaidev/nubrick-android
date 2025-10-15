@@ -66,6 +66,7 @@ public data class Config(
     val onEvent: ((event: Event) -> Unit)? = null,
     val cachePolicy: CachePolicy = CachePolicy(),
     val onDispatch: ((event: NativebrikEvent) -> Unit)? = null,
+    val trackCrashes : Boolean = true,
 )
 
 public enum class CacheStorage {
@@ -127,6 +128,17 @@ public class NativebrikClient {
             db = this.db,
             context = context,
         )
+
+        if (this.config.trackCrashes) {
+            val existingHandler = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                try {
+                    this.experiment.record(throwable)
+                } finally {
+                    existingHandler?.uncaughtException(thread, throwable)
+                }
+            }
+        }
     }
 
     public fun close() {
