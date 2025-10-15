@@ -127,6 +127,16 @@ public class NativebrikClient {
             db = this.db,
             context = context,
         )
+
+        val existingHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                this.experiment.record(throwable)
+            } 
+            finally {
+                existingHandler?.uncaughtException(thread, throwable)
+            }
+        }
     }
 
     public fun close() {
