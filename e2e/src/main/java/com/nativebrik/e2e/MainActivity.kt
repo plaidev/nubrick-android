@@ -17,17 +17,17 @@ import androidx.compose.ui.unit.dp
 import com.nativebrik.e2e.ui.theme.NativebrikAndroidTheme
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.Nativebrik
-import com.nativebrik.sdk.NativebrikClient
+import com.nativebrik.sdk.NubrickClient
 import com.nativebrik.sdk.NativebrikProvider
 import com.nativebrik.sdk.component.EmbeddingLoadingState
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nativebrik: NativebrikClient
+    private lateinit var nativebrik: NubrickClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.nativebrik = NativebrikClient(
+        this.nativebrik = NubrickClient(
             config = Config(projectId = "ckto7v223akg00ag3jsg"),
             context = this.applicationContext,
         )

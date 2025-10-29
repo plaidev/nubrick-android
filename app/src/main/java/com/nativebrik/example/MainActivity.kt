@@ -18,15 +18,15 @@ import androidx.compose.ui.unit.dp
 import com.nativebrik.example.ui.theme.NativebrikAndroidTheme
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.Nativebrik
-import com.nativebrik.sdk.NativebrikClient
+import com.nativebrik.sdk.NubrickClient
 import com.nativebrik.sdk.NativebrikProvider
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nativebrik: NativebrikClient
+    private lateinit var nativebrik: NubrickClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.nativebrik = NativebrikClient(
+        this.nativebrik = NubrickClient(
             config = Config(projectId = "cgv3p3223akg00fod19g"),
             context = this.applicationContext,
         )

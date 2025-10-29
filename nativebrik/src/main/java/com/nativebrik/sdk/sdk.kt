@@ -83,15 +83,15 @@ public data class NativebrikEvent(
     val name: String
 )
 
-internal var LocalNativebrikClient = compositionLocalOf<NativebrikClient> {
+internal var LocalNativebrikClient = compositionLocalOf<NubrickClient> {
     error("NativebrikClient is not found")
 }
 
 public object Nativebrik {
     /**
-     * Retrieves the current [NativebrikClient] at the call site's position in the hierarchy.
+     * Retrieves the current [NubrickClient] at the call site's position in the hierarchy.
      */
-    val client: NativebrikClient
+    val client: NubrickClient
         @Composable
         @ReadOnlyComposable
         get() = LocalNativebrikClient.current
@@ -99,7 +99,7 @@ public object Nativebrik {
 
 @Composable
 public fun NativebrikProvider(
-    client: NativebrikClient,
+    client: NubrickClient,
     content: @Composable() () -> Unit
 ) {
     CompositionLocalProvider(
@@ -111,13 +111,13 @@ public fun NativebrikProvider(
 }
 
 
-public class NativebrikClient {
-    private final val config: Config
-    private final val db: SQLiteDatabase
-    public final val user: NativebrikUser
-    public final val experiment: NativebrikExperiment
+class NubrickClient {
+    private val config: Config
+    private val db: SQLiteDatabase
+    val user: NativebrikUser
+    val experiment: NativebrikExperiment
 
-    public constructor(config: Config, context: Context) {
+    constructor(config: Config, context: Context) {
         this.config = config
         this.user = NativebrikUser(context)
         val helper = NativebrikDbHelper(context)
@@ -141,7 +141,7 @@ public class NativebrikClient {
         }
     }
 
-    public fun close() {
+    fun close() {
         this.db.close()
     }
 }
@@ -220,7 +220,7 @@ public class NativebrikExperiment {
     }
 }
 
-public class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NativebrikClient) {
+public class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         return client.experiment.container.fetchEmbedding(experimentId, componentId)
     }
