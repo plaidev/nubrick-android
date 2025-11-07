@@ -18,7 +18,7 @@ import com.nativebrik.e2e.ui.theme.NativebrikAndroidTheme
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.Nubrick
 import com.nativebrik.sdk.NubrickClient
-import com.nativebrik.sdk.NativebrikProvider
+import com.nativebrik.sdk.NubrickProvider
 import com.nativebrik.sdk.component.EmbeddingLoadingState
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 
@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             NativebrikAndroidTheme {
                 // A surface container using the 'background' color from the theme
-                NativebrikProvider(client = nativebrik) {
+                NubrickProvider(client = nativebrik) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background

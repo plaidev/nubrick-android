@@ -98,7 +98,7 @@ object Nubrick {
 }
 
 @Composable
-fun NativebrikProvider(
+fun NubrickProvider(
     client: NubrickClient,
     content: @Composable() () -> Unit
 ) {

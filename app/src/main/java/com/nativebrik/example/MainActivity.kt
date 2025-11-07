@@ -19,7 +19,7 @@ import com.nativebrik.example.ui.theme.NativebrikAndroidTheme
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.Nubrick
 import com.nativebrik.sdk.NubrickClient
-import com.nativebrik.sdk.NativebrikProvider
+import com.nativebrik.sdk.NubrickProvider
 
 class MainActivity : ComponentActivity() {
     private lateinit var nativebrik: NubrickClient
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             NativebrikAndroidTheme {
-                NativebrikProvider(client = nativebrik) {
+                NubrickProvider(client = nativebrik) {
                     // A surface container using the 'background' color from the theme
                     Surface(
                         modifier = Modifier.fillMaxSize(),
