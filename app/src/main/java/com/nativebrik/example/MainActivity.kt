@@ -17,7 +17,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nativebrik.example.ui.theme.NativebrikAndroidTheme
 import com.nativebrik.sdk.Config
-import com.nativebrik.sdk.Nativebrik
+import com.nativebrik.sdk.Nubrick
 import com.nativebrik.sdk.NubrickClient
 import com.nativebrik.sdk.NativebrikProvider
 
@@ -42,12 +42,12 @@ class MainActivity : ComponentActivity() {
                         Column(
                             modifier = Modifier.verticalScroll(rememberScrollState())
                         ) {
-                            Nativebrik.client.experiment.Embedding(
+                            Nubrick.client.experiment.Embedding(
                                 "HEADER_INFORMATION",
                                 arguments = emptyMap<String, String>(),
                                 modifier = Modifier.height(100f.dp),
                             )
-                            Nativebrik.client.experiment.Embedding(
+                            Nubrick.client.experiment.Embedding(
                                 "TOP_COMPONENT",
                                 arguments = emptyMap<String, String>(),
                                 modifier = Modifier.height(270f.dp),

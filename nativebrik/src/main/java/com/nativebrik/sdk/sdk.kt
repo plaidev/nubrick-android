@@ -84,10 +84,10 @@ data class NubrickEvent(
 )
 
 internal var LocalNativebrikClient = compositionLocalOf<NubrickClient> {
-    error("NativebrikClient is not found")
+    error("NubrickClient is not found")
 }
 
-object Nativebrik {
+object Nubrick {
     /**
      * Retrieves the current [NubrickClient] at the call site's position in the hierarchy.
      */

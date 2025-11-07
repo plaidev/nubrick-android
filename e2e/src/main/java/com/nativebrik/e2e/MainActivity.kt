@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.nativebrik.e2e.ui.theme.NativebrikAndroidTheme
 import com.nativebrik.sdk.Config
-import com.nativebrik.sdk.Nativebrik
+import com.nativebrik.sdk.Nubrick
 import com.nativebrik.sdk.NubrickClient
 import com.nativebrik.sdk.NativebrikProvider
 import com.nativebrik.sdk.component.EmbeddingLoadingState
@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             // embedding
-                            Nativebrik.client.experiment.Embedding(
+                            Nubrick.client.experiment.Embedding(
                                 "EMBEDDING_FOR_E2E",
                                 modifier = Modifier.height(240f.dp),
                                 content = {
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                             )
 
                             // remote config
-                            Nativebrik.client.experiment.RemoteConfig("REMOTE_CONFIG_FOR_E2E") {
+                            Nubrick.client.experiment.RemoteConfig("REMOTE_CONFIG_FOR_E2E") {
                                 when (it) {
                                     is RemoteConfigLoadingState.Completed -> {
                                         Text(text = it.variant.getAsString("message") ?: "")
