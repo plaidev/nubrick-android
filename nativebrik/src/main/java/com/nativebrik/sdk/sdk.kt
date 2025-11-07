@@ -22,7 +22,7 @@ import com.nativebrik.sdk.data.CacheStore
 import com.nativebrik.sdk.data.Container
 import com.nativebrik.sdk.data.ContainerImpl
 import com.nativebrik.sdk.data.FormRepositoryImpl
-import com.nativebrik.sdk.data.database.NativebrikDbHelper
+import com.nativebrik.sdk.data.database.NubrickDbHelper
 import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 import com.nativebrik.sdk.schema.UIBlock
@@ -83,7 +83,7 @@ data class NubrickEvent(
     val name: String
 )
 
-internal var LocalNativebrikClient = compositionLocalOf<NubrickClient> {
+internal var LocalNubrickClient = compositionLocalOf<NubrickClient> {
     error("NubrickClient is not found")
 }
 
@@ -94,7 +94,7 @@ object Nubrick {
     val client: NubrickClient
         @Composable
         @ReadOnlyComposable
-        get() = LocalNativebrikClient.current
+        get() = LocalNubrickClient.current
 }
 
 @Composable
@@ -103,7 +103,7 @@ fun NubrickProvider(
     content: @Composable() () -> Unit
 ) {
     CompositionLocalProvider(
-        LocalNativebrikClient provides client
+        LocalNubrickClient provides client
     ) {
         client.experiment.Overlay()
         content()
@@ -115,14 +115,14 @@ class NubrickClient {
     private val config: Config
     private val db: SQLiteDatabase
     val user: NubrickUser
-    val experiment: NativebrikExperiment
+    val experiment: NubrickExperiment
 
     constructor(config: Config, context: Context) {
         this.config = config
         this.user = NubrickUser(context)
-        val helper = NativebrikDbHelper(context)
+        val helper = NubrickDbHelper(context)
         this.db = helper.writableDatabase
-        this.experiment = NativebrikExperiment(
+        this.experiment = NubrickExperiment(
             config = this.config,
             user = this.user,
             db = this.db,
@@ -146,7 +146,7 @@ class NubrickClient {
     }
 }
 
-class NativebrikExperiment {
+class NubrickExperiment {
     internal val container: Container
     private val trigger: TriggerViewModel
 
@@ -212,6 +212,7 @@ class NativebrikExperiment {
         )
     }
 
+    // This is for flutter SDK
     fun remoteConfig(id: String): com.nativebrik.sdk.remoteconfig.RemoteConfig {
         return com.nativebrik.sdk.remoteconfig.RemoteConfig(
             container = this.container,
