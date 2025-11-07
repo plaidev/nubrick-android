@@ -155,10 +155,8 @@ internal class RootViewModel(
         }
 
         if (destBlock.data?.kind == PageKind.TOOLTIP) {
+            onNextTooltip(destId)
             val anchorId = destBlock.data.tooltipAnchor ?: ""
-            if (this.currentTooltipAnchorId.value != anchorId) {
-                onNextTooltip(destId)
-            }
             this.currentTooltipAnchorId.value = anchorId
         }
 
