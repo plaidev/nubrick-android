@@ -22,8 +22,8 @@ import com.nativebrik.sdk.data.CacheStore
 import com.nativebrik.sdk.data.Container
 import com.nativebrik.sdk.data.ContainerImpl
 import com.nativebrik.sdk.data.FormRepositoryImpl
-import com.nativebrik.sdk.data.database.NativebrikDbHelper
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.database.NubrickDbHelper
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 import com.nativebrik.sdk.schema.UIBlock
 import com.nativebrik.sdk.schema.UIRootBlock
@@ -41,69 +41,69 @@ data class Endpoint(
     val track: String = "https://track.nativebrik.com/track/v1",
 )
 
-public enum class EventPropertyType {
+enum class EventPropertyType {
     INTEGER,
     STRING,
     TIMESTAMPZ,
     UNKNOWN
 }
 
-public data class EventProperty(
+data class EventProperty(
     val name: String,
     val value: String,
     val type: EventPropertyType
 )
 
-public data class Event(
+data class Event(
     val name: String?,
     val deepLink: String?,
     val payload: List<EventProperty>?
 )
 
-public data class Config(
+data class Config(
     val projectId: String,
     val endpoint: Endpoint = Endpoint(),
     val onEvent: ((event: Event) -> Unit)? = null,
     val cachePolicy: CachePolicy = CachePolicy(),
-    val onDispatch: ((event: NativebrikEvent) -> Unit)? = null,
+    val onDispatch: ((event: NubrickEvent) -> Unit)? = null,
     val trackCrashes : Boolean = true,
 )
 
-public enum class CacheStorage {
+enum class CacheStorage {
     IN_MEMORY
 }
 
-public data class CachePolicy(
+data class CachePolicy(
     val cacheTime: Duration = 24.toDuration(DurationUnit.HOURS),
     val staleTime: Duration = Duration.ZERO,
     val storage: CacheStorage = CacheStorage.IN_MEMORY,
 )
 
-public data class NativebrikEvent(
+data class NubrickEvent(
     val name: String
 )
 
-internal var LocalNativebrikClient = compositionLocalOf<NativebrikClient> {
-    error("NativebrikClient is not found")
+internal var LocalNubrickClient = compositionLocalOf<NubrickClient> {
+    error("NubrickClient is not found")
 }
 
-public object Nativebrik {
+object Nubrick {
     /**
-     * Retrieves the current [NativebrikClient] at the call site's position in the hierarchy.
+     * Retrieves the current [NubrickClient] at the call site's position in the hierarchy.
      */
-    val client: NativebrikClient
+    val client: NubrickClient
         @Composable
         @ReadOnlyComposable
-        get() = LocalNativebrikClient.current
+        get() = LocalNubrickClient.current
 }
 
 @Composable
-public fun NativebrikProvider(
-    client: NativebrikClient,
+fun NubrickProvider(
+    client: NubrickClient,
     content: @Composable() () -> Unit
 ) {
     CompositionLocalProvider(
-        LocalNativebrikClient provides client
+        LocalNubrickClient provides client
     ) {
         client.experiment.Overlay()
         content()
@@ -111,18 +111,18 @@ public fun NativebrikProvider(
 }
 
 
-public class NativebrikClient {
-    private final val config: Config
-    private final val db: SQLiteDatabase
-    public final val user: NativebrikUser
-    public final val experiment: NativebrikExperiment
+class NubrickClient {
+    private val config: Config
+    private val db: SQLiteDatabase
+    val user: NubrickUser
+    val experiment: NubrickExperiment
 
-    public constructor(config: Config, context: Context) {
+    constructor(config: Config, context: Context) {
         this.config = config
-        this.user = NativebrikUser(context)
-        val helper = NativebrikDbHelper(context)
+        this.user = NubrickUser(context)
+        val helper = NubrickDbHelper(context)
         this.db = helper.writableDatabase
-        this.experiment = NativebrikExperiment(
+        this.experiment = NubrickExperiment(
             config = this.config,
             user = this.user,
             db = this.db,
@@ -141,18 +141,18 @@ public class NativebrikClient {
         }
     }
 
-    public fun close() {
+    fun close() {
         this.db.close()
     }
 }
 
-public class NativebrikExperiment {
+class NubrickExperiment {
     internal val container: Container
     private val trigger: TriggerViewModel
 
     internal constructor(
         config: Config,
-        user: NativebrikUser,
+        user: NubrickUser,
         db: SQLiteDatabase,
         context: Context
     ) {
@@ -160,7 +160,7 @@ public class NativebrikExperiment {
             config = config.copy(onEvent = { event ->
                 val name = event.name ?: ""
                 if (name.isNotEmpty()) {
-                    this.dispatch(NativebrikEvent(name))
+                    this.dispatch(NubrickEvent(name))
                 }
                 config.onEvent?.let { it(event) }
             }),
@@ -173,21 +173,21 @@ public class NativebrikExperiment {
         this.trigger = TriggerViewModel(this.container, user)
     }
 
-    public fun dispatch(event: NativebrikEvent) {
+    fun dispatch(event: NubrickEvent) {
         this.trigger.dispatch(event)
     }
 
-    public fun record(throwable: Throwable) {
+    fun record(throwable: Throwable) {
         this.container.record(throwable)
     }
 
     @Composable
-    public fun Overlay() {
+    fun Overlay() {
         Trigger(trigger = this.trigger)
     }
 
     @Composable
-    public fun Embedding(
+    fun Embedding(
         id: String,
         modifier: Modifier = Modifier,
         arguments: Any? = null,
@@ -204,7 +204,7 @@ public class NativebrikExperiment {
     }
 
     @Composable
-    public fun RemoteConfig(id: String, content: @Composable (RemoteConfigLoadingState) -> Unit) {
+    fun RemoteConfig(id: String, content: @Composable (RemoteConfigLoadingState) -> Unit) {
         return com.nativebrik.sdk.remoteconfig.RemoteConfigView(
             container = this.container,
             experimentId = id,
@@ -212,7 +212,8 @@ public class NativebrikExperiment {
         )
     }
 
-    public fun remoteConfig(id: String): com.nativebrik.sdk.remoteconfig.RemoteConfig {
+    // This is for flutter SDK
+    fun remoteConfig(id: String): com.nativebrik.sdk.remoteconfig.RemoteConfig {
         return com.nativebrik.sdk.remoteconfig.RemoteConfig(
             container = this.container,
             experimentId = id,
@@ -220,7 +221,10 @@ public class NativebrikExperiment {
     }
 }
 
-public class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NativebrikClient) {
+/**
+ * This is for flutter SDK
+ */
+class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         return client.experiment.container.fetchEmbedding(experimentId, componentId)
     }

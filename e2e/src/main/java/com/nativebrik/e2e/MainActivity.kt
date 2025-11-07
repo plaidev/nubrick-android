@@ -14,28 +14,28 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.nativebrik.e2e.ui.theme.NativebrikAndroidTheme
+import com.nativebrik.e2e.ui.theme.NubrickAndroidTheme
 import com.nativebrik.sdk.Config
-import com.nativebrik.sdk.Nativebrik
-import com.nativebrik.sdk.NativebrikClient
-import com.nativebrik.sdk.NativebrikProvider
+import com.nativebrik.sdk.Nubrick
+import com.nativebrik.sdk.NubrickClient
+import com.nativebrik.sdk.NubrickProvider
 import com.nativebrik.sdk.component.EmbeddingLoadingState
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nativebrik: NativebrikClient
+    private lateinit var nubrick: NubrickClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.nativebrik = NativebrikClient(
+        this.nubrick = NubrickClient(
             config = Config(projectId = "ckto7v223akg00ag3jsg"),
             context = this.applicationContext,
         )
 
         setContent {
-            NativebrikAndroidTheme {
+            NubrickAndroidTheme {
                 // A surface container using the 'background' color from the theme
-                NativebrikProvider(client = nativebrik) {
+                NubrickProvider(client = nubrick) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             // embedding
-                            Nativebrik.client.experiment.Embedding(
+                            Nubrick.client.experiment.Embedding(
                                 "EMBEDDING_FOR_E2E",
                                 modifier = Modifier.height(240f.dp),
                                 content = {
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                             )
 
                             // remote config
-                            Nativebrik.client.experiment.RemoteConfig("REMOTE_CONFIG_FOR_E2E") {
+                            Nubrick.client.experiment.RemoteConfig("REMOTE_CONFIG_FOR_E2E") {
                                 when (it) {
                                     is RemoteConfigLoadingState.Completed -> {
                                         Text(text = it.variant.getAsString("message") ?: "")

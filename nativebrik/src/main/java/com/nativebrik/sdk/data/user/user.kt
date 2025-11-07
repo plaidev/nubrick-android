@@ -75,7 +75,7 @@ internal data class UserProperty(
 
 private const val USER_CUSTOM_PROPERTY_KEY_PREFIX = "NATIVEBRIK_CUSTOM_"
 
-class NativebrikUser {
+class NubrickUser {
     private var properties: MutableMap<String, String> = mutableMapOf()
     private var customProperties: MutableMap<String, String> = mutableMapOf()
     internal var preferences: SharedPreferences? = null

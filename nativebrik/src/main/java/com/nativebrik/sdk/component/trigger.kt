@@ -11,9 +11,9 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
-import com.nativebrik.sdk.NativebrikEvent
+import com.nativebrik.sdk.NubrickEvent
 import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.data.user.getNativebrikUserSharedPreferences
 import com.nativebrik.sdk.schema.TriggerEventNameDefs
 import com.nativebrik.sdk.schema.UIBlock
@@ -23,7 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-internal class TriggerViewModel(internal val container: Container, internal val user: NativebrikUser) : ViewModel() {
+internal class TriggerViewModel(internal val container: Container, internal val user: NubrickUser) : ViewModel() {
     private val ignoreFirstUserEventToForegroundEvent = mutableStateOf(true)
     internal val modalStacks = mutableStateListOf<UIRootBlock>()
 
@@ -40,27 +40,27 @@ internal class TriggerViewModel(internal val container: Container, internal val 
         this.user.comeBack()
 
         // dispatch the event when every time the user is activated
-        this.dispatch(NativebrikEvent(TriggerEventNameDefs.USER_ENTER_TO_APP.name))
+        this.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP.name))
 
         val retention = this.user.retention
         if (retention == 1) {
-            this.dispatch(NativebrikEvent(TriggerEventNameDefs.RETENTION_1.name))
+            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_1.name))
         } else if (retention in 2..3) {
-            this.dispatch(NativebrikEvent(TriggerEventNameDefs.RETENTION_2_3.name))
+            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_2_3.name))
         } else if (retention in 4..7) {
-            this.dispatch(NativebrikEvent(TriggerEventNameDefs.RETENTION_4_7.name))
+            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_4_7.name))
         } else if (retention in 8..14) {
-            this.dispatch(NativebrikEvent(TriggerEventNameDefs.RETENTION_8_14.name))
+            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_8_14.name))
         } else if (retention > 14) {
-            this.dispatch(NativebrikEvent(TriggerEventNameDefs.RETENTION_15.name))
+            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_15.name))
         }
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    fun dispatch(event: NativebrikEvent) {
+    fun dispatch(event: NubrickEvent) {
         val self = this
         GlobalScope.launch(Dispatchers.IO) {
-            self.container.handleNativebrikEvent(event)
+            self.container.handleNubrickEvent(event)
             self.container.fetchInAppMessage(event.name).onSuccess {
                 GlobalScope.launch(Dispatchers.Main) {
                     if (it is UIBlock.UnionUIRootBlock) {
@@ -88,7 +88,7 @@ internal fun Trigger(trigger: TriggerViewModel) {
     val context = LocalContext.current
     LaunchedEffect("") {
         // dispatch user boot
-        trigger.dispatch(NativebrikEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
+        trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
 
         // dispatch the first time visit
         val preferences = getNativebrikUserSharedPreferences(context)
@@ -96,7 +96,7 @@ internal fun Trigger(trigger: TriggerViewModel) {
         val count: Int = preferences?.getInt(countKey, 0) ?: 0
         preferences?.edit()?.putInt(countKey, count + 1)?.apply()
         if (count == 0) {
-            trigger.dispatch(NativebrikEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
+            trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
         }
 
         trigger.callWhenUserComesBack()
@@ -110,7 +110,7 @@ internal fun Trigger(trigger: TriggerViewModel) {
                     if (trigger.ignoreFirstCall()) {
                         return@LifecycleEventObserver
                     }
-                    trigger.dispatch(NativebrikEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
+                    trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
                     trigger.callWhenUserComesBack()
                 }
                 else -> {}
