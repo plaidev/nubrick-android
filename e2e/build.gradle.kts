@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.nativebrik.e2e"
+    namespace = "io.nubrick.e2e"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.nativebrik.e2e"
+        applicationId = "io.nubrick.e2e"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -50,7 +50,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":nativebrik"))
+    implementation(project(":nubrick"))
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
