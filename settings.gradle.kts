@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Nativebrik android"
+rootProject.name = "Nubrick android"
 include(":app")
 include(":nubrick")
 include(":e2e")

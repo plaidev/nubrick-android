@@ -8,7 +8,7 @@ import org.junit.Test
 
 class CompilerTest {
     private val userId = "userid"
-    private val teamName = "nativebrik"
+    private val teamName = "nubrick"
     private val variable = JsonObject(mapOf(
         "user" to JsonObject(mapOf(
             "id" to JsonPrimitive(userId),

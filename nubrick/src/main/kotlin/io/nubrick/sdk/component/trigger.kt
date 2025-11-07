@@ -14,7 +14,7 @@ import androidx.lifecycle.ViewModel
 import io.nubrick.sdk.NubrickEvent
 import io.nubrick.sdk.data.Container
 import io.nubrick.sdk.data.user.NubrickUser
-import io.nubrick.sdk.data.user.getNativebrikUserSharedPreferences
+import io.nubrick.sdk.data.user.getNubrickUserSharedPreferences
 import io.nubrick.sdk.schema.TriggerEventNameDefs
 import io.nubrick.sdk.schema.UIBlock
 import io.nubrick.sdk.schema.UIRootBlock
@@ -91,7 +91,7 @@ internal fun Trigger(trigger: TriggerViewModel) {
         trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
 
         // dispatch the first time visit
-        val preferences = getNativebrikUserSharedPreferences(context)
+        val preferences = getNubrickUserSharedPreferences(context)
         val countKey = "NATIVEBRIK_SDK_INITIALIZED_COUNT"
         val count: Int = preferences?.getInt(countKey, 0) ?: 0
         preferences?.edit()?.putInt(countKey, count + 1)?.apply()

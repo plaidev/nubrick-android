@@ -19,7 +19,7 @@ import java.util.UUID
 import kotlin.random.Random
 
 
-internal fun getNativebrikUserSharedPreferences(context: Context): SharedPreferences? {
+internal fun getNubrickUserSharedPreferences(context: Context): SharedPreferences? {
     return context.getSharedPreferences(
         context.packageName + ".nubrik.io.user",
         Context.MODE_PRIVATE
@@ -94,7 +94,7 @@ class NubrickUser {
         }
 
     internal constructor(context: Context, seed: Int? = null) {
-        this.preferences = getNativebrikUserSharedPreferences(context)
+        this.preferences = getNubrickUserSharedPreferences(context)
 
         // userId := uuid by default
         val userIdKey = BuiltinUserProperty.userId.toString()
@@ -147,8 +147,7 @@ class NubrickUser {
         this.comeBack()
     }
 
-    // This is an alias of NativebrikUser.setProperties
-    fun set(props: Map<String, Any>) {
+    fun setProperties(props: Map<String, Any>) {
         val editor = this.preferences?.edit()
         props.forEach { (key, value) ->
             if (key == BuiltinUserProperty.userId.toString()) {
@@ -162,10 +161,6 @@ class NubrickUser {
             editor?.putString(USER_CUSTOM_PROPERTY_KEY_PREFIX + key, strValue)
         }
         editor?.apply()
-    }
-
-    fun setProperties(props: Map<String, Any>) {
-        this.set(props)
     }
 
     fun getProperties(): Map<String, String> {

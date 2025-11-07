@@ -97,7 +97,7 @@ class ExtractionUnitTest {
         val properties: List<UserProperty> = listOf(
             UserProperty(
                 name = "name",
-                value = "Nativebrik",
+                value = "Nubrick",
                 type = UserPropertyType.STRING
             ),
             UserProperty(
@@ -110,7 +110,7 @@ class ExtractionUnitTest {
             ExperimentCondition(
                 property = "name",
                 operator = ConditionOperator.Equal.name,
-                value = "Nativebrik"
+                value = "Nubrick"
             ),
             ExperimentCondition(
                 property = "id",
@@ -126,7 +126,7 @@ class ExtractionUnitTest {
         val properties: List<UserProperty> = listOf(
             UserProperty(
                 name = "name",
-                value = "Nativebrik",
+                value = "Nubrick",
                 type = UserPropertyType.STRING
             ),
             UserProperty(
@@ -139,7 +139,7 @@ class ExtractionUnitTest {
             ExperimentCondition(
                 property = "name",
                 operator = ConditionOperator.Equal.name,
-                value = "Nativebrik"
+                value = "Nubrick"
             ),
             ExperimentCondition(
                 property = "id",

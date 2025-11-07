@@ -233,13 +233,13 @@ internal class TrackRepositoryImpl: TrackRepository {
             return // in case there was exception in json decoding we stop here
         }
 
-        val causedByNativebrik = exceptionsList.isNotEmpty() //if list is empty all exceptions were filtered out so not from nativebrik
+        val causedByNubrick = exceptionsList.isNotEmpty() //if list is empty all exceptions were filtered out so not from nubrick
 
         this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
             name = TriggerEventNameDefs.N_ERROR_RECORD.name
         )))
 
-        if (causedByNativebrik) {
+        if (causedByNubrick) {
             buffer.add(TrackEvent.UserEvent(TrackUserEvent(
                 name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
             )))
@@ -259,12 +259,12 @@ internal class TrackRepositoryImpl: TrackRepository {
 
         while (currentException != null && counter < 20) {
             val stackFrames = currentException.stackTrace
-            val nativebrikFrames = stackFrames.filter { it.className.contains("io.nubrick.sdk") || it.className.contains("package:nativebrik_bridge") }
-            if (nativebrikFrames.isNotEmpty()) {
+            val nubrickFrames = stackFrames.filter { it.className.contains("io.nubrick.sdk") || it.className.contains("package:nativebrik_bridge") }
+            if (nubrickFrames.isNotEmpty()) {
                 exceptionsList.add(ExceptionRecord(
                     type = currentException::class.simpleName,
                     message = currentException.message,
-                    callStacks = nativebrikFrames.map {
+                    callStacks = nubrickFrames.map {
                         StackFrame(
                             fileName = it.fileName,
                             className = it.className,
