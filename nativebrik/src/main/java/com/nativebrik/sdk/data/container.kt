@@ -10,7 +10,7 @@ import com.nativebrik.sdk.data.database.DatabaseRepositoryImpl
 import com.nativebrik.sdk.data.extraction.extractComponentId
 import com.nativebrik.sdk.data.extraction.extractExperimentConfig
 import com.nativebrik.sdk.data.extraction.extractExperimentVariant
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.schema.ApiHttpHeader
 import com.nativebrik.sdk.schema.ApiHttpRequest
 import com.nativebrik.sdk.schema.ExperimentConfigs
@@ -57,7 +57,7 @@ internal interface Container {
 
 internal class ContainerImpl(
     private val config: Config,
-    private val user: NativebrikUser,
+    private val user: NubrickUser,
     private val db: SQLiteDatabase,
     private val arguments: Any? = null,
     private val formRepository: FormRepository? = null,

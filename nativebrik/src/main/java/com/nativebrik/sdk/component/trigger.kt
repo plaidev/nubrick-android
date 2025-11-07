@@ -13,7 +13,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import com.nativebrik.sdk.NubrickEvent
 import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.data.user.getNativebrikUserSharedPreferences
 import com.nativebrik.sdk.schema.TriggerEventNameDefs
 import com.nativebrik.sdk.schema.UIBlock
@@ -23,7 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
-internal class TriggerViewModel(internal val container: Container, internal val user: NativebrikUser) : ViewModel() {
+internal class TriggerViewModel(internal val container: Container, internal val user: NubrickUser) : ViewModel() {
     private val ignoreFirstUserEventToForegroundEvent = mutableStateOf(true)
     internal val modalStacks = mutableStateListOf<UIRootBlock>()
 

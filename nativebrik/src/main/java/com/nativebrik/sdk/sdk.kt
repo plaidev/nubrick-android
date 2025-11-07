@@ -23,7 +23,7 @@ import com.nativebrik.sdk.data.Container
 import com.nativebrik.sdk.data.ContainerImpl
 import com.nativebrik.sdk.data.FormRepositoryImpl
 import com.nativebrik.sdk.data.database.NativebrikDbHelper
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 import com.nativebrik.sdk.schema.UIBlock
 import com.nativebrik.sdk.schema.UIRootBlock
@@ -114,12 +114,12 @@ fun NubrickProvider(
 class NubrickClient {
     private val config: Config
     private val db: SQLiteDatabase
-    val user: NativebrikUser
+    val user: NubrickUser
     val experiment: NativebrikExperiment
 
     constructor(config: Config, context: Context) {
         this.config = config
-        this.user = NativebrikUser(context)
+        this.user = NubrickUser(context)
         val helper = NativebrikDbHelper(context)
         this.db = helper.writableDatabase
         this.experiment = NativebrikExperiment(
@@ -152,7 +152,7 @@ class NativebrikExperiment {
 
     internal constructor(
         config: Config,
-        user: NativebrikUser,
+        user: NubrickUser,
         db: SQLiteDatabase,
         context: Context
     ) {

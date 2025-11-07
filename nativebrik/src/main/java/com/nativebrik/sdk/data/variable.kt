@@ -1,6 +1,6 @@
 package com.nativebrik.sdk.data
 
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.schema.BuiltinUserProperty
 import com.nativebrik.sdk.schema.Property
 import kotlinx.serialization.json.JsonArray
@@ -40,7 +40,7 @@ internal fun mergeJsonElements(a: JsonElement?, b: JsonElement?): JsonElement {
 }
 
 internal fun createVariableForTemplate(
-    user: NativebrikUser? = null,
+    user: NubrickUser? = null,
     data: JsonElement? = null,
     properties: List<Property>? = null,
     form: Map<String, JsonElement>? = null,

@@ -16,7 +16,7 @@ class UserAndroidTest {
     fun shouldInitiateUser() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        val user = NativebrikUser(context = appContext, 0)
+        val user = NubrickUser(context = appContext, 0)
         Assert.assertEquals(true, user.id.count() == 36)
         Assert.assertEquals(0.22964408192413588, user.getNormalizedUserRnd(0), 0.0001)
 

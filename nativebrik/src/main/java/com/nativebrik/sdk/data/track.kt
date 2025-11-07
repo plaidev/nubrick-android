@@ -3,7 +3,7 @@ package com.nativebrik.sdk.data
 import android.os.Build
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.VERSION
-import com.nativebrik.sdk.data.user.NativebrikUser
+import com.nativebrik.sdk.data.user.NubrickUser
 import com.nativebrik.sdk.data.user.formatISO8601
 import com.nativebrik.sdk.data.user.getCurrentDate
 import com.nativebrik.sdk.schema.TriggerEventNameDefs
@@ -141,13 +141,13 @@ internal interface TrackRepository {
 internal class TrackRepositoryImpl: TrackRepository {
     private val queueLock: ReentrantLock = ReentrantLock()
     private val config: Config
-    private val user: NativebrikUser
+    private val user: NubrickUser
     private var timer: Timer? = null
     private val maxBatchSize: Int = 50
     private val maxQueueSize: Int = 300
     private var buffer: MutableList<TrackEvent> = mutableListOf()
 
-    internal constructor(config: Config, user: NativebrikUser) {
+    internal constructor(config: Config, user: NubrickUser) {
         this.config = config
         this.user = user
 
