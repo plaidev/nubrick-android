@@ -7,11 +7,11 @@ plugins {
     id("signing")
 }
 
-group = "com.nativebrik"
+group = "io.nubrick"
 version = "0.6.3"
 
 android {
-    namespace = "com.nativebrik.sdk"
+    namespace = "io.nubrick.sdk"
     compileSdk = 36
 
     defaultConfig {
@@ -81,8 +81,8 @@ tasks.register<Jar>("javadocEmptyJar") {
 }
 tasks.register<Zip>("makeArchive") {
     dependsOn("publishMavenPublicationToMavenRepository")
-    from(layout.buildDirectory.dir("repos/com/nativebrik/sdk/$version"))
-    into("com/nativebrik/sdk/$version")
+    from(layout.buildDirectory.dir("repos/io/nubrick/sdk/$version"))
+    into("io/nubrick/sdk/$version")
 }
 
 afterEvaluate {
@@ -96,28 +96,28 @@ afterEvaluate {
                 artifact(tasks["javadocEmptyJar"])
 
                 pom {
-                    name = "Nativebrik SDK"
+                    name = "Nubrick SDK"
                     description =
-                        "Nativebrik is a tool that helps you to build/manage your mobile application."
-                    url = "https://github.com/plaidev/nativebrik-sdk"
+                        "Nubrick is a tool that helps you to build/manage your mobile application."
+                    url = "https://github.com/plaidev/nubrick-android"
                     licenses {
                         license {
                             name = "The Apache License, Version 2.0"
-                            url = "https://github.com/plaidev/nativebrik-sdk/blob/main/LICENSE"
+                            url = "https://github.com/plaidev/nubrick-android/blob/main/LICENSE"
                             distribution = "repo"
                         }
                     }
                     developers {
                         developer {
-                            id = "nativebrik"
-                            name = "nativebrik"
-                            email = "dev.share@nativebrik.com"
+                            id = "nubrick"
+                            name = "nubrick"
+                            email = "dev.share+nubrick@plaid.co.jp"
                         }
                     }
                     scm {
-                        connection = "scm:git:https://github.com/plaidev/nativebrik-sdk.git"
-                        developerConnection = "scm:git:ssh://github.com/plaidev/nativebrik-sdk.git"
-                        url = "https://github.com/plaidev/nativebrik-sdk"
+                        connection = "scm:git:https://github.com/plaidev/nubrick-android.git"
+                        developerConnection = "scm:git:ssh://github.com/plaidev/nubrick-android.git"
+                        url = "https://github.com/plaidev/nubrick-android"
                     }
                 }
             }
