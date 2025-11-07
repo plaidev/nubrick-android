@@ -65,7 +65,7 @@ data class Config(
     val endpoint: Endpoint = Endpoint(),
     val onEvent: ((event: Event) -> Unit)? = null,
     val cachePolicy: CachePolicy = CachePolicy(),
-    val onDispatch: ((event: NativebrikEvent) -> Unit)? = null,
+    val onDispatch: ((event: NubrickEvent) -> Unit)? = null,
     val trackCrashes : Boolean = true,
 )
 
@@ -79,7 +79,7 @@ data class CachePolicy(
     val storage: CacheStorage = CacheStorage.IN_MEMORY,
 )
 
-data class NativebrikEvent(
+data class NubrickEvent(
     val name: String
 )
 
@@ -160,7 +160,7 @@ class NativebrikExperiment {
             config = config.copy(onEvent = { event ->
                 val name = event.name ?: ""
                 if (name.isNotEmpty()) {
-                    this.dispatch(NativebrikEvent(name))
+                    this.dispatch(NubrickEvent(name))
                 }
                 config.onEvent?.let { it(event) }
             }),
@@ -173,7 +173,7 @@ class NativebrikExperiment {
         this.trigger = TriggerViewModel(this.container, user)
     }
 
-    fun dispatch(event: NativebrikEvent) {
+    fun dispatch(event: NubrickEvent) {
         this.trigger.dispatch(event)
     }
 
