@@ -41,26 +41,26 @@ data class Endpoint(
     val track: String = "https://track.nativebrik.com/track/v1",
 )
 
-public enum class EventPropertyType {
+enum class EventPropertyType {
     INTEGER,
     STRING,
     TIMESTAMPZ,
     UNKNOWN
 }
 
-public data class EventProperty(
+data class EventProperty(
     val name: String,
     val value: String,
     val type: EventPropertyType
 )
 
-public data class Event(
+data class Event(
     val name: String?,
     val deepLink: String?,
     val payload: List<EventProperty>?
 )
 
-public data class Config(
+data class Config(
     val projectId: String,
     val endpoint: Endpoint = Endpoint(),
     val onEvent: ((event: Event) -> Unit)? = null,
@@ -69,17 +69,17 @@ public data class Config(
     val trackCrashes : Boolean = true,
 )
 
-public enum class CacheStorage {
+enum class CacheStorage {
     IN_MEMORY
 }
 
-public data class CachePolicy(
+data class CachePolicy(
     val cacheTime: Duration = 24.toDuration(DurationUnit.HOURS),
     val staleTime: Duration = Duration.ZERO,
     val storage: CacheStorage = CacheStorage.IN_MEMORY,
 )
 
-public data class NativebrikEvent(
+data class NativebrikEvent(
     val name: String
 )
 
@@ -87,7 +87,7 @@ internal var LocalNativebrikClient = compositionLocalOf<NubrickClient> {
     error("NativebrikClient is not found")
 }
 
-public object Nativebrik {
+object Nativebrik {
     /**
      * Retrieves the current [NubrickClient] at the call site's position in the hierarchy.
      */
@@ -98,7 +98,7 @@ public object Nativebrik {
 }
 
 @Composable
-public fun NativebrikProvider(
+fun NativebrikProvider(
     client: NubrickClient,
     content: @Composable() () -> Unit
 ) {
@@ -146,7 +146,7 @@ class NubrickClient {
     }
 }
 
-public class NativebrikExperiment {
+class NativebrikExperiment {
     internal val container: Container
     private val trigger: TriggerViewModel
 
@@ -173,21 +173,21 @@ public class NativebrikExperiment {
         this.trigger = TriggerViewModel(this.container, user)
     }
 
-    public fun dispatch(event: NativebrikEvent) {
+    fun dispatch(event: NativebrikEvent) {
         this.trigger.dispatch(event)
     }
 
-    public fun record(throwable: Throwable) {
+    fun record(throwable: Throwable) {
         this.container.record(throwable)
     }
 
     @Composable
-    public fun Overlay() {
+    fun Overlay() {
         Trigger(trigger = this.trigger)
     }
 
     @Composable
-    public fun Embedding(
+    fun Embedding(
         id: String,
         modifier: Modifier = Modifier,
         arguments: Any? = null,
@@ -204,7 +204,7 @@ public class NativebrikExperiment {
     }
 
     @Composable
-    public fun RemoteConfig(id: String, content: @Composable (RemoteConfigLoadingState) -> Unit) {
+    fun RemoteConfig(id: String, content: @Composable (RemoteConfigLoadingState) -> Unit) {
         return com.nativebrik.sdk.remoteconfig.RemoteConfigView(
             container = this.container,
             experimentId = id,
@@ -212,7 +212,7 @@ public class NativebrikExperiment {
         )
     }
 
-    public fun remoteConfig(id: String): com.nativebrik.sdk.remoteconfig.RemoteConfig {
+    fun remoteConfig(id: String): com.nativebrik.sdk.remoteconfig.RemoteConfig {
         return com.nativebrik.sdk.remoteconfig.RemoteConfig(
             container = this.container,
             experimentId = id,
@@ -220,7 +220,10 @@ public class NativebrikExperiment {
     }
 }
 
-public class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
+/**
+ * This is for flutter SDK
+ */
+class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         return client.experiment.container.fetchEmbedding(experimentId, componentId)
     }
