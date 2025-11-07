@@ -1,7 +1,7 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
-import com.nativebrik.sdk.Config
-import com.nativebrik.sdk.schema.UIBlock
+import io.nubrick.sdk.Config
+import io.nubrick.sdk.schema.UIBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json

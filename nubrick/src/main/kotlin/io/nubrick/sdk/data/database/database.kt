@@ -1,15 +1,15 @@
-package com.nativebrik.sdk.data.database
+package io.nubrick.sdk.data.database
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import com.nativebrik.sdk.data.extraction.compareInteger
-import com.nativebrik.sdk.data.user.getToday
-import com.nativebrik.sdk.data.user.getCurrentDate
-import com.nativebrik.sdk.schema.ConditionOperator
-import com.nativebrik.sdk.schema.ExperimentFrequency
-import com.nativebrik.sdk.schema.UserEventFrequencyCondition
-import com.nativebrik.sdk.schema.FrequencyUnit
+import io.nubrick.sdk.data.extraction.compareInteger
+import io.nubrick.sdk.data.user.getToday
+import io.nubrick.sdk.data.user.getCurrentDate
+import io.nubrick.sdk.schema.ConditionOperator
+import io.nubrick.sdk.schema.ExperimentFrequency
+import io.nubrick.sdk.schema.UserEventFrequencyCondition
+import io.nubrick.sdk.schema.FrequencyUnit
 
 internal interface DatabaseRepository {
     fun appendUserEvent(name: String)

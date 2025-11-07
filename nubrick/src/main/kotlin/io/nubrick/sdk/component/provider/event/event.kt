@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.provider.event
+package io.nubrick.sdk.component.provider.event
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -23,10 +23,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import com.nativebrik.sdk.component.provider.container.ContainerContext
-import com.nativebrik.sdk.component.provider.data.DataContext
-import com.nativebrik.sdk.data.FormValueListener
-import com.nativebrik.sdk.schema.UIBlockEventDispatcher
+import io.nubrick.sdk.component.provider.container.ContainerContext
+import io.nubrick.sdk.component.provider.data.DataContext
+import io.nubrick.sdk.data.FormValueListener
+import io.nubrick.sdk.schema.UIBlockEventDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

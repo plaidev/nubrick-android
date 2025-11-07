@@ -1,11 +1,11 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.nativebrik.sdk.schema.CollectionKind
-import com.nativebrik.sdk.schema.UIBlock
+import io.nubrick.sdk.schema.CollectionKind
+import io.nubrick.sdk.schema.UIBlock
 
 @Composable
 internal fun Block(

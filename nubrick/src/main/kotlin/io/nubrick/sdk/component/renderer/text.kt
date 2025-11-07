@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.BasicText
@@ -12,17 +12,17 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import com.nativebrik.sdk.component.provider.data.DataContext
-import com.nativebrik.sdk.component.provider.event.eventDispatcher
-import com.nativebrik.sdk.component.provider.event.skeleton
-import com.nativebrik.sdk.schema.Color
-import com.nativebrik.sdk.schema.FontDesign
-import com.nativebrik.sdk.schema.FontWeight
-import com.nativebrik.sdk.schema.TextAlign
-import com.nativebrik.sdk.schema.UITextBlock
-import com.nativebrik.sdk.template.compile
-import com.nativebrik.sdk.template.hasPlaceholder
-import com.nativebrik.sdk.vendor.blurhash.BlurHashDecoder
+import io.nubrick.sdk.component.provider.data.DataContext
+import io.nubrick.sdk.component.provider.event.eventDispatcher
+import io.nubrick.sdk.component.provider.event.skeleton
+import io.nubrick.sdk.schema.Color
+import io.nubrick.sdk.schema.FontDesign
+import io.nubrick.sdk.schema.FontWeight
+import io.nubrick.sdk.schema.TextAlign
+import io.nubrick.sdk.schema.UITextBlock
+import io.nubrick.sdk.template.compile
+import io.nubrick.sdk.template.hasPlaceholder
+import io.nubrick.sdk.vendor.blurhash.BlurHashDecoder
 import androidx.compose.ui.graphics.Color as PrimitiveColor
 import androidx.compose.ui.text.font.FontFamily as PrimitiveFontFamily
 import androidx.compose.ui.text.font.FontWeight as PrimitiveFontWeight

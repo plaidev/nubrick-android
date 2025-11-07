@@ -1,11 +1,11 @@
-package com.nativebrik.sdk.data.user
+package io.nubrick.sdk.data.user
 
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
-import com.nativebrik.sdk.VERSION
-import com.nativebrik.sdk.schema.BuiltinUserProperty
-import com.nativebrik.sdk.schema.UserPropertyType
+import io.nubrick.sdk.VERSION
+import io.nubrick.sdk.schema.BuiltinUserProperty
+import io.nubrick.sdk.schema.UserPropertyType
 import java.net.HttpURLConnection
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -21,7 +21,7 @@ import kotlin.random.Random
 
 internal fun getNativebrikUserSharedPreferences(context: Context): SharedPreferences? {
     return context.getSharedPreferences(
-        context.packageName + ".nativebrik.com.user",
+        context.packageName + ".nubrik.io.user",
         Context.MODE_PRIVATE
     )
 }

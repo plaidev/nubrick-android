@@ -1,14 +1,14 @@
-package com.nativebrik.sdk.data.extraction
+package io.nubrick.sdk.data.extraction
 
-import com.nativebrik.sdk.data.user.UserProperty
-import com.nativebrik.sdk.data.user.getCurrentDate
-import com.nativebrik.sdk.schema.ConditionOperator
-import com.nativebrik.sdk.schema.ExperimentCondition
-import com.nativebrik.sdk.schema.ExperimentConfig
-import com.nativebrik.sdk.schema.ExperimentConfigs
-import com.nativebrik.sdk.schema.ExperimentFrequency
-import com.nativebrik.sdk.schema.ExperimentVariant
-import com.nativebrik.sdk.schema.UserEventFrequencyCondition
+import io.nubrick.sdk.data.user.UserProperty
+import io.nubrick.sdk.data.user.getCurrentDate
+import io.nubrick.sdk.schema.ConditionOperator
+import io.nubrick.sdk.schema.ExperimentCondition
+import io.nubrick.sdk.schema.ExperimentConfig
+import io.nubrick.sdk.schema.ExperimentConfigs
+import io.nubrick.sdk.schema.ExperimentFrequency
+import io.nubrick.sdk.schema.ExperimentVariant
+import io.nubrick.sdk.schema.UserEventFrequencyCondition
 
 internal fun extractComponentId(variant: ExperimentVariant): String? {
     val configs = variant.configs ?: return null

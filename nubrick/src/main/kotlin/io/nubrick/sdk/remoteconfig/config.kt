@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.remoteconfig
+package io.nubrick.sdk.remoteconfig
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -6,12 +6,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.nativebrik.sdk.Event
-import com.nativebrik.sdk.component.Embedding
-import com.nativebrik.sdk.component.EmbeddingLoadingState
-import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.NotFoundException
-import com.nativebrik.sdk.schema.ExperimentVariant
+import io.nubrick.sdk.Event
+import io.nubrick.sdk.component.Embedding
+import io.nubrick.sdk.component.EmbeddingLoadingState
+import io.nubrick.sdk.data.Container
+import io.nubrick.sdk.data.NotFoundException
+import io.nubrick.sdk.schema.ExperimentVariant
 
 sealed class RemoteConfigLoadingState {
     class Loading(): RemoteConfigLoadingState()

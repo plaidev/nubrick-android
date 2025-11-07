@@ -1,10 +1,10 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.nativebrik.sdk.schema.UIPageBlock
+import io.nubrick.sdk.schema.UIPageBlock
 
 @Composable
 internal fun Page(

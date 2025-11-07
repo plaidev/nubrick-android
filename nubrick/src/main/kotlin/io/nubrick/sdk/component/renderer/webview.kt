@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import android.annotation.SuppressLint
 import android.webkit.WebView

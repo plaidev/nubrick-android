@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.provider.data
+package io.nubrick.sdk.component.provider.data
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -10,10 +10,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import com.nativebrik.sdk.component.provider.container.ContainerContext
-import com.nativebrik.sdk.component.provider.pageblock.PageBlockContext
-import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.schema.ApiHttpRequest
+import io.nubrick.sdk.component.provider.container.ContainerContext
+import io.nubrick.sdk.component.provider.pageblock.PageBlockContext
+import io.nubrick.sdk.data.Container
+import io.nubrick.sdk.schema.ApiHttpRequest
 import kotlinx.serialization.json.JsonElement
 
 private var LocalData = compositionLocalOf<DataState> {

@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
@@ -16,11 +16,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.nativebrik.sdk.component.provider.data.DataContext
-import com.nativebrik.sdk.component.provider.data.NestedDataProvider
-import com.nativebrik.sdk.schema.FlexDirection
-import com.nativebrik.sdk.schema.UICollectionBlock
-import com.nativebrik.sdk.template.variableByPath
+import io.nubrick.sdk.component.provider.data.DataContext
+import io.nubrick.sdk.component.provider.data.NestedDataProvider
+import io.nubrick.sdk.schema.FlexDirection
+import io.nubrick.sdk.schema.UICollectionBlock
+import io.nubrick.sdk.template.variableByPath
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray

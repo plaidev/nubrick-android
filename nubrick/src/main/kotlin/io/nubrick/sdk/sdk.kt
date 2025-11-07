@@ -1,4 +1,4 @@
-package com.nativebrik.sdk
+package io.nubrick.sdk
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -12,21 +12,21 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.nativebrik.sdk.component.Embedding
-import com.nativebrik.sdk.component.EmbeddingLoadingState
-import com.nativebrik.sdk.component.Root
-import com.nativebrik.sdk.component.Trigger
-import com.nativebrik.sdk.component.TriggerViewModel
-import com.nativebrik.sdk.component.bridge.UIBlockEventBridgeViewModel
-import com.nativebrik.sdk.data.CacheStore
-import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.ContainerImpl
-import com.nativebrik.sdk.data.FormRepositoryImpl
-import com.nativebrik.sdk.data.database.NubrickDbHelper
-import com.nativebrik.sdk.data.user.NubrickUser
-import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
-import com.nativebrik.sdk.schema.UIBlock
-import com.nativebrik.sdk.schema.UIRootBlock
+import io.nubrick.sdk.component.Embedding
+import io.nubrick.sdk.component.EmbeddingLoadingState
+import io.nubrick.sdk.component.Root
+import io.nubrick.sdk.component.Trigger
+import io.nubrick.sdk.component.TriggerViewModel
+import io.nubrick.sdk.component.bridge.UIBlockEventBridgeViewModel
+import io.nubrick.sdk.data.CacheStore
+import io.nubrick.sdk.data.Container
+import io.nubrick.sdk.data.ContainerImpl
+import io.nubrick.sdk.data.FormRepositoryImpl
+import io.nubrick.sdk.data.database.NubrickDbHelper
+import io.nubrick.sdk.data.user.NubrickUser
+import io.nubrick.sdk.remoteconfig.RemoteConfigLoadingState
+import io.nubrick.sdk.schema.UIBlock
+import io.nubrick.sdk.schema.UIRootBlock
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -205,7 +205,7 @@ class NubrickExperiment {
 
     @Composable
     fun RemoteConfig(id: String, content: @Composable (RemoteConfigLoadingState) -> Unit) {
-        return com.nativebrik.sdk.remoteconfig.RemoteConfigView(
+        return io.nubrick.sdk.remoteconfig.RemoteConfigView(
             container = this.container,
             experimentId = id,
             content = content
@@ -213,8 +213,8 @@ class NubrickExperiment {
     }
 
     // This is for flutter SDK
-    fun remoteConfig(id: String): com.nativebrik.sdk.remoteconfig.RemoteConfig {
-        return com.nativebrik.sdk.remoteconfig.RemoteConfig(
+    fun remoteConfig(id: String): io.nubrick.sdk.remoteconfig.RemoteConfig {
+        return io.nubrick.sdk.remoteconfig.RemoteConfig(
             container = this.container,
             experimentId = id,
         )

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.nativebrik.example"
+    namespace = "io.nubrick.example"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.nativebrik.example"
+        applicationId = "io.nubrick.example"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.template
+package io.nubrick.sdk.template
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

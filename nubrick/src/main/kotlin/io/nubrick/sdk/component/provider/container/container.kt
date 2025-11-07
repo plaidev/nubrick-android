@@ -1,10 +1,10 @@
-package com.nativebrik.sdk.component.provider.container
+package io.nubrick.sdk.component.provider.container
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
-import com.nativebrik.sdk.data.Container
+import io.nubrick.sdk.data.Container
 
 
 private var LocalContainer = compositionLocalOf<Container> {

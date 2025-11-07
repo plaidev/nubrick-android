@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import android.os.Build
 import android.window.OnBackInvokedDispatcher
@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.nativebrik.sdk.schema.UIPageBlock
+import io.nubrick.sdk.schema.UIPageBlock
 
 @Composable
 internal fun ModalBottomSheetBackHandler(handler: () -> Unit) {

@@ -1,12 +1,12 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
 import android.os.Build
-import com.nativebrik.sdk.Config
-import com.nativebrik.sdk.VERSION
-import com.nativebrik.sdk.data.user.NubrickUser
-import com.nativebrik.sdk.data.user.formatISO8601
-import com.nativebrik.sdk.data.user.getCurrentDate
-import com.nativebrik.sdk.schema.TriggerEventNameDefs
+import io.nubrick.sdk.Config
+import io.nubrick.sdk.VERSION
+import io.nubrick.sdk.data.user.NubrickUser
+import io.nubrick.sdk.data.user.formatISO8601
+import io.nubrick.sdk.data.user.getCurrentDate
+import io.nubrick.sdk.schema.TriggerEventNameDefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -259,7 +259,7 @@ internal class TrackRepositoryImpl: TrackRepository {
 
         while (currentException != null && counter < 20) {
             val stackFrames = currentException.stackTrace
-            val nativebrikFrames = stackFrames.filter { it.className.contains("com.nativebrik.sdk") || it.className.contains("package:nativebrik_bridge") }
+            val nativebrikFrames = stackFrames.filter { it.className.contains("io.nubrick.sdk") || it.className.contains("package:nativebrik_bridge") }
             if (nativebrikFrames.isNotEmpty()) {
                 exceptionsList.add(ExceptionRecord(
                     type = currentException::class.simpleName,

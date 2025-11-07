@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,13 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import com.nativebrik.sdk.component.provider.container.ContainerContext
-import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.FormValue
-import com.nativebrik.sdk.schema.UIMultiSelectInputBlock
-import com.nativebrik.sdk.schema.UISelectInputBlock
-import com.nativebrik.sdk.schema.UISelectInputBlockData
-import com.nativebrik.sdk.schema.UISelectInputOption
+import io.nubrick.sdk.component.provider.container.ContainerContext
+import io.nubrick.sdk.data.Container
+import io.nubrick.sdk.data.FormValue
+import io.nubrick.sdk.schema.UIMultiSelectInputBlock
+import io.nubrick.sdk.schema.UISelectInputBlock
+import io.nubrick.sdk.schema.UISelectInputBlockData
+import io.nubrick.sdk.schema.UISelectInputOption
 
 internal const val NONE_VALUE = ""
 internal const val NONE_LABEL = "None"

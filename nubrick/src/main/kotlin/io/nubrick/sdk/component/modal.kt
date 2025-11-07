@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component
+package io.nubrick.sdk.component
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
@@ -6,9 +6,9 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.nativebrik.sdk.component.provider.pageblock.PageBlockData
-import com.nativebrik.sdk.schema.ModalPresentationStyle
-import com.nativebrik.sdk.schema.ModalScreenSize
+import io.nubrick.sdk.component.provider.pageblock.PageBlockData
+import io.nubrick.sdk.schema.ModalPresentationStyle
+import io.nubrick.sdk.schema.ModalScreenSize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

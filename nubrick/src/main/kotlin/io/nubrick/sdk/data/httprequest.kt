@@ -1,7 +1,7 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
-import com.nativebrik.sdk.schema.ApiHttpRequest
-import com.nativebrik.sdk.schema.ApiHttpRequestMethod
+import io.nubrick.sdk.schema.ApiHttpRequest
+import io.nubrick.sdk.schema.ApiHttpRequestMethod
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json

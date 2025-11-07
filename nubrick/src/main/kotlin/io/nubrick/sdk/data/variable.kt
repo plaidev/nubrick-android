@@ -1,8 +1,8 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
-import com.nativebrik.sdk.data.user.NubrickUser
-import com.nativebrik.sdk.schema.BuiltinUserProperty
-import com.nativebrik.sdk.schema.Property
+import io.nubrick.sdk.data.user.NubrickUser
+import io.nubrick.sdk.schema.BuiltinUserProperty
+import io.nubrick.sdk.schema.Property
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull

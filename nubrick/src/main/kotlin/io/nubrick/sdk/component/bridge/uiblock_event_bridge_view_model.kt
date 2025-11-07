@@ -1,12 +1,12 @@
-package com.nativebrik.sdk.component.bridge
+package io.nubrick.sdk.component.bridge
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.ViewModel
-import com.nativebrik.sdk.component.provider.container.ContainerContext
-import com.nativebrik.sdk.component.provider.data.DataContext
-import com.nativebrik.sdk.component.provider.event.LocalEventListener
-import com.nativebrik.sdk.schema.UIBlockEventDispatcher
+import io.nubrick.sdk.component.provider.container.ContainerContext
+import io.nubrick.sdk.component.provider.data.DataContext
+import io.nubrick.sdk.component.provider.event.LocalEventListener
+import io.nubrick.sdk.schema.UIBlockEventDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope

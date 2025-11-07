@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
@@ -8,14 +8,14 @@ import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import com.nativebrik.sdk.component.provider.data.DataContext
-import com.nativebrik.sdk.component.provider.event.eventDispatcher
-import com.nativebrik.sdk.component.provider.event.skeleton
-import com.nativebrik.sdk.schema.ImageContentMode
-import com.nativebrik.sdk.schema.UIImageBlock
-import com.nativebrik.sdk.template.compile
-import com.nativebrik.sdk.template.hasPlaceholder
-import com.nativebrik.sdk.vendor.blurhash.BlurHashDecoder
+import io.nubrick.sdk.component.provider.data.DataContext
+import io.nubrick.sdk.component.provider.event.eventDispatcher
+import io.nubrick.sdk.component.provider.event.skeleton
+import io.nubrick.sdk.schema.ImageContentMode
+import io.nubrick.sdk.schema.UIImageBlock
+import io.nubrick.sdk.template.compile
+import io.nubrick.sdk.template.hasPlaceholder
+import io.nubrick.sdk.vendor.blurhash.BlurHashDecoder
 
 internal data class ImageFallback(
     val blurhash: String,

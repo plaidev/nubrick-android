@@ -1,24 +1,24 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
-import com.nativebrik.sdk.Config
-import com.nativebrik.sdk.Event
-import com.nativebrik.sdk.NubrickEvent
-import com.nativebrik.sdk.data.database.DatabaseRepository
-import com.nativebrik.sdk.data.database.DatabaseRepositoryImpl
-import com.nativebrik.sdk.data.extraction.extractComponentId
-import com.nativebrik.sdk.data.extraction.extractExperimentConfig
-import com.nativebrik.sdk.data.extraction.extractExperimentVariant
-import com.nativebrik.sdk.data.user.NubrickUser
-import com.nativebrik.sdk.schema.ApiHttpHeader
-import com.nativebrik.sdk.schema.ApiHttpRequest
-import com.nativebrik.sdk.schema.ExperimentConfigs
-import com.nativebrik.sdk.schema.ExperimentKind
-import com.nativebrik.sdk.schema.ExperimentVariant
-import com.nativebrik.sdk.schema.Property
-import com.nativebrik.sdk.schema.UIBlock
-import com.nativebrik.sdk.template.compile
+import io.nubrick.sdk.Config
+import io.nubrick.sdk.Event
+import io.nubrick.sdk.NubrickEvent
+import io.nubrick.sdk.data.database.DatabaseRepository
+import io.nubrick.sdk.data.database.DatabaseRepositoryImpl
+import io.nubrick.sdk.data.extraction.extractComponentId
+import io.nubrick.sdk.data.extraction.extractExperimentConfig
+import io.nubrick.sdk.data.extraction.extractExperimentVariant
+import io.nubrick.sdk.data.user.NubrickUser
+import io.nubrick.sdk.schema.ApiHttpHeader
+import io.nubrick.sdk.schema.ApiHttpRequest
+import io.nubrick.sdk.schema.ExperimentConfigs
+import io.nubrick.sdk.schema.ExperimentKind
+import io.nubrick.sdk.schema.ExperimentVariant
+import io.nubrick.sdk.schema.Property
+import io.nubrick.sdk.schema.UIBlock
+import io.nubrick.sdk.template.compile
 import kotlinx.serialization.json.JsonElement
 
 class NotFoundException : Exception("Not found")

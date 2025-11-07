@@ -1,12 +1,12 @@
-package com.nativebrik.sdk.data.database
+package io.nubrick.sdk.data.database
 
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import android.provider.BaseColumns
-import com.nativebrik.sdk.data.user.formatISO8601
-import com.nativebrik.sdk.data.user.getCurrentDate
-import com.nativebrik.sdk.schema.DateTime
-import com.nativebrik.sdk.schema.FrequencyUnit
+import io.nubrick.sdk.data.user.formatISO8601
+import io.nubrick.sdk.data.user.getCurrentDate
+import io.nubrick.sdk.schema.DateTime
+import io.nubrick.sdk.schema.FrequencyUnit
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneOffset

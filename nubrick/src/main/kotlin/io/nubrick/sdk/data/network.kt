@@ -1,6 +1,6 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
-import com.nativebrik.sdk.data.user.syncDateFromHttpResponse
+import io.nubrick.sdk.data.user.syncDateFromHttpResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

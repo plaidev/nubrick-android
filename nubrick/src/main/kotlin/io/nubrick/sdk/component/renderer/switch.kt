@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component.renderer
+package io.nubrick.sdk.component.renderer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -6,9 +6,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.nativebrik.sdk.component.provider.container.ContainerContext
-import com.nativebrik.sdk.data.FormValue
-import com.nativebrik.sdk.schema.UISwitchInputBlock
+import io.nubrick.sdk.component.provider.container.ContainerContext
+import io.nubrick.sdk.data.FormValue
+import io.nubrick.sdk.schema.UISwitchInputBlock
 import androidx.compose.material3.Switch as MaterialSwitch
 
 @Composable

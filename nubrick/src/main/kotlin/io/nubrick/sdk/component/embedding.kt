@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component
+package io.nubrick.sdk.component
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -16,10 +16,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.nativebrik.sdk.Event
-import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.NotFoundException
-import com.nativebrik.sdk.schema.UIBlock
+import io.nubrick.sdk.Event
+import io.nubrick.sdk.data.Container
+import io.nubrick.sdk.data.NotFoundException
+import io.nubrick.sdk.schema.UIBlock
 
 sealed class EmbeddingLoadingState {
     class Loading(): EmbeddingLoadingState()

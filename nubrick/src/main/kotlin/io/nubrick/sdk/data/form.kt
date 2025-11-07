@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

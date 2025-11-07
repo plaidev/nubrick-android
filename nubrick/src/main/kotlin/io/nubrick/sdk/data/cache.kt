@@ -1,7 +1,7 @@
-package com.nativebrik.sdk.data
+package io.nubrick.sdk.data
 
-import com.nativebrik.sdk.CachePolicy
-import com.nativebrik.sdk.data.user.getCurrentDate
+import io.nubrick.sdk.CachePolicy
+import io.nubrick.sdk.data.user.getCurrentDate
 import java.time.ZonedDateTime
 import java.util.concurrent.locks.ReentrantReadWriteLock
 

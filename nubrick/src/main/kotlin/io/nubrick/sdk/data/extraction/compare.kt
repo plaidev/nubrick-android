@@ -1,8 +1,8 @@
-package com.nativebrik.sdk.data.extraction
+package io.nubrick.sdk.data.extraction
 
-import com.nativebrik.sdk.data.user.UserProperty
-import com.nativebrik.sdk.schema.ConditionOperator
-import com.nativebrik.sdk.schema.UserPropertyType
+import io.nubrick.sdk.data.user.UserProperty
+import io.nubrick.sdk.schema.ConditionOperator
+import io.nubrick.sdk.schema.UserPropertyType
 import java.time.ZonedDateTime
 import java.util.Locale
 import java.util.regex.Pattern

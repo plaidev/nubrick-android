@@ -1,4 +1,4 @@
-package com.nativebrik.sdk.component
+package io.nubrick.sdk.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -11,13 +11,13 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
-import com.nativebrik.sdk.NubrickEvent
-import com.nativebrik.sdk.data.Container
-import com.nativebrik.sdk.data.user.NubrickUser
-import com.nativebrik.sdk.data.user.getNativebrikUserSharedPreferences
-import com.nativebrik.sdk.schema.TriggerEventNameDefs
-import com.nativebrik.sdk.schema.UIBlock
-import com.nativebrik.sdk.schema.UIRootBlock
+import io.nubrick.sdk.NubrickEvent
+import io.nubrick.sdk.data.Container
+import io.nubrick.sdk.data.user.NubrickUser
+import io.nubrick.sdk.data.user.getNativebrikUserSharedPreferences
+import io.nubrick.sdk.schema.TriggerEventNameDefs
+import io.nubrick.sdk.schema.UIBlock
+import io.nubrick.sdk.schema.UIRootBlock
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
