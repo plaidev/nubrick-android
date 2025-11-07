@@ -14,7 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.nativebrik.e2e.ui.theme.NativebrikAndroidTheme
+import com.nativebrik.e2e.ui.theme.NubrickAndroidTheme
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.Nubrick
 import com.nativebrik.sdk.NubrickClient
@@ -23,19 +23,19 @@ import com.nativebrik.sdk.component.EmbeddingLoadingState
 import com.nativebrik.sdk.remoteconfig.RemoteConfigLoadingState
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nativebrik: NubrickClient
+    private lateinit var nubrick: NubrickClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.nativebrik = NubrickClient(
+        this.nubrick = NubrickClient(
             config = Config(projectId = "ckto7v223akg00ag3jsg"),
             context = this.applicationContext,
         )
 
         setContent {
-            NativebrikAndroidTheme {
+            NubrickAndroidTheme {
                 // A surface container using the 'background' color from the theme
-                NubrickProvider(client = nativebrik) {
+                NubrickProvider(client = nubrick) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background

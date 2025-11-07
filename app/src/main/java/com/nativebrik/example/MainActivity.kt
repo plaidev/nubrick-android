@@ -15,25 +15,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.nativebrik.example.ui.theme.NativebrikAndroidTheme
+import com.nativebrik.example.ui.theme.NubrickAndroidTheme
 import com.nativebrik.sdk.Config
 import com.nativebrik.sdk.Nubrick
 import com.nativebrik.sdk.NubrickClient
 import com.nativebrik.sdk.NubrickProvider
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nativebrik: NubrickClient
+    private lateinit var nubrick: NubrickClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.nativebrik = NubrickClient(
+        this.nubrick = NubrickClient(
             config = Config(projectId = "cgv3p3223akg00fod19g"),
             context = this.applicationContext,
         )
 
         setContent {
-            NativebrikAndroidTheme {
-                NubrickProvider(client = nativebrik) {
+            NubrickAndroidTheme {
+                NubrickProvider(client = nubrick) {
                     // A surface container using the 'background' color from the theme
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        this.nativebrik.close()
+        this.nubrick.close()
         super.onDestroy()
     }
 }
@@ -76,7 +76,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
-    NativebrikAndroidTheme {
+    NubrickAndroidTheme {
         Greeting("Android")
     }
 }
