@@ -63,6 +63,7 @@ import io.nubrick.sdk.schema.UIRootBlock
 import io.nubrick.sdk.template.compile
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 
 private fun parseUIEventToEvent(event: UIBlockEventDispatcher): Event {
     return Event(
@@ -83,6 +84,11 @@ private fun parseUIEventToEvent(event: UIBlockEventDispatcher): Event {
     )
 }
 
+internal data class WebviewData(
+    val url: String,
+    val trigger: UIBlockEventDispatcher?,
+) {}
+
 internal class RootViewModel(
     private val root: UIRootBlock,
     private val modalViewModel: ModalViewModel,
@@ -93,7 +99,7 @@ internal class RootViewModel(
 ) : ViewModel() {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
-    val webviewUrl = mutableStateOf("")
+    val webviewData = mutableStateOf<WebviewData?>(null)
 
     // We use them for sdk bridge between flutter <-> android.
     val currentPageBlock = mutableStateOf<UIPageBlock?>(null)
@@ -150,7 +156,10 @@ internal class RootViewModel(
         }
 
         if (destBlock.data?.kind == PageKind.WEBVIEW_MODAL) {
-            this.webviewUrl.value = destBlock.data.webviewUrl ?: ""
+            this.webviewData.value = WebviewData(
+                url = destBlock.data.webviewUrl ?: "",
+                trigger = destBlock.data.triggerSetting?.onTrigger
+            )
             return
         }
 
@@ -190,7 +199,7 @@ internal class RootViewModel(
     }
 
     fun handleWebviewDismiss() {
-        this.webviewUrl.value = ""
+        this.webviewData.value = null
     }
 }
 
@@ -287,6 +296,11 @@ internal fun Root(
             container.handleEvent(e)
         }
     }
+    LaunchedEffect(Unit) {
+        modalViewModel.setOnTrigger { trigger, data ->
+            listener(trigger, data)
+        }
+    }
 
     val currentPageBlock = viewModel.currentPageBlock.value
     val displayedPageBlock = viewModel.displayedPageBlock.value
@@ -321,7 +335,7 @@ internal fun Root(
 
                 if (modalState.modalVisibility) {
                     BackHandler(true) {
-                        modalViewModel.back()
+                        modalViewModel.back(JsonNull)
                     }
                     val isLarge =
                         modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
@@ -340,7 +354,7 @@ internal fun Root(
                         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
                     ) {
                         ModalBottomSheetBackHandler {
-                            modalViewModel.back()
+                            modalViewModel.back(JsonNull)
                         }
                         Column(
                             modifier = if (modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN) {
@@ -373,7 +387,7 @@ internal fun Root(
                                     it,
                                     stack.block,
                                     onClose = { modalViewModel.close() },
-                                    onBack = { modalViewModel.back() },
+                                    onBack = { modalViewModel.back(JsonNull) },
                                     isFullscreen,
                                 )
                                 ModalPage(
@@ -388,7 +402,7 @@ internal fun Root(
                     }
                 }
 
-                if (viewModel.webviewUrl.value.isNotEmpty()) {
+                if (viewModel.webviewData.value != null) {
                     Dialog(
                         properties = DialogProperties(
                             usePlatformDefaultWidth = true,
@@ -406,8 +420,11 @@ internal fun Root(
                                 .background(Color.LightGray)
                         ) {
                             WebViewPage(
-                                url = viewModel.webviewUrl.value,
+                                url = viewModel.webviewData.value?.url ?: "",
                                 onDismiss = {
+                                    viewModel.webviewData.value?.trigger?.let { trigger ->
+                                        listener(trigger, JsonNull)
+                                    }
                                     viewModel.handleWebviewDismiss()
                                 },
                                 modifier = Modifier
