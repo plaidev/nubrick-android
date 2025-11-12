@@ -11,7 +11,7 @@ group = "io.nubrick"
 version = "0.7.0"
 
 android {
-    namespace = "io.nubrick.sdk"
+    namespace = "io.nubrick.nubrick"
     compileSdk = 36
 
     defaultConfig {
@@ -81,8 +81,8 @@ tasks.register<Jar>("javadocEmptyJar") {
 }
 tasks.register<Zip>("makeArchive") {
     dependsOn("publishMavenPublicationToMavenRepository")
-    from(layout.buildDirectory.dir("repos/io/nubrick/sdk/$version"))
-    into("io/nubrick/sdk/$version")
+    from(layout.buildDirectory.dir("repos/io/nubrick/nubrick/$version"))
+    into("io/nubrick/nubrick/$version")
 }
 
 afterEvaluate {
@@ -90,7 +90,7 @@ afterEvaluate {
         publications {
             register<MavenPublication>("maven") {
                 groupId = project.group as String
-                artifactId = "sdk"
+                artifactId = "nubrick"
                 version = project.version as String
                 from(components["release"])
                 artifact(tasks["javadocEmptyJar"])

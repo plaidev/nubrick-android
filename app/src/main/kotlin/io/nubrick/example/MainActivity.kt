@@ -16,10 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.nubrick.example.ui.theme.NubrickAndroidTheme
-import io.nubrick.sdk.Config
-import io.nubrick.sdk.Nubrick
-import io.nubrick.sdk.NubrickClient
-import io.nubrick.sdk.NubrickProvider
+import io.nubrick.nubrick.Config
+import io.nubrick.nubrick.Nubrick
+import io.nubrick.nubrick.NubrickClient
+import io.nubrick.nubrick.NubrickProvider
 
 class MainActivity : ComponentActivity() {
     private lateinit var nubrick: NubrickClient
