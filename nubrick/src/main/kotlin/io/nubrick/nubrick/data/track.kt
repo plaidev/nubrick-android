@@ -99,7 +99,8 @@ internal data class TrackEventMeta(
     val appVersion: String?,
     val osName: String?,
     val osVersion: String?,
-    val sdkVersion: String?
+    val sdkVersion: String?,
+    val platform: String? = "android"
 ) {
     fun encode(): JsonObject {
         return JsonObject(mapOf(
@@ -108,6 +109,7 @@ internal data class TrackEventMeta(
             "osName" to JsonPrimitive(this.osName),
             "osVersion" to JsonPrimitive(this.osVersion),
             "sdkVersion" to JsonPrimitive(this.sdkVersion),
+            "platform" to JsonPrimitive(this.platform),
         ))
     }
 }
@@ -233,7 +235,12 @@ internal class TrackRepositoryImpl: TrackRepository {
             return // in case there was exception in json decoding we stop here
         }
 
-        val causedByNubrick = exceptionsList.isNotEmpty() //if list is empty all exceptions were filtered out so not from nubrick
+        val causedByNubrick = exceptionsList.any { exception ->
+            exception.callStacks.orEmpty().any { frame ->
+                frame.className?.contains("io.nubrick.nubrick") ?: false ||
+                frame.className?.contains("package:nativebrik_bridge") ?: false
+            }
+        }
 
         this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
             name = TriggerEventNameDefs.N_ERROR_RECORD.name
@@ -259,22 +266,18 @@ internal class TrackRepositoryImpl: TrackRepository {
 
         while (currentException != null && counter < 20) {
             val stackFrames = currentException.stackTrace
-            val nubrickFrames = stackFrames.filter { it.className.contains("io.nubrick.nubrick") || it.className.contains("package:nativebrik_bridge") }
-            if (nubrickFrames.isNotEmpty()) {
-                exceptionsList.add(ExceptionRecord(
-                    type = currentException::class.simpleName,
-                    message = currentException.message,
-                    callStacks = nubrickFrames.map {
-                        StackFrame(
-                            fileName = it.fileName,
-                            className = it.className,
-                            methodName = it.methodName,
-                            lineNumber = it.lineNumber
-                        )
-                    }
-                )
-                )
-            }
+            exceptionsList.add(ExceptionRecord(
+                type = currentException::class.simpleName,
+                message = currentException.message,
+                callStacks = stackFrames.map {
+                    StackFrame(
+                        fileName = it.fileName,
+                        className = it.className,
+                        methodName = it.methodName,
+                        lineNumber = if (it.lineNumber >= 0) it.lineNumber else null
+                    )
+                }
+            ))
             currentException = currentException.cause
             counter ++
         }
