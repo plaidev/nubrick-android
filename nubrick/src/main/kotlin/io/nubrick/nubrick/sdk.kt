@@ -22,6 +22,7 @@ import io.nubrick.nubrick.data.CacheStore
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
 import io.nubrick.nubrick.data.FormRepositoryImpl
+import io.nubrick.nubrick.data.TrackCrashEvent
 import io.nubrick.nubrick.data.database.NubrickDbHelper
 import io.nubrick.nubrick.data.user.NubrickUser
 import io.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
@@ -33,6 +34,14 @@ import kotlinx.serialization.json.Json
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
+
+@RequiresOptIn(
+    message = "This API is internal to the Flutter bridge and should not be used directly.",
+    level = RequiresOptIn.Level.ERROR
+)
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+annotation class FlutterBridgeApi
 
 const val VERSION = BuildConfig.VERSION_NAME
 
@@ -133,7 +142,7 @@ class NubrickClient {
             val existingHandler = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
                 try {
-                    this.experiment.record(throwable)
+                    this.experiment.storeNativeCrash(throwable)
                 } finally {
                     existingHandler?.uncaughtException(thread, throwable)
                 }
@@ -177,8 +186,18 @@ class NubrickExperiment {
         this.trigger.dispatch(event)
     }
 
-    fun record(throwable: Throwable) {
-        this.container.record(throwable)
+    fun storeNativeCrash(throwable: Throwable) {
+        this.container.storeNativeCrash(throwable)
+    }
+
+    /**
+     * Reports a crash event
+     *
+     * @param crashEvent The crash event containing exceptions, platform, and SDK version
+     */
+    @FlutterBridgeApi
+    fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
+        this.container.sendFlutterCrash(crashEvent)
     }
 
     @Composable
@@ -224,6 +243,7 @@ class NubrickExperiment {
 /**
  * This is for flutter SDK
  */
+@FlutterBridgeApi
 class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         return client.experiment.container.fetchEmbedding(experimentId, componentId)

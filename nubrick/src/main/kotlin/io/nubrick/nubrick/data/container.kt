@@ -51,7 +51,8 @@ internal interface Container {
     suspend fun fetchTooltip(trigger: String): Result<UIBlock>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
 
-    fun record(throwable: Throwable)
+    fun storeNativeCrash(throwable: Throwable)
+    fun sendFlutterCrash(crashEvent: TrackCrashEvent)
     fun handleNubrickEvent(it: NubrickEvent)
 }
 
@@ -287,8 +288,12 @@ internal class ContainerImpl(
         return Result.success(experimentId to variant)
     }
 
-    override fun record(throwable: Throwable) {
-        this.trackRepository.record(throwable)
+    override fun storeNativeCrash(throwable: Throwable) {
+        this.trackRepository.storeNativeCrash(throwable)
+    }
+
+    override fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
+        this.trackRepository.sendFlutterCrash(crashEvent)
     }
 
     override fun handleNubrickEvent(it: NubrickEvent) {

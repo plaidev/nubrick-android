@@ -2,6 +2,7 @@ package io.nubrick.nubrick.data
 
 import android.os.Build
 import io.nubrick.nubrick.Config
+import io.nubrick.nubrick.FlutterBridgeApi
 import io.nubrick.nubrick.VERSION
 import io.nubrick.nubrick.data.user.NubrickUser
 import io.nubrick.nubrick.data.user.formatISO8601
@@ -26,19 +27,39 @@ import kotlin.concurrent.fixedRateTimer
 private val CRASH_RECORD_KEY = "CRASH_RECORD_KEY"
 
 @Serializable
-internal data class ExceptionRecord(
-    val type: String?,
-    val message: String?,
-    val callStacks: List<StackFrame>?
-)
-
-@Serializable
-internal data class StackFrame(
+data class StackFrame(
     val fileName: String?,
     val className: String?,
     val methodName: String?,
     val lineNumber: Int?,
 )
+
+@Serializable
+data class ExceptionRecord(
+    val type: String?,
+    val message: String?,
+    val callStacks: List<StackFrame>?
+)
+
+data class TrackCrashEvent(
+    val exceptions: List<ExceptionRecord>,
+    val platform: String? = null,
+    val flutterSdkVersion: String? = null,
+) {
+    internal fun encode(): JsonObject {
+        val map = mutableMapOf(
+            "typename" to JsonPrimitive("crash"),
+            "exceptions" to Json.encodeToJsonElement(this.exceptions),
+        )
+        if (platform != null) {
+            map["platform"] = JsonPrimitive(platform)
+        }
+        if (flutterSdkVersion != null) {
+            map["flutterSdkVersion"] = JsonPrimitive(flutterSdkVersion)
+        }
+        return JsonObject(map)
+    }
+}
 
 
 internal data class TrackUserEvent(
@@ -65,17 +86,6 @@ internal data class TrackExperimentEvent(
             "experimentId" to JsonPrimitive(this.experimentId),
             "variantId" to JsonPrimitive(this.variantId),
             "timestamp" to JsonPrimitive(formatISO8601(this.timestamp)),
-        ))
-    }
-}
-
-internal data class TrackCrashEvent(
-    val exceptionsList: List<ExceptionRecord>,
-) {
-    fun encode(): JsonObject {
-        return JsonObject(mapOf(
-            "typename" to JsonPrimitive("crash"),
-            "exceptions" to Json.encodeToJsonElement(this.exceptionsList),
         ))
     }
 }
@@ -137,7 +147,8 @@ internal interface TrackRepository {
     fun trackExperimentEvent(event: TrackExperimentEvent)
     fun trackEvent(event: TrackUserEvent)
 
-    fun record(throwable: Throwable)
+    fun storeNativeCrash(throwable: Throwable)
+    fun sendFlutterCrash(crashEvent: TrackCrashEvent)
 }
 
 internal class TrackRepositoryImpl: TrackRepository {
@@ -153,7 +164,7 @@ internal class TrackRepositoryImpl: TrackRepository {
         this.config = config
         this.user = user
 
-        this.report()
+        this.sendStoredCrash()
     }
 
     override fun trackEvent(event: TrackUserEvent) {
@@ -215,7 +226,31 @@ internal class TrackRepositoryImpl: TrackRepository {
         }
     }
 
-    private fun report() {
+    private fun sendCrashToBackend(crashEvent: TrackCrashEvent) {
+        val causedByNubrick = crashEvent.exceptions.any { exception ->
+            exception.callStacks.orEmpty().any { frame ->
+                frame.className?.contains("io.nubrick.nubrick") ?: false ||
+                frame.className?.contains("package:nativebrik_bridge") ?: false
+            }
+        }
+
+        this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
+            name = TriggerEventNameDefs.N_ERROR_RECORD.name
+        )))
+
+        if (causedByNubrick) {
+            buffer.add(TrackEvent.UserEvent(TrackUserEvent(
+                name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
+            )))
+            buffer.add(TrackEvent.CrashEvent(crashEvent))
+        }
+        val self = this
+        CoroutineScope(Dispatchers.IO).launch {
+            self.sendAndFlush()
+        }
+    }
+
+    private fun sendStoredCrash() {
         val data = this.queueLock.withLock {
             val data = this.user.preferences?.getString(CRASH_RECORD_KEY, "") ?: ""
             if (data.isNotEmpty()) {
@@ -235,30 +270,10 @@ internal class TrackRepositoryImpl: TrackRepository {
             return // in case there was exception in json decoding we stop here
         }
 
-        val causedByNubrick = exceptionsList.any { exception ->
-            exception.callStacks.orEmpty().any { frame ->
-                frame.className?.contains("io.nubrick.nubrick") ?: false ||
-                frame.className?.contains("package:nativebrik_bridge") ?: false
-            }
-        }
-
-        this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
-            name = TriggerEventNameDefs.N_ERROR_RECORD.name
-        )))
-
-        if (causedByNubrick) {
-            buffer.add(TrackEvent.UserEvent(TrackUserEvent(
-                name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
-            )))
-            buffer.add(TrackEvent.CrashEvent(TrackCrashEvent((exceptionsList))))
-        }
-        val self = this
-        CoroutineScope(Dispatchers.IO).launch {
-            self.sendAndFlush()
-        }
+        sendCrashToBackend(TrackCrashEvent(exceptions = exceptionsList))
     }
 
-    override fun record(throwable: Throwable) {
+    override fun storeNativeCrash(throwable: Throwable) {
         // Loop on chained exceptions (up to 20 times max)
         var counter = 0
         var currentException : Throwable? = throwable
@@ -284,5 +299,9 @@ internal class TrackRepositoryImpl: TrackRepository {
 
         val data = Json.encodeToString(exceptionsList)
         this.user.preferences?.edit()?.putString(CRASH_RECORD_KEY, data)?.commit()
+    }
+
+    override fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
+        sendCrashToBackend(crashEvent)
     }
 }
