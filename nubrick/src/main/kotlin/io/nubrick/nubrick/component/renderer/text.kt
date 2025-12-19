@@ -23,6 +23,7 @@ import io.nubrick.nubrick.schema.UITextBlock
 import io.nubrick.nubrick.template.compile
 import io.nubrick.nubrick.template.hasPlaceholder
 import io.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color as PrimitiveColor
 import androidx.compose.ui.text.font.FontFamily as PrimitiveFontFamily
 import androidx.compose.ui.text.font.FontWeight as PrimitiveFontWeight
@@ -53,8 +54,9 @@ internal fun parseFontWeight(fontWeight: FontWeight?): PrimitiveFontWeight {
     }
 }
 
+@Composable
 internal fun parseFontStyle(size: Int? = null, color: Color? = null, fontWeight: FontWeight? = null, fontDesign: FontDesign? = null, alignment: TextAlign? = null, transparent: Boolean = false): TextStyle {
-    val textColor = parseColorForText(color) ?: PrimitiveColor.Black // get from theme
+    val textColor = parseColorForText(color) ?: MaterialTheme.colorScheme.onSurface
     return TextStyle.Default.copy(
         color = if (transparent) PrimitiveColor.Transparent else textColor,
         fontSize = size?.sp ?: 16.sp,
