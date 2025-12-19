@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import io.nubrick.nubrick.component.provider.container.ContainerContext
 import io.nubrick.nubrick.component.provider.data.DataContext
 import io.nubrick.nubrick.data.FormValueListener
@@ -83,6 +84,7 @@ internal fun Modifier.eventDispatcher(
     var disabled by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val interaction = remember { MutableInteractionSource() }
 
     if (event.requiredFields != null) {
         val handleFormValueChange: FormValueListener = { values ->
@@ -103,7 +105,7 @@ internal fun Modifier.eventDispatcher(
 
     this
         .alpha(if (disabled) 0.5f else if (isLoading) 0.8f else 1f)
-        .clickable(enabled = !disabled && !isLoading) {
+        .clickable(enabled = !disabled && !isLoading, interactionSource = interaction, indication = null) {
             val req = event.httpRequest
             if (req == null) {
                 eventListener.dispatch(event, data)

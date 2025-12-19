@@ -352,6 +352,7 @@ internal fun Root(
                         dragHandle = {},
                         windowInsets = WindowInsets(0, 0, 0, 0),
                         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
+                        tonalElevation = 0.dp, // to have the right background color as set in theme
                     ) {
                         ModalBottomSheetBackHandler {
                             modalViewModel.back(JsonNull)

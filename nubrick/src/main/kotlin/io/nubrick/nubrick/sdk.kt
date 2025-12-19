@@ -17,6 +17,7 @@ import io.nubrick.nubrick.component.EmbeddingLoadingState
 import io.nubrick.nubrick.component.Root
 import io.nubrick.nubrick.component.Trigger
 import io.nubrick.nubrick.component.TriggerViewModel
+import io.nubrick.nubrick.component.NubrickTheme
 import io.nubrick.nubrick.component.bridge.UIBlockEventBridgeViewModel
 import io.nubrick.nubrick.data.CacheStore
 import io.nubrick.nubrick.data.Container
@@ -114,7 +115,9 @@ fun NubrickProvider(
     CompositionLocalProvider(
         LocalNubrickClient provides client
     ) {
-        client.experiment.Overlay()
+        NubrickTheme {
+            client.experiment.Overlay()
+        }
         content()
     }
 }
@@ -213,13 +216,15 @@ class NubrickExperiment {
         onEvent: ((event: Event) -> Unit)? = null,
         content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null
     ) {
-        Embedding(
-            container = this.container.initWith(arguments),
-            id,
-            modifier = modifier,
-            onEvent = onEvent,
-            content = content
-        )
+        NubrickTheme {
+            Embedding(
+                container = this.container.initWith(arguments),
+                id,
+                modifier = modifier,
+                onEvent = onEvent,
+                content = content
+            )
+        }
     }
 
     @Composable
