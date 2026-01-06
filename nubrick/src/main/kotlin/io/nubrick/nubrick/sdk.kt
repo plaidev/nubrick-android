@@ -23,6 +23,7 @@ import io.nubrick.nubrick.data.CacheStore
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
 import io.nubrick.nubrick.data.FormRepositoryImpl
+import io.nubrick.nubrick.data.Breadcrumb
 import io.nubrick.nubrick.data.TrackCrashEvent
 import io.nubrick.nubrick.data.database.NubrickDbHelper
 import io.nubrick.nubrick.data.user.NubrickUser
@@ -201,6 +202,16 @@ class NubrickExperiment {
     @FlutterBridgeApi
     fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         this.container.sendFlutterCrash(crashEvent)
+    }
+
+    /**
+     * Records a breadcrumb for crash reporting context
+     *
+     * @param breadcrumb The breadcrumb to record
+     */
+    @FlutterBridgeApi
+    fun recordBreadcrumb(breadcrumb: Breadcrumb) {
+        this.container.recordBreadcrumb(breadcrumb)
     }
 
     @Composable
