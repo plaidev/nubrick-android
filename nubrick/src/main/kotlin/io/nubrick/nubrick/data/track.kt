@@ -41,10 +41,66 @@ data class ExceptionRecord(
     val callStacks: List<StackFrame>?
 )
 
+/**
+ * The category of a breadcrumb.
+ * Based on Sentry's breadcrumb categories.
+ */
+@Serializable
+enum class BreadcrumbCategory {
+    /** Screen navigation events */
+    navigation,
+    /** User interaction events (taps, clicks, etc.) */
+    ui,
+    /** HTTP request events */
+    http,
+    /** Console log events */
+    console,
+    /** Custom events */
+    custom;
+
+    companion object {
+        fun fromString(value: String): BreadcrumbCategory {
+            return entries.find { it.name == value } ?: custom
+        }
+    }
+}
+
+/**
+ * The severity level of a breadcrumb.
+ * Based on Sentry's breadcrumb levels.
+ */
+@Serializable
+enum class BreadcrumbLevel {
+    debug,
+    info,
+    warning,
+    error,
+    fatal;
+
+    companion object {
+        fun fromString(value: String): BreadcrumbLevel {
+            return entries.find { it.name == value } ?: info
+        }
+    }
+}
+
+/**
+ * Breadcrumb for crash reporting context
+ */
+@Serializable
+data class Breadcrumb(
+    val message: String,
+    val category: BreadcrumbCategory = BreadcrumbCategory.custom,
+    val level: BreadcrumbLevel = BreadcrumbLevel.info,
+    val data: Map<String, String>? = null,
+    val timestamp: Long
+)
+
 data class TrackCrashEvent(
     val exceptions: List<ExceptionRecord>,
     val platform: String? = null,
     val flutterSdkVersion: String? = null,
+    val breadcrumbs: List<Breadcrumb>? = null,
 ) {
     internal fun encode(): JsonObject {
         val map = mutableMapOf(
@@ -56,6 +112,9 @@ data class TrackCrashEvent(
         }
         if (flutterSdkVersion != null) {
             map["flutterSdkVersion"] = JsonPrimitive(flutterSdkVersion)
+        }
+        if (breadcrumbs != null) {
+            map["breadcrumbs"] = Json.encodeToJsonElement(breadcrumbs)
         }
         return JsonObject(map)
     }
@@ -149,16 +208,21 @@ internal interface TrackRepository {
 
     fun storeNativeCrash(throwable: Throwable)
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
+    fun recordBreadcrumb(breadcrumb: Breadcrumb)
+    fun getBreadcrumbs(): List<Breadcrumb>
 }
 
 internal class TrackRepositoryImpl: TrackRepository {
     private val queueLock: ReentrantLock = ReentrantLock()
+    private val breadcrumbLock: ReentrantLock = ReentrantLock()
     private val config: Config
     private val user: NubrickUser
     private var timer: Timer? = null
     private val maxBatchSize: Int = 50
     private val maxQueueSize: Int = 300
+    private val maxBreadcrumbSize: Int = 50
     private var buffer: MutableList<TrackEvent> = mutableListOf()
+    private var breadcrumbBuffer: MutableList<Breadcrumb> = mutableListOf()
 
     internal constructor(config: Config, user: NubrickUser) {
         this.config = config
@@ -302,6 +366,27 @@ internal class TrackRepositoryImpl: TrackRepository {
     }
 
     override fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
-        sendCrashToBackend(crashEvent)
+        // Get current breadcrumbs and include them in the crash event
+        val breadcrumbs = getBreadcrumbs()
+        val eventWithBreadcrumbs = crashEvent.copy(
+            breadcrumbs = crashEvent.breadcrumbs ?: breadcrumbs.ifEmpty { null }
+        )
+        sendCrashToBackend(eventWithBreadcrumbs)
+    }
+
+    override fun recordBreadcrumb(breadcrumb: Breadcrumb) {
+        this.breadcrumbLock.withLock {
+            this.breadcrumbBuffer.add(breadcrumb)
+            if (this.breadcrumbBuffer.size > this.maxBreadcrumbSize) {
+                val overflow = this.breadcrumbBuffer.size - this.maxBreadcrumbSize
+                repeat(overflow) { this.breadcrumbBuffer.removeAt(0) }
+            }
+        }
+    }
+
+    override fun getBreadcrumbs(): List<Breadcrumb> {
+        return this.breadcrumbLock.withLock {
+            this.breadcrumbBuffer.toList()
+        }
     }
 }

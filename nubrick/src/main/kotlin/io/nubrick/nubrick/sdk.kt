@@ -23,6 +23,9 @@ import io.nubrick.nubrick.data.CacheStore
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
 import io.nubrick.nubrick.data.FormRepositoryImpl
+import io.nubrick.nubrick.data.Breadcrumb
+import io.nubrick.nubrick.data.BreadcrumbCategory
+import io.nubrick.nubrick.data.BreadcrumbLevel
 import io.nubrick.nubrick.data.TrackCrashEvent
 import io.nubrick.nubrick.data.database.NubrickDbHelper
 import io.nubrick.nubrick.data.user.NubrickUser
@@ -201,6 +204,60 @@ class NubrickExperiment {
     @FlutterBridgeApi
     fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         this.container.sendFlutterCrash(crashEvent)
+    }
+
+    /**
+     * Records a breadcrumb for crash reporting context
+     *
+     * @param breadcrumb The breadcrumb to record
+     */
+    @FlutterBridgeApi
+    fun recordBreadcrumb(breadcrumb: Breadcrumb) {
+        this.container.recordBreadcrumb(breadcrumb)
+    }
+
+    /**
+     * Records a breadcrumb from Flutter Bridge data
+     *
+     * @param data Map containing breadcrumb data from Flutter's method channel.
+     *
+     * Expected structure from Flutter (see `lib/breadcrumb.dart`):
+     * ```
+     * {
+     *   "message": String,              // Required: breadcrumb message
+     *   "category": String,             // Optional: "navigation", "ui", "http", "console", "custom"
+     *   "level": String,                // Optional: "debug", "info", "warning", "error", "fatal"
+     *   "data": Map<String, Any?>?,     // Optional: additional key-value data
+     *   "timestamp": Long               // Required: milliseconds since epoch
+     * }
+     * ```
+     */
+    @FlutterBridgeApi
+    fun recordBreadcrumb(data: Map<String, Any?>) {
+        // Flutter method channel passes String and Long from Dart
+        val message = data["message"] as? String ?: return
+        val timestamp = (data["timestamp"] as? Number)?.toLong() ?: return
+        // category and level are optional strings with defaults
+        val categoryString = data["category"] as? String ?: "custom"
+        val levelString = data["level"] as? String ?: "info"
+        val category = BreadcrumbCategory.fromString(categoryString)
+        val level = BreadcrumbLevel.fromString(levelString)
+
+        // data is an optional map; we only keep String values
+        @Suppress("UNCHECKED_CAST")
+        val rawData = data["data"] as? Map<String, Any?>
+        val stringData = rawData?.mapNotNull { (key, value) ->
+            (value as? String)?.let { key to it }
+        }?.toMap()
+
+        val breadcrumb = Breadcrumb(
+            message = message,
+            category = category,
+            level = level,
+            data = stringData,
+            timestamp = timestamp
+        )
+        this.container.recordBreadcrumb(breadcrumb)
     }
 
     @Composable

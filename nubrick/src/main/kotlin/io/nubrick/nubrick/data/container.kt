@@ -53,6 +53,7 @@ internal interface Container {
 
     fun storeNativeCrash(throwable: Throwable)
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
+    fun recordBreadcrumb(breadcrumb: Breadcrumb)
     fun handleNubrickEvent(it: NubrickEvent)
 }
 
@@ -294,6 +295,10 @@ internal class ContainerImpl(
 
     override fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         this.trackRepository.sendFlutterCrash(crashEvent)
+    }
+
+    override fun recordBreadcrumb(breadcrumb: Breadcrumb) {
+        this.trackRepository.recordBreadcrumb(breadcrumb)
     }
 
     override fun handleNubrickEvent(it: NubrickEvent) {
