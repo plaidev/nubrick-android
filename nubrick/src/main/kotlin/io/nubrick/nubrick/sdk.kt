@@ -24,6 +24,8 @@ import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
 import io.nubrick.nubrick.data.FormRepositoryImpl
 import io.nubrick.nubrick.data.Breadcrumb
+import io.nubrick.nubrick.data.BreadcrumbCategory
+import io.nubrick.nubrick.data.BreadcrumbLevel
 import io.nubrick.nubrick.data.TrackCrashEvent
 import io.nubrick.nubrick.data.database.NubrickDbHelper
 import io.nubrick.nubrick.data.user.NubrickUser
@@ -211,6 +213,36 @@ class NubrickExperiment {
      */
     @FlutterBridgeApi
     fun recordBreadcrumb(breadcrumb: Breadcrumb) {
+        this.container.recordBreadcrumb(breadcrumb)
+    }
+
+    /**
+     * Records a breadcrumb from Flutter Bridge data
+     *
+     * @param data Dictionary containing breadcrumb data with string values
+     */
+    @FlutterBridgeApi
+    fun recordBreadcrumb(data: Map<String, Any?>) {
+        val message = data["message"] as? String ?: return
+        val timestamp = (data["timestamp"] as? Number)?.toLong() ?: return
+        val categoryString = data["category"] as? String ?: "custom"
+        val levelString = data["level"] as? String ?: "info"
+        val category = BreadcrumbCategory.fromString(categoryString)
+        val level = BreadcrumbLevel.fromString(levelString)
+
+        @Suppress("UNCHECKED_CAST")
+        val rawData = data["data"] as? Map<String, Any?>
+        val stringData = rawData?.mapNotNull { (key, value) ->
+            (value as? String)?.let { key to it }
+        }?.toMap()
+
+        val breadcrumb = Breadcrumb(
+            message = message,
+            category = category,
+            level = level,
+            data = stringData,
+            timestamp = timestamp
+        )
         this.container.recordBreadcrumb(breadcrumb)
     }
 

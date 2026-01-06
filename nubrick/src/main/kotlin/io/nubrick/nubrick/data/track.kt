@@ -42,13 +42,56 @@ data class ExceptionRecord(
 )
 
 /**
+ * The category of a breadcrumb.
+ * Based on Sentry's breadcrumb categories.
+ */
+@Serializable
+enum class BreadcrumbCategory {
+    /** Screen navigation events */
+    navigation,
+    /** User interaction events (taps, clicks, etc.) */
+    ui,
+    /** HTTP request events */
+    http,
+    /** Console log events */
+    console,
+    /** Custom events */
+    custom;
+
+    companion object {
+        fun fromString(value: String): BreadcrumbCategory {
+            return entries.find { it.name == value } ?: custom
+        }
+    }
+}
+
+/**
+ * The severity level of a breadcrumb.
+ * Based on Sentry's breadcrumb levels.
+ */
+@Serializable
+enum class BreadcrumbLevel {
+    debug,
+    info,
+    warning,
+    error,
+    fatal;
+
+    companion object {
+        fun fromString(value: String): BreadcrumbLevel {
+            return entries.find { it.name == value } ?: info
+        }
+    }
+}
+
+/**
  * Breadcrumb for crash reporting context
  */
 @Serializable
 data class Breadcrumb(
     val message: String,
-    val category: String = "custom",
-    val level: String = "info",
+    val category: BreadcrumbCategory = BreadcrumbCategory.custom,
+    val level: BreadcrumbLevel = BreadcrumbLevel.info,
     val data: Map<String, String>? = null,
     val timestamp: Long
 )
