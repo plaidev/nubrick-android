@@ -45,12 +45,13 @@ data class TrackCrashEvent(
     val exceptions: List<ExceptionRecord>,
     val platform: String? = null,
     val flutterSdkVersion: String? = null,
-    val severity: String? = null,
+    val severity: CrashSeverity = CrashSeverity.ERROR,
 ) {
     internal fun encode(): JsonObject {
         val map = mutableMapOf(
             "typename" to JsonPrimitive("crash"),
             "exceptions" to Json.encodeToJsonElement(this.exceptions),
+            "severity" to JsonPrimitive(severity.name.lowercase()),
         )
         if (platform != null) {
             map["platform"] = JsonPrimitive(platform)
@@ -58,13 +59,26 @@ data class TrackCrashEvent(
         if (flutterSdkVersion != null) {
             map["flutterSdkVersion"] = JsonPrimitive(flutterSdkVersion)
         }
-        if (severity != null) {
-            map["severity"] = JsonPrimitive(severity)
-        }
         return JsonObject(map)
     }
 }
 
+/**
+ * Severity level for crash/error reporting.
+ */
+enum class CrashSeverity {
+    DEBUG, INFO, WARNING, ERROR, FATAL;
+
+    /** Returns true if this severity level should be counted as an error (ERROR or FATAL). */
+    val isErrorLevel: Boolean get() = this == ERROR || this == FATAL
+
+    companion object {
+        /** Parses a string into a CrashSeverity, defaulting to ERROR for null, empty, or invalid values. */
+        fun from(value: String?): CrashSeverity =
+            if (value.isNullOrEmpty()) ERROR
+            else entries.find { it.name.equals(value, ignoreCase = true) } ?: ERROR
+    }
+}
 
 internal data class TrackUserEvent(
     val name: String,
@@ -238,14 +252,19 @@ internal class TrackRepositoryImpl: TrackRepository {
             }
         }
 
-        this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
-            name = TriggerEventNameDefs.N_ERROR_RECORD.name
-        )))
+        // Only send error tracking events for error or fatal severity
+        if (crashEvent.severity.isErrorLevel) {
+            this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
+                name = TriggerEventNameDefs.N_ERROR_RECORD.name
+            )))
+        }
 
         if (causedByNubrick) {
-            buffer.add(TrackEvent.UserEvent(TrackUserEvent(
-                name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
-            )))
+            if (crashEvent.severity.isErrorLevel) {
+                buffer.add(TrackEvent.UserEvent(TrackUserEvent(
+                    name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
+                )))
+            }
             buffer.add(TrackEvent.CrashEvent(crashEvent))
         }
         val self = this
