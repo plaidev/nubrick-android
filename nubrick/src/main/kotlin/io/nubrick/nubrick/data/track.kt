@@ -45,6 +45,7 @@ data class TrackCrashEvent(
     val exceptions: List<ExceptionRecord>,
     val platform: String? = null,
     val flutterSdkVersion: String? = null,
+    val severity: String? = null,
 ) {
     internal fun encode(): JsonObject {
         val map = mutableMapOf(
@@ -56,6 +57,9 @@ data class TrackCrashEvent(
         }
         if (flutterSdkVersion != null) {
             map["flutterSdkVersion"] = JsonPrimitive(flutterSdkVersion)
+        }
+        if (severity != null) {
+            map["severity"] = JsonPrimitive(severity)
         }
         return JsonObject(map)
     }
