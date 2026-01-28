@@ -2774,6 +2774,8 @@ internal class UIPageBlockData (
 	val tooltipPlacement: UITooltipPlacement? = null,
 	val tooltipTransitionTarget: UITooltipTransitionTarget? = null,
 	val props: List<Property>? = null,
+	val frameWidth: Int? = null,
+	val frameHeight: Int? = null,
 	val query: String? = null,
 ) {
 	companion object {
@@ -2803,6 +2805,8 @@ internal class UIPageBlockData (
 				props = ListDecoder.decode(element.jsonObject["props"]) { element: JsonElement? ->
 				Property.decode(element)
 			},
+				frameWidth = IntDecoder.decode(element.jsonObject["frameWidth"]),
+				frameHeight = IntDecoder.decode(element.jsonObject["frameHeight"]),
 				query = StringDecoder.decode(element.jsonObject["query"]),
 			)
 		}
@@ -2860,6 +2864,12 @@ internal class UIPageBlockData (
 				ListEncoder.encode(value) { item ->
 					Property.encode(item)
 				}?.let { map["props"] = it }
+			}
+			data.frameWidth?.let { value ->
+				IntEncoder.encode(value)?.let { map["frameWidth"] = it }
+			}
+			data.frameHeight?.let { value ->
+				IntEncoder.encode(value)?.let { map["frameHeight"] = it }
 			}
 			data.query?.let { value ->
 				StringEncoder.encode(value)?.let { map["query"] = it }
@@ -3960,4 +3970,3 @@ internal enum class Weekdays {
 		}
 	}
 }
-

@@ -4,9 +4,11 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +31,7 @@ sealed class EmbeddingLoadingState {
 }
 
 @Composable
-internal fun rememberEmbeddingState(container: Container, experimentId: String, componentId: String?, onEvent: ((event: Event) -> Unit)?): EmbeddingLoadingState {
+internal fun rememberEmbeddingState(container: Container, experimentId: String, componentId: String?, onEvent: ((event: Event) -> Unit)?, onWidthChange: (Int?) -> Unit, onHeightChange: (Int?) -> Unit): EmbeddingLoadingState {
     var loadingState: EmbeddingLoadingState by remember { mutableStateOf(EmbeddingLoadingState.Loading()) }
     LaunchedEffect("key") {
         container.fetchEmbedding(experimentId, componentId).onSuccess {
@@ -41,7 +43,9 @@ internal fun rememberEmbeddingState(container: Container, experimentId: String, 
                             root = it.data,
                             modifier = Modifier
                                 .fillMaxSize(),
-                            onEvent = onEvent ?: {}
+                            onEvent = onEvent ?: {},
+                            onWidthChange = onWidthChange,
+                            onHeightChange = onHeightChange
                         )
                     }
                 }
@@ -74,12 +78,15 @@ internal fun Embedding(
     onEvent: ((event: Event) -> Unit)? = null,
     content: (@Composable() (state: EmbeddingLoadingState) -> Unit)?
 ) {
-    val state = rememberEmbeddingState(container, experimentId, componentId, onEvent)
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    var width: Int? by remember { mutableStateOf(null) }
+    var height: Int? by remember { mutableStateOf(null) }
+    val state = rememberEmbeddingState(container, experimentId, componentId, onEvent, onWidthChange = { width = it }, onHeightChange = { height = it })
+    var modifierWithSize = Modifier
+                            .then(width?.takeIf { it != 0 }?.let { Modifier.width(it.dp) } ?: Modifier)
+                            .then(height?.takeIf { it != 0 }?.let { Modifier.height(it.dp) } ?: Modifier)
+                            .then(modifier)
+    
+    Box(modifier = modifierWithSize) {
         AnimatedContent(
             targetState = state,
             label = "EmbeddingLoadingStateAnimation",
@@ -88,10 +95,9 @@ internal fun Embedding(
             },
             modifier = Modifier.fillMaxSize()
         ) { state ->
-            Row(
+            Box(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                contentAlignment = Alignment.Center
             ) {
                 when (state) {
                     is EmbeddingLoadingState.Completed -> if (content != null) content(state) else state.view()

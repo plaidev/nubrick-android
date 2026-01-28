@@ -96,6 +96,8 @@ internal class RootViewModel(
     private val onDismiss: ((root: UIRootBlock) -> Unit) = {},
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
     private val onTrigger: ((trigger: UIBlockEventDispatcher) -> Unit) = {},
+    private val onWidthChange: ((Int?) -> Unit)? = null,
+    private val onHeightChange: ((Int?) -> Unit)? = null,
 ) : ViewModel() {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
@@ -188,6 +190,11 @@ internal class RootViewModel(
             return
         }
 
+        if (destBlock.data?.kind == PageKind.COMPONENT) {
+            onWidthChange?.invoke(destBlock.data.frameWidth)
+            onHeightChange?.invoke(destBlock.data.frameHeight)
+        }
+
         // Before displaying the page, we close displayed modals. but never emit dismiss event.
         modalViewModel.close(forceReset = true, emitDispatch = false)
         this.displayedPageBlock.value = PageBlockData(destBlock, properties)
@@ -251,6 +258,8 @@ internal fun Root(
     onNextTooltip: (pageId: String) -> Unit = {},
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
     eventBridge: UIBlockEventBridgeViewModel? = null,
+    onWidthChange: ((Int?) -> Unit)? = null,
+    onHeightChange: ((Int?) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -278,7 +287,9 @@ internal fun Root(
                 val e = parseUIEventToEvent(trigger)
                 onEvent(e)
                 container.handleEvent(e)
-            }
+            },
+            onWidthChange = onWidthChange,
+            onHeightChange = onHeightChange
         )
     }
     LaunchedEffect(Unit) {
