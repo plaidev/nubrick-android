@@ -93,25 +93,12 @@ internal fun Embedding(
         .then(height?.takeIf { it != 0 }?.let { Modifier.height(it.dp) } ?: Modifier)
         .then(modifier)
     
-    Box(modifier = modifierWithSize) {
-        AnimatedContent(
-            targetState = state,
-            label = "EmbeddingLoadingStateAnimation",
-            transitionSpec = {
-                fadeIn() togetherWith fadeOut()
-            },
-            modifier = Modifier.fillMaxSize()
-        ) { state ->
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                when (state) {
-                    is EmbeddingLoadingState.Completed -> if (content != null) content(state) else state.view()
-                    is EmbeddingLoadingState.Loading -> if (content != null) content(state) else CircularProgressIndicator()
-                    else -> if (content != null) content(state) else Unit
-                }
-            }
+    Box(modifier = modifierWithSize, contentAlignment = Alignment.Center) {
+        when (state) {
+            is EmbeddingLoadingState.Completed -> if (content != null) content(state) else state.view()
+            is EmbeddingLoadingState.Loading -> if (content != null) content(state) else CircularProgressIndicator()
+            else -> if (content != null) content(state) else Unit
         }
     }
+    
 }
