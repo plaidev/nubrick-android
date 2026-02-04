@@ -2,16 +2,23 @@ package io.nubrick.nubrick
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import io.nubrick.nubrick.component.Embedding
 import io.nubrick.nubrick.component.EmbeddingLoadingState
 import io.nubrick.nubrick.component.Root
@@ -29,6 +36,8 @@ import io.nubrick.nubrick.data.user.NubrickUser
 import io.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
 import io.nubrick.nubrick.schema.UIBlock
 import io.nubrick.nubrick.schema.UIRootBlock
+import io.nubrick.nubrick.schema.UIPageBlock
+import io.nubrick.nubrick.schema.PageKind
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -254,9 +263,32 @@ class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
         return client.experiment.container.fetchEmbedding(experimentId, componentId)
     }
 
+    fun computeInitialSize(embedding: Any?): Pair<Int?, Int?> {
+        val root: UIRootBlock? = extractRootBlock(embedding)
+        val pages: List<UIPageBlock>? = root?.data?.pages
+        val triggerPage = pages?.firstOrNull {
+            it.data?.kind == PageKind.TRIGGER
+        }
+        val triggerDestinationId = triggerPage?.data?.triggerSetting?.onTrigger?.destinationPageId
+        val triggerDestinationPage = pages?.firstOrNull {
+            it.id == triggerDestinationId
+        }
+        return Pair(triggerDestinationPage?.data?.frameWidth, triggerDestinationPage?.data?.frameHeight)
+        
+    }
+
     suspend fun connectTooltip(trigger: String): Result<String?> {
         return client.experiment.container.fetchTooltip(trigger).mapCatching { it ->
             it.let { Json.encodeToString(UIBlock.encode(it)) }
+        }
+    }
+
+    private fun extractRootBlock(data: Any?): UIRootBlock? {
+        return when (data) {
+            is UIBlock.UnionUIRootBlock -> data.data
+            is UIRootBlock -> data
+            is String -> UIRootBlock.decode(Json.decodeFromString(data))
+            else -> null
         }
     }
 
@@ -269,33 +301,39 @@ class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
         onEvent: ((event: Event) -> Unit),
         onNextTooltip: ((pageId: String) -> Unit) = {},
         onDismiss: (() -> Unit) = {},
+        onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
         eventBridge: UIBlockEventBridgeViewModel? = null,
     ) {
+        var width: Int? by remember(data) { mutableStateOf(null) }
+        var height: Int? by remember(data) { mutableStateOf(null) }
         val container = remember(arguments) {
             client.experiment.container.initWith(arguments)
         }
-        val rootBlock: UIRootBlock? = when (data) {
-            is UIBlock.UnionUIRootBlock -> data.data
-            is UIRootBlock -> data
-            is String -> UIRootBlock.decode(Json.decodeFromString(data))
-            else -> null
-        }
+        val widthModifier = width?.takeIf { it != 0 }?.let { Modifier.width(it.dp) } ?: Modifier.fillMaxWidth()
+        val heightModifier = height?.takeIf { it != 0 }?.let { Modifier.height(it.dp) } ?: Modifier.fillMaxHeight()
+        val rootBlock: UIRootBlock? = extractRootBlock(data)
         rootBlock?.let {
-            Row(
-                modifier = modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = modifier,
+                contentAlignment = Alignment.Center
             ) {
-                Root(
-                    modifier = Modifier.fillMaxSize(),
-                    container = container,
-                    root = it,
-                    onEvent = onEvent,
-                    onNextTooltip = onNextTooltip,
-                    onDismiss = { onDismiss() },
-                    eventBridge = eventBridge,
-                )
+                        Root(
+                            modifier = widthModifier.then(heightModifier),
+                            container = container,
+                            root = it,
+                            onEvent = onEvent,
+                            onNextTooltip = onNextTooltip,
+                            onDismiss = { onDismiss() },
+                            eventBridge = eventBridge,
+                            onSizeChange = { newWidth, newHeight ->
+                                width = newWidth
+                                height = newHeight
+                                onSizeChange?.invoke(newWidth, newHeight)
+                            },
+                        )
+                    
+                }
+            
             }
         }
-    }
 }

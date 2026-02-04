@@ -96,8 +96,7 @@ internal class RootViewModel(
     private val onDismiss: ((root: UIRootBlock) -> Unit) = {},
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
     private val onTrigger: ((trigger: UIBlockEventDispatcher) -> Unit) = {},
-    private val onWidthChange: ((Int?) -> Unit)? = null,
-    private val onHeightChange: ((Int?) -> Unit)? = null,
+    private val onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
 ) : ViewModel() {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
@@ -191,8 +190,7 @@ internal class RootViewModel(
         }
 
         if (destBlock.data?.kind == PageKind.COMPONENT) {
-            onWidthChange?.invoke(destBlock.data.frameWidth)
-            onHeightChange?.invoke(destBlock.data.frameHeight)
+            onSizeChange?.invoke(destBlock.data.frameWidth, destBlock.data.frameHeight)
         }
 
         // Before displaying the page, we close displayed modals. but never emit dismiss event.
@@ -250,7 +248,7 @@ internal fun ModalPage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Root(
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxSize(),
     container: Container,
     root: UIRootBlock,
     embeddingVisibility: Boolean = true,
@@ -258,8 +256,7 @@ internal fun Root(
     onNextTooltip: (pageId: String) -> Unit = {},
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
     eventBridge: UIBlockEventBridgeViewModel? = null,
-    onWidthChange: ((Int?) -> Unit)? = null,
-    onHeightChange: ((Int?) -> Unit)? = null,
+    onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -288,8 +285,7 @@ internal fun Root(
                 onEvent(e)
                 container.handleEvent(e)
             },
-            onWidthChange = onWidthChange,
-            onHeightChange = onHeightChange
+            onSizeChange = onSizeChange,
         )
     }
     LaunchedEffect(Unit) {
@@ -319,7 +315,7 @@ internal fun Root(
 
     ContainerProvider(container = container) {
         EventListenerProvider(listener = listener) {
-            Box(Modifier.fillMaxSize()) {
+            Box(modifier) {
                 if (embeddingVisibility && displayedPageBlock != null) {
                     AnimatedContent(
                         targetState = displayedPageBlock,

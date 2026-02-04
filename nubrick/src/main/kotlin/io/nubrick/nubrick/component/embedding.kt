@@ -31,11 +31,10 @@ sealed class EmbeddingLoadingState {
 }
 
 @Composable
-internal fun rememberEmbeddingState(container: Container, experimentId: String, componentId: String?, onEvent: ((event: Event) -> Unit)?, onWidthChange: (Int?) -> Unit, onHeightChange: (Int?) -> Unit): EmbeddingLoadingState {
+internal fun rememberEmbeddingState(container: Container, experimentId: String, componentId: String?, onEvent: ((event: Event) -> Unit)?, onSizeChange: (width: Int?, height: Int?) -> Unit): EmbeddingLoadingState {
     var loadingState: EmbeddingLoadingState by remember { mutableStateOf(EmbeddingLoadingState.Loading()) }
     LaunchedEffect("key") {
-        onWidthChange(null)
-        onHeightChange(null)
+        onSizeChange(null, null)
         container.fetchEmbedding(experimentId, componentId).onSuccess {
             loadingState = when (it) {
                 is UIBlock.UnionUIRootBlock -> {
@@ -46,21 +45,18 @@ internal fun rememberEmbeddingState(container: Container, experimentId: String, 
                             modifier = Modifier
                                 .fillMaxSize(),
                             onEvent = onEvent ?: {},
-                            onWidthChange = onWidthChange,
-                            onHeightChange = onHeightChange
+                            onSizeChange = onSizeChange
                         )
                     }
                 }
 
                 else -> {
-                    onWidthChange(null)
-                    onHeightChange(null)
+                    onSizeChange(null, null)
                     EmbeddingLoadingState.NotFound()
                 }
             }
         }.onFailure {
-            onWidthChange(null)
-            onHeightChange(null)
+            onSizeChange(null, null)
             loadingState = when (it) {
                 is NotFoundException -> {
                     EmbeddingLoadingState.NotFound()
@@ -86,7 +82,16 @@ internal fun Embedding(
 ) {
     var width: Int? by remember(experimentId, componentId) { mutableStateOf(null) }
     var height: Int? by remember(experimentId, componentId) { mutableStateOf(null) }
-    val state = rememberEmbeddingState(container, experimentId, componentId, onEvent, onWidthChange = { width = it }, onHeightChange = { height = it })
+    val state = rememberEmbeddingState(
+        container,
+        experimentId,
+        componentId,
+        onEvent,
+        onSizeChange = { newWidth, newHeight ->
+            width = newWidth
+            height = newHeight
+        }
+    )
     val modifierWithSize = Modifier
         // 0 means fill/unspecified size from editor; only apply fixed sizes when non-zero.
         .then(width?.takeIf { it != 0 }?.let { Modifier.width(it.dp) } ?: Modifier)
