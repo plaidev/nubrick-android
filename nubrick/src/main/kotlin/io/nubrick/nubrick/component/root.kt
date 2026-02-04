@@ -248,7 +248,7 @@ internal fun ModalPage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Root(
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxSize(),
     container: Container,
     root: UIRootBlock,
     embeddingVisibility: Boolean = true,
@@ -315,7 +315,7 @@ internal fun Root(
 
     ContainerProvider(container = container) {
         EventListenerProvider(listener = listener) {
-            Box(modifier.then(Modifier.fillMaxSize())) {
+            Box(modifier) {
                 if (embeddingVisibility && displayedPageBlock != null) {
                     AnimatedContent(
                         targetState = displayedPageBlock,

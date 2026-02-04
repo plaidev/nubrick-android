@@ -54,7 +54,6 @@ import kotlin.time.toDuration
 annotation class FlutterBridgeApi
 
 const val VERSION = BuildConfig.VERSION_NAME
-private const val SIZE_LOG_TAG = "NubrickSize"
 
 data class Endpoint(
     val cdn: String = "https://cdn.nativebrik.com",
