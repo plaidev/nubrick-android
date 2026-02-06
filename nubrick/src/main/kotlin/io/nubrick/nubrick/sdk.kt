@@ -258,7 +258,7 @@ class NubrickExperiment {
  * This is for flutter SDK
  */
 @FlutterBridgeApi
-class __DO_NOT_USE_THIS_INTERNAL_BRIDGE(private val client: NubrickClient) {
+class FlutterBridge(private val client: NubrickClient) {
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         return client.experiment.container.fetchEmbedding(experimentId, componentId)
     }
