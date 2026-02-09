@@ -26,4 +26,4 @@ jobs:
           curl --fail-with-body -L -X POST \
             -F "file=@./e2e/build/outputs/apk/release/e2e-release-unsigned.apk" \
             -H "Authorization: Token ${{ secrets.MAGICPOD_API_TOKEN }}" \
-            "https://app.magicpod.com/api/v1.0/Nativebrik.inc/Nativebrik/upload-file/"
+            "https://app.magicpod.com/api/v1.0/Nubrick.app/Nubrick/upload-file/"
