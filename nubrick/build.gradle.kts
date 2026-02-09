@@ -114,7 +114,7 @@ afterEvaluate {
                         developer {
                             id = "nubrick"
                             name = "nubrick"
-                            email = "dev.share+nubrick@plaid.co.jp"
+                            email = "nubrick-support@plaid.co.jp"
                         }
                     }
                     scm {
