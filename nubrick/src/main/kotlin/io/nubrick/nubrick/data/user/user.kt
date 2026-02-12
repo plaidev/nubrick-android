@@ -108,7 +108,7 @@ class NubrickUser {
         this.preferences?.edit()?.putInt(USER_SEED_KEY, userSeed)?.apply()
         this.properties[USER_SEED_KEY] = userSeed.toString()
 
-        val languageCode = Locale.getDefault().toLanguageTag()
+        val languageCode = Locale.getDefault().language
         this.properties[BuiltinUserProperty.languageCode.toString()] = languageCode
 
         val regionCode = Locale.getDefault().country.toString()
