@@ -1,21 +1,19 @@
 package io.nubrick.nubrick.component
 
-import SetDialogDestinationToEdgeToEdge
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,19 +21,20 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import io.nubrick.nubrick.Event
 import io.nubrick.nubrick.EventProperty
@@ -50,7 +49,6 @@ import io.nubrick.nubrick.component.provider.pageblock.PageBlockProvider
 import io.nubrick.nubrick.component.renderer.ModalBottomSheetBackHandler
 import io.nubrick.nubrick.component.renderer.NavigationHeader
 import io.nubrick.nubrick.component.renderer.Page
-import io.nubrick.nubrick.component.renderer.WebViewPage
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.schema.ModalPresentationStyle
 import io.nubrick.nubrick.schema.ModalScreenSize
@@ -410,35 +408,40 @@ internal fun Root(
                     }
                 }
 
-                if (viewModel.webviewData.value != null) {
-                    Dialog(
-                        properties = DialogProperties(
-                            usePlatformDefaultWidth = true,
-                            decorFitsSystemWindows = false
-                        ),
-                        onDismissRequest = {}
-                    ) {
-                        val statusBarHeight = with(LocalDensity.current) {
-                            WindowInsets.statusBars.getTop(this).toDp()
+                val webviewData = viewModel.webviewData.value
+                val pendingWebviewReturn = remember { mutableStateOf(false) }
+
+                LaunchedEffect(webviewData) {
+                    if (webviewData != null) {
+                        try {
+                            val customTabsIntent = CustomTabsIntent.Builder().build()
+                            customTabsIntent.launchUrl(context, webviewData.url.toUri())
+                            pendingWebviewReturn.value = true
+                        } catch (_: Throwable) {
+                            // No browser available — fire trigger immediately
+                            webviewData.trigger?.let { trigger ->
+                                listener(trigger, JsonNull)
+                            }
+                            viewModel.handleWebviewDismiss()
                         }
-                        SetDialogDestinationToEdgeToEdge()
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .background(Color.LightGray)
-                        ) {
-                            WebViewPage(
-                                url = viewModel.webviewData.value?.url ?: "",
-                                onDismiss = {
-                                    viewModel.webviewData.value?.trigger?.let { trigger ->
-                                        listener(trigger, JsonNull)
-                                    }
-                                    viewModel.handleWebviewDismiss()
-                                },
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(top = statusBarHeight)
-                            )
+                    }
+                }
+
+                if (pendingWebviewReturn.value) {
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                webviewData?.trigger?.let { trigger ->
+                                    listener(trigger, JsonNull)
+                                }
+                                viewModel.handleWebviewDismiss()
+                                pendingWebviewReturn.value = false
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
                         }
                     }
                 }
