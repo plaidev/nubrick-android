@@ -131,12 +131,12 @@ private fun createRoundedShape(frame: FrameData?): Shape {
             frame?.borderTopLeftRadius == frame?.borderBottomLeftRadius
 
     val roundedShape = if (isSingleRadius) {
-        RoundedCornerShape(frame?.borderRadius?.dp ?: 0.dp)
+        RoundedCornerShape((frame?.borderRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
     } else {
-        val topLeftRadiusPx = toPx(frame?.borderTopLeftRadius?.dp ?: 0.dp)
-        val topRightRadiusPx = toPx(frame?.borderTopRightRadius?.dp ?: 0.dp)
-        val bottomRightRadiusPx = toPx(frame?.borderBottomRightRadius?.dp ?: 0.dp)
-        val bottomLeftRadiusPx = toPx(frame?.borderBottomLeftRadius?.dp ?: 0.dp)
+        val topLeftRadiusPx = toPx((frame?.borderTopLeftRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
+        val topRightRadiusPx = toPx((frame?.borderTopRightRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
+        val bottomRightRadiusPx = toPx((frame?.borderBottomRightRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
+        val bottomLeftRadiusPx = toPx((frame?.borderBottomLeftRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
 
         GenericShape { size, _ ->
             val width = size.width
