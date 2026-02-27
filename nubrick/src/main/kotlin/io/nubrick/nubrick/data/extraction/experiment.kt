@@ -60,12 +60,12 @@ internal fun extractExperimentConfig(
     isNotInFrequency: (experimentId: String, frequency: ExperimentFrequency?) -> Boolean,
     isMatchedToUserEventFrequencyConditions: (conditions: List<UserEventFrequencyCondition>?) -> Boolean,
 ): ExperimentConfig? {
-    val configs = configs.configs ?: return null
-    if (configs.isEmpty()) return null
+    val configList = configs.configs ?: return null
+    if (configList.isEmpty()) return null
     val currentDate = getCurrentDate()
 
     // Filter configs that match the requested kinds, are within their time window, and match all conditions
-    val matched = configs.filter { config ->
+    val matched = configList.filter { config ->
         val configKind = config.kind ?: return@filter false
         if (!kinds.contains(configKind)) return@filter false
 

@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonElement
 
 internal data class ExtractedVariant(
     val experimentId: String,
-    val kind: ExperimentKind?,
+    val kind: ExperimentKind,
     val variant: ExperimentVariant,
 )
 
@@ -53,7 +53,7 @@ internal interface Container {
     ): Result<JsonElement>
 
     suspend fun fetchEmbedding(experimentId: String, componentId: String? = null): Result<UIBlock>
-    suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind?, UIBlock>>
+    suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind, UIBlock>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
 
     fun storeNativeCrash(throwable: Throwable)
@@ -191,7 +191,7 @@ internal class ContainerImpl(
         return Result.success(component)
     }
 
-    override suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind?, UIBlock>> {
+    override suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind, UIBlock>> {
         // send the user track event and save it to database
         this.trackRepository.trackEvent(TrackUserEvent(trigger))
         this.databaseRepository.appendUserEvent(trigger)
@@ -260,6 +260,7 @@ internal class ContainerImpl(
             }
         ) ?: return Result.failure(NotFoundException())
         val experimentId = config.id ?: return Result.failure(NotFoundException())
+        val kind = config.kind ?: return Result.failure(NotFoundException())
 
         val normalizedUserRnd = this.user.getNormalizedUserRnd(config.seed)
         val variant = extractExperimentVariant(
@@ -267,7 +268,7 @@ internal class ContainerImpl(
             normalizedUserRnd = normalizedUserRnd
         ) ?: return Result.failure(NotFoundException())
 
-        return Result.success(ExtractedVariant(experimentId, config.kind, variant))
+        return Result.success(ExtractedVariant(experimentId, kind, variant))
     }
 
     override fun storeNativeCrash(throwable: Throwable) {

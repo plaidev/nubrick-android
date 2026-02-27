@@ -79,7 +79,10 @@ internal class TriggerViewModel(
                 if (kind == ExperimentKind.TOOLTIP) {
                     self.onTooltip?.let { callback ->
                         val jsonString = Json.encodeToString(UIBlock.encode(block))
-                        callback(jsonString)
+                        // Flutter MethodChannel requires calls on the main thread
+                        GlobalScope.launch(Dispatchers.Main) {
+                            callback(jsonString)
+                        }
                     }
                 } else {
                     GlobalScope.launch(Dispatchers.Main) {
