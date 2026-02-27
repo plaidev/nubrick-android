@@ -7,6 +7,7 @@ import io.nubrick.nubrick.schema.ConditionOperator
 import io.nubrick.nubrick.schema.ExperimentCondition
 import io.nubrick.nubrick.schema.ExperimentConfig
 import io.nubrick.nubrick.schema.ExperimentConfigs
+import io.nubrick.nubrick.schema.ExperimentKind
 import io.nubrick.nubrick.schema.ExperimentVariant
 import io.nubrick.nubrick.schema.VariantConfig
 import org.junit.Assert
@@ -54,11 +55,12 @@ class ExtractionUnitTest {
             configs = listOf(
                 ExperimentConfig(
                     "1",
+                    kind = ExperimentKind.POPUP,
                     distribution = emptyList()
                 )
             )
         )
-        Assert.assertEquals("1", extractExperimentConfig(configs, properties, { _, _ -> true }, { _ -> true })?.id)
+        Assert.assertEquals("1", extractExperimentConfig(configs, listOf(ExperimentKind.POPUP), properties, { _, _ -> true }, { _ -> true })?.id)
     }
 
     @Test
@@ -70,20 +72,23 @@ class ExtractionUnitTest {
             configs = listOf(
                 ExperimentConfig(
                     "1",
+                    kind = ExperimentKind.POPUP,
                     startedAt = getCurrentDate().plusDays(1),
                 ),
                 ExperimentConfig("2",
+                    kind = ExperimentKind.POPUP,
                     startedAt = getCurrentDate().minusDays(1),
                     endedAt = getCurrentDate().minusDays(1)
                 ),
                 ExperimentConfig(
                     "running",
+                    kind = ExperimentKind.POPUP,
                     startedAt = getCurrentDate().minusDays(1),
                     endedAt = getCurrentDate().plusDays(1),
                 )
             )
         )
-        Assert.assertEquals("running", extractExperimentConfig(configs, properties, { _, _ -> true }, { _ -> true })?.id)
+        Assert.assertEquals("running", extractExperimentConfig(configs, listOf(ExperimentKind.POPUP), properties, { _, _ -> true }, { _ -> true })?.id)
     }
 
     @Test
@@ -148,5 +153,79 @@ class ExtractionUnitTest {
             ),
         )
         Assert.assertEquals(false, isInDistributionTarget(distribution, properties))
+    }
+
+    @Test
+    fun extractExperimentConfig_shouldSelectHighestPriority() {
+        val configs = ExperimentConfigs(
+            configs = listOf(
+                ExperimentConfig("low", kind = ExperimentKind.POPUP, priority = 1),
+                ExperimentConfig("high", kind = ExperimentKind.POPUP, priority = 10),
+                ExperimentConfig("mid", kind = ExperimentKind.POPUP, priority = 5),
+            )
+        )
+        Assert.assertEquals("high", extractExperimentConfig(
+            configs, listOf(ExperimentKind.POPUP), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )?.id)
+    }
+
+    @Test
+    fun extractExperimentConfig_tiedPriorityShouldPreferLatestStartDate() {
+        val now = getCurrentDate()
+        val earlier = now.minusSeconds(2000)
+        val later = now.minusSeconds(1000)
+
+        val configs = ExperimentConfigs(
+            configs = listOf(
+                ExperimentConfig("earlier", kind = ExperimentKind.POPUP, startedAt = earlier, priority = 5),
+                ExperimentConfig("later", kind = ExperimentKind.POPUP, startedAt = later, priority = 5),
+            )
+        )
+        Assert.assertEquals("later", extractExperimentConfig(
+            configs, listOf(ExperimentKind.POPUP), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )?.id)
+    }
+
+    @Test
+    fun extractExperimentConfig_nilPriorityShouldBeRankedLowest() {
+        val configs = ExperimentConfigs(
+            configs = listOf(
+                ExperimentConfig("no_priority", kind = ExperimentKind.POPUP),
+                ExperimentConfig("has_priority", kind = ExperimentKind.POPUP, priority = 1),
+            )
+        )
+        Assert.assertEquals("has_priority", extractExperimentConfig(
+            configs, listOf(ExperimentKind.POPUP), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )?.id)
+    }
+
+    @Test
+    fun extractExperimentConfig_shouldFilterByKind() {
+        val configs = ExperimentConfigs(
+            configs = listOf(
+                ExperimentConfig("popup", kind = ExperimentKind.POPUP),
+                ExperimentConfig("tooltip", kind = ExperimentKind.TOOLTIP),
+            )
+        )
+
+        val popupOnly = extractExperimentConfig(
+            configs, listOf(ExperimentKind.POPUP), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )
+        Assert.assertEquals("popup", popupOnly?.id)
+
+        val tooltipOnly = extractExperimentConfig(
+            configs, listOf(ExperimentKind.TOOLTIP), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )
+        Assert.assertEquals("tooltip", tooltipOnly?.id)
+
+        val both = extractExperimentConfig(
+            configs, listOf(ExperimentKind.POPUP, ExperimentKind.TOOLTIP), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )
+        Assert.assertNotNull(both)
+
+        val configOnly = extractExperimentConfig(
+            configs, listOf(ExperimentKind.CONFIG), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
+        )
+        Assert.assertNull(configOnly)
     }
 }

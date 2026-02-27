@@ -132,14 +132,25 @@ fun NubrickProvider(
 }
 
 
-class NubrickClient {
-    private val config: Config
+class NubrickClient private constructor(
+    private val config: Config,
+    context: Context,
+    onTooltip: ((data: String) -> Unit)? = null,
+) {
     private val db: SQLiteDatabase
     val user: NubrickUser
     val experiment: NubrickExperiment
 
-    constructor(config: Config, context: Context) {
-        this.config = config
+    constructor(config: Config, context: Context) : this(config, context, onTooltip = null)
+
+    companion object {
+        @FlutterBridgeApi
+        fun create(config: Config, context: Context, onTooltip: (data: String) -> Unit): NubrickClient {
+            return NubrickClient(config, context, onTooltip)
+        }
+    }
+
+    init {
         this.user = NubrickUser(context)
         val helper = NubrickDbHelper(context)
         this.db = helper.writableDatabase
@@ -148,6 +159,7 @@ class NubrickClient {
             user = this.user,
             db = this.db,
             context = context,
+            onTooltip = onTooltip,
         )
 
         if (this.config.trackCrashes) {
@@ -175,7 +187,8 @@ class NubrickExperiment {
         config: Config,
         user: NubrickUser,
         db: SQLiteDatabase,
-        context: Context
+        context: Context,
+        onTooltip: ((data: String) -> Unit)? = null,
     ) {
         this.container = ContainerImpl(
             config = config.copy(onEvent = { event ->
@@ -191,7 +204,7 @@ class NubrickExperiment {
             cache = CacheStore(config.cachePolicy),
             context = context,
         )
-        this.trigger = TriggerViewModel(this.container, user)
+        this.trigger = TriggerViewModel(this.container, user, onTooltip)
     }
 
     fun dispatch(event: NubrickEvent) {
@@ -275,12 +288,6 @@ class FlutterBridge(private val client: NubrickClient) {
         }
         return Pair(triggerDestinationPage?.data?.frameWidth, triggerDestinationPage?.data?.frameHeight)
         
-    }
-
-    suspend fun connectTooltip(trigger: String): Result<String?> {
-        return client.experiment.container.fetchTooltip(trigger).mapCatching { it ->
-            it.let { Json.encodeToString(UIBlock.encode(it)) }
-        }
     }
 
     private fun extractRootBlock(data: Any?): UIRootBlock? {

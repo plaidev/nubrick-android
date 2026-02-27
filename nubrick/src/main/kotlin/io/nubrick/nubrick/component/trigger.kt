@@ -15,6 +15,7 @@ import io.nubrick.nubrick.NubrickEvent
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.user.NubrickUser
 import io.nubrick.nubrick.data.user.getNubrickUserSharedPreferences
+import io.nubrick.nubrick.schema.ExperimentKind
 import io.nubrick.nubrick.schema.TriggerEventNameDefs
 import io.nubrick.nubrick.schema.UIBlock
 import io.nubrick.nubrick.schema.UIRootBlock
@@ -22,8 +23,14 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
-internal class TriggerViewModel(internal val container: Container, internal val user: NubrickUser) : ViewModel() {
+internal class TriggerViewModel(
+    internal val container: Container,
+    internal val user: NubrickUser,
+    private val onTooltip: ((data: String) -> Unit)? = null,
+) : ViewModel() {
     private val ignoreFirstUserEventToForegroundEvent = mutableStateOf(true)
     internal val modalStacks = mutableStateListOf<UIRootBlock>()
 
@@ -59,15 +66,29 @@ internal class TriggerViewModel(internal val container: Container, internal val 
     @OptIn(DelicateCoroutinesApi::class)
     fun dispatch(event: NubrickEvent) {
         val self = this
+        // onTooltip is only set in the Flutter SDK. Tooltips are a Flutter-only feature,
+        // so we fetch both popups and tooltips when running in Flutter, and popups only otherwise.
+        val kinds: List<ExperimentKind> = if (self.onTooltip != null) {
+            listOf(ExperimentKind.POPUP, ExperimentKind.TOOLTIP)
+        } else {
+            listOf(ExperimentKind.POPUP)
+        }
         GlobalScope.launch(Dispatchers.IO) {
             self.container.handleNubrickEvent(event)
-            self.container.fetchInAppMessage(event.name).onSuccess {
-                GlobalScope.launch(Dispatchers.Main) {
-                    if (it is UIBlock.UnionUIRootBlock) {
-                        if (self.modalStacks.indexOfFirst { stack ->
-                            stack.id == it.data.id
-                        } < 0) {
-                            self.modalStacks.add(it.data)
+            self.container.fetchTriggerContent(event.name, kinds).onSuccess { (kind, block) ->
+                if (kind == ExperimentKind.TOOLTIP) {
+                    self.onTooltip?.let { callback ->
+                        val jsonString = Json.encodeToString(UIBlock.encode(block))
+                        callback(jsonString)
+                    }
+                } else {
+                    GlobalScope.launch(Dispatchers.Main) {
+                        if (block is UIBlock.UnionUIRootBlock) {
+                            if (self.modalStacks.indexOfFirst { stack ->
+                                    stack.id == block.data.id
+                                } < 0) {
+                                self.modalStacks.add(block.data)
+                            }
                         }
                     }
                 }

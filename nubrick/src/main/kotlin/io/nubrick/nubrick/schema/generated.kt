@@ -821,6 +821,7 @@ internal class ExperimentConfig (
 	val frequency: ExperimentFrequency? = null,
 	val startedAt: DateTime? = null,
 	val endedAt: DateTime? = null,
+	val priority: Int? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): ExperimentConfig? {
@@ -848,6 +849,7 @@ internal class ExperimentConfig (
 				frequency = ExperimentFrequency.decode(element.jsonObject["frequency"]),
 				startedAt = DateTimeDecoder.decode(element.jsonObject["startedAt"]),
 				endedAt = DateTimeDecoder.decode(element.jsonObject["endedAt"]),
+				priority = IntDecoder.decode(element.jsonObject["priority"]),
 			)
 		}
 
@@ -893,6 +895,9 @@ internal class ExperimentConfig (
 			}
 			data.endedAt?.let { value ->
 				DateTimeEncoder.encode(value)?.let { map["endedAt"] = it }
+			}
+			data.priority?.let { value ->
+				IntEncoder.encode(value)?.let { map["priority"] = it }
 			}
 
 			return JsonObject(map)
