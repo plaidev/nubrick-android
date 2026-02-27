@@ -21,6 +21,12 @@ import io.nubrick.nubrick.schema.UIBlock
 import io.nubrick.nubrick.template.compile
 import kotlinx.serialization.json.JsonElement
 
+internal data class ExtractedVariant(
+    val experimentId: String,
+    val kind: ExperimentKind,
+    val variant: ExperimentVariant,
+)
+
 class NotFoundException : Exception("Not found")
 class FailedToDecodeException : Exception("Failed to decode")
 class SkipHttpRequestException : Exception("Skip http request")
@@ -47,8 +53,7 @@ internal interface Container {
     ): Result<JsonElement>
 
     suspend fun fetchEmbedding(experimentId: String, componentId: String? = null): Result<UIBlock>
-    suspend fun fetchInAppMessage(trigger: String): Result<UIBlock>
-    suspend fun fetchTooltip(trigger: String): Result<UIBlock>
+    suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind, UIBlock>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
 
     fun storeNativeCrash(throwable: Throwable)
@@ -166,27 +171,27 @@ internal class ContainerImpl(
         val configs = this.experimentRepository.fetchExperimentConfigs(experimentId).getOrElse {
             return Result.failure(it)
         }
-        val (experimentId, variant) = this.extractVariant(configs = configs, ExperimentKind.EMBED)
+        val extracted = this.extractVariant(configs = configs, listOf(ExperimentKind.EMBED))
             .getOrElse {
                 return Result.failure(it)
             }
-        val variantId = variant.id ?: return Result.failure(NotFoundException())
+        val variantId = extracted.variant.id ?: return Result.failure(NotFoundException())
         this.trackRepository.trackExperimentEvent(
             TrackExperimentEvent(
-                experimentId = experimentId,
+                experimentId = extracted.experimentId,
                 variantId = variantId
             )
         )
-        this.databaseRepository.appendExperimentHistory(experimentId)
-        val componentId = extractComponentId(variant) ?: return Result.failure(NotFoundException())
+        this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
-            this.componentRepository.fetchComponent(experimentId, componentId).getOrElse {
+            this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
                 return Result.failure(it)
             }
         return Result.success(component)
     }
 
-    override suspend fun fetchInAppMessage(trigger: String): Result<UIBlock> {
+    override suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind, UIBlock>> {
         // send the user track event and save it to database
         this.trackRepository.trackEvent(TrackUserEvent(trigger))
         this.databaseRepository.appendUserEvent(trigger)
@@ -195,76 +200,54 @@ internal class ContainerImpl(
         val configs = this.experimentRepository.fetchTriggerExperimentConfigs(trigger).getOrElse {
             return Result.failure(it)
         }
-        val (experimentId, variant) = this.extractVariant(configs = configs, ExperimentKind.POPUP)
-            .getOrElse {
-                return Result.failure(it)
-            }
-        val variantId = variant.id ?: return Result.failure(NotFoundException())
-        this.trackRepository.trackExperimentEvent(
-            TrackExperimentEvent(
-                experimentId = experimentId,
-                variantId = variantId
-            )
-        )
-        this.databaseRepository.appendExperimentHistory(experimentId)
-        val componentId = extractComponentId(variant) ?: return Result.failure(NotFoundException())
-        val component =
-            this.componentRepository.fetchComponent(experimentId, componentId).getOrElse {
-                return Result.failure(it)
-            }
-        return Result.success(component)
-    }
 
-    override suspend fun fetchTooltip(trigger: String): Result<UIBlock> {
-        // fetch config from cdn
-        val configs = this.experimentRepository.fetchTriggerExperimentConfigs(trigger).getOrElse {
-            return Result.failure(it)
-        }
-        val (experimentId, variant) = this.extractVariant(configs = configs, ExperimentKind.TOOLTIP)
+        // select the best matching config for the specified kinds
+        val extracted = this.extractVariant(configs = configs, kinds)
             .getOrElse {
                 return Result.failure(it)
             }
-        val variantId = variant.id ?: return Result.failure(NotFoundException())
+        val variantId = extracted.variant.id ?: return Result.failure(NotFoundException())
         this.trackRepository.trackExperimentEvent(
             TrackExperimentEvent(
-                experimentId = experimentId,
+                experimentId = extracted.experimentId,
                 variantId = variantId
             )
         )
-        this.databaseRepository.appendExperimentHistory(experimentId)
-        val componentId = extractComponentId(variant) ?: return Result.failure(NotFoundException())
+        this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
-            this.componentRepository.fetchComponent(experimentId, componentId).getOrElse {
+            this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
                 return Result.failure(it)
             }
-        return Result.success(component)
+        return Result.success(extracted.kind to component)
     }
 
     override suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant> {
         val configs = this.experimentRepository.fetchExperimentConfigs(experimentId).getOrElse {
             return Result.failure(it)
         }
-        val (experimentId, variant) = this.extractVariant(configs = configs, ExperimentKind.CONFIG)
+        val extracted = this.extractVariant(configs = configs, listOf(ExperimentKind.CONFIG))
             .getOrElse {
                 return Result.failure(it)
             }
-        val variantId = variant.id ?: return Result.failure(NotFoundException())
+        val variantId = extracted.variant.id ?: return Result.failure(NotFoundException())
         this.trackRepository.trackExperimentEvent(
             TrackExperimentEvent(
-                experimentId = experimentId,
+                experimentId = extracted.experimentId,
                 variantId = variantId
             )
         )
-        this.databaseRepository.appendExperimentHistory(experimentId)
-        return Result.success(variant)
+        this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        return Result.success(extracted.variant)
     }
 
     private fun extractVariant(
         configs: ExperimentConfigs,
-        kind: ExperimentKind,
-    ): Result<Pair<String, ExperimentVariant>> {
+        kinds: List<ExperimentKind>,
+    ): Result<ExtractedVariant> {
         val config = extractExperimentConfig(
             configs = configs,
+            kinds = kinds,
             properties = { seed -> this.user.toUserProperties(seed) },
             isNotInFrequency = { experimentId, frequency ->
                 this.databaseRepository.isNotInFrequency(experimentId, frequency)
@@ -277,7 +260,7 @@ internal class ContainerImpl(
             }
         ) ?: return Result.failure(NotFoundException())
         val experimentId = config.id ?: return Result.failure(NotFoundException())
-        if (config.kind != kind) return Result.failure(NotFoundException())
+        val kind = config.kind ?: return Result.failure(NotFoundException())
 
         val normalizedUserRnd = this.user.getNormalizedUserRnd(config.seed)
         val variant = extractExperimentVariant(
@@ -285,7 +268,7 @@ internal class ContainerImpl(
             normalizedUserRnd = normalizedUserRnd
         ) ?: return Result.failure(NotFoundException())
 
-        return Result.success(experimentId to variant)
+        return Result.success(ExtractedVariant(experimentId, kind, variant))
     }
 
     override fun storeNativeCrash(throwable: Throwable) {
