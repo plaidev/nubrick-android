@@ -135,7 +135,7 @@ fun NubrickProvider(
 class NubrickClient private constructor(
     private val config: Config,
     context: Context,
-    onTooltip: ((data: String) -> Unit)? = null,
+    onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
 ) {
     private val db: SQLiteDatabase
     val user: NubrickUser
@@ -145,7 +145,11 @@ class NubrickClient private constructor(
 
     companion object {
         @FlutterBridgeApi
-        fun create(config: Config, context: Context, onTooltip: (data: String) -> Unit): NubrickClient {
+        fun create(
+            config: Config,
+            context: Context,
+            onTooltip: (data: String, experimentId: String) -> Unit
+        ): NubrickClient {
             return NubrickClient(config, context, onTooltip)
         }
     }
@@ -188,7 +192,7 @@ class NubrickExperiment {
         user: NubrickUser,
         db: SQLiteDatabase,
         context: Context,
-        onTooltip: ((data: String) -> Unit)? = null,
+        onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
     ) {
         this.container = ContainerImpl(
             config = config.copy(onEvent = { event ->
@@ -223,6 +227,12 @@ class NubrickExperiment {
     @FlutterBridgeApi
     fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         this.container.sendFlutterCrash(crashEvent)
+    }
+
+    @FlutterBridgeApi
+    fun appendTooltipExperimentHistory(experimentId: String) {
+        if (experimentId.isEmpty()) return
+        this.container.appendExperimentHistory(experimentId)
     }
 
     @Composable

@@ -29,7 +29,7 @@ import kotlinx.serialization.json.Json
 internal class TriggerViewModel(
     internal val container: Container,
     internal val user: NubrickUser,
-    private val onTooltip: ((data: String) -> Unit)? = null,
+    private val onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
 ) : ViewModel() {
     private val ignoreFirstUserEventToForegroundEvent = mutableStateOf(true)
     internal val modalStacks = mutableStateListOf<UIRootBlock>()
@@ -75,13 +75,15 @@ internal class TriggerViewModel(
         }
         GlobalScope.launch(Dispatchers.IO) {
             self.container.handleNubrickEvent(event)
-            self.container.fetchTriggerContent(event.name, kinds).onSuccess { (kind, block) ->
+            self.container.fetchTriggerContent(event.name, kinds).onSuccess { triggerContent ->
+                val kind = triggerContent.kind
+                val block = triggerContent.block
                 if (kind == ExperimentKind.TOOLTIP) {
                     self.onTooltip?.let { callback ->
                         val jsonString = Json.encodeToString(UIBlock.encode(block))
                         // Flutter MethodChannel requires calls on the main thread
                         GlobalScope.launch(Dispatchers.Main) {
-                            callback(jsonString)
+                            callback(jsonString, triggerContent.experimentId)
                         }
                     }
                 } else {
