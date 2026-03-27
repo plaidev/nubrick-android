@@ -27,6 +27,12 @@ internal data class ExtractedVariant(
     val variant: ExperimentVariant,
 )
 
+internal data class TriggerContent(
+    val experimentId: String,
+    val kind: ExperimentKind,
+    val block: UIBlock,
+)
+
 class NotFoundException : Exception("Not found")
 class FailedToDecodeException : Exception("Failed to decode")
 class SkipHttpRequestException : Exception("Skip http request")
@@ -53,8 +59,9 @@ internal interface Container {
     ): Result<JsonElement>
 
     suspend fun fetchEmbedding(experimentId: String, componentId: String? = null): Result<UIBlock>
-    suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind, UIBlock>>
+    suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<TriggerContent>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
+    fun appendExperimentHistory(experimentId: String)
 
     fun storeNativeCrash(throwable: Throwable)
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
@@ -182,7 +189,11 @@ internal class ContainerImpl(
                 variantId = variantId
             )
         )
-        this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        // Tooltip is a Flutter-only flow. Persist tooltip history only after
+        // Flutter confirms the tooltip actually started rendering.
+        if (extracted.kind != ExperimentKind.TOOLTIP) {
+            this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        }
         val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
             this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
@@ -191,7 +202,7 @@ internal class ContainerImpl(
         return Result.success(component)
     }
 
-    override suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<Pair<ExperimentKind, UIBlock>> {
+    override suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<TriggerContent> {
         // send the user track event and save it to database
         this.trackRepository.trackEvent(TrackUserEvent(trigger))
         this.databaseRepository.appendUserEvent(trigger)
@@ -213,13 +224,23 @@ internal class ContainerImpl(
                 variantId = variantId
             )
         )
-        this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        // Tooltip is a Flutter-only flow. Persist tooltip history only after
+        // Flutter confirms the tooltip actually started rendering.
+        if (extracted.kind != ExperimentKind.TOOLTIP) {
+            this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        }
         val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
             this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
                 return Result.failure(it)
             }
-        return Result.success(extracted.kind to component)
+        return Result.success(
+            TriggerContent(
+                experimentId = extracted.experimentId,
+                kind = extracted.kind,
+                block = component,
+            )
+        )
     }
 
     override suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant> {
@@ -239,6 +260,10 @@ internal class ContainerImpl(
         )
         this.databaseRepository.appendExperimentHistory(extracted.experimentId)
         return Result.success(extracted.variant)
+    }
+
+    override fun appendExperimentHistory(experimentId: String) {
+        this.databaseRepository.appendExperimentHistory(experimentId)
     }
 
     private fun extractVariant(
