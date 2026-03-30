@@ -247,8 +247,10 @@ internal class TrackRepositoryImpl: TrackRepository {
     private fun sendCrashToBackend(crashEvent: TrackCrashEvent) {
         val causedByNubrick = crashEvent.exceptions.any { exception ->
             exception.callStacks.orEmpty().any { frame ->
-                frame.className?.contains("io.nubrick.nubrick") ?: false ||
-                frame.className?.contains("package:nativebrik_bridge") ?: false
+                val className = frame.className ?: return@any false
+                className.contains("io.nubrick.nubrick") ||
+                className.contains("app.nubrick.flutter.nubrick_flutter") ||
+                className.contains("package:nubrick_flutter")
             }
         }
 
