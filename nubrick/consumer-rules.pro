@@ -5,9 +5,6 @@
 -keep,allowshrinking class io.nubrick.nubrick.**
 -keepclassmembers,allowshrinking class io.nubrick.nubrick.** { *; }
 
-# Keep file and line metadata for crash frame readability.
--keepattributes SourceFile,LineNumberTable
-
 # Bridge APIs can be invoked indirectly, so keep them hard.
 -keep @io.nubrick.nubrick.FlutterBridgeApi class * { *; }
 -keepclassmembers class * {
