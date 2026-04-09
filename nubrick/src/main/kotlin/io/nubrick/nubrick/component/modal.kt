@@ -9,7 +9,7 @@ import androidx.compose.runtime.setValue
 import io.nubrick.nubrick.component.provider.pageblock.PageBlockData
 import io.nubrick.nubrick.schema.ModalPresentationStyle
 import io.nubrick.nubrick.schema.ModalScreenSize
-import io.nubrick.nubrick.schema.UIBlockEventDispatcher
+import io.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
@@ -29,7 +29,7 @@ internal class ModalViewModel(
     private val largeSheetState: SheetState,
     private val scope: CoroutineScope,
     private val onDismiss: () -> Unit,
-    private var onTrigger: ((trigger: UIBlockEventDispatcher, data: JsonElement) -> Unit) = { _, _ -> },
+    private var onTrigger: ((trigger: UIBlockAction, data: JsonElement) -> Unit) = { _, _ -> },
 ) {
     var modalState by mutableStateOf(ModalState())
         private set
@@ -90,7 +90,7 @@ internal class ModalViewModel(
         }
     }
 
-    fun setOnTrigger(onTrigger: ((trigger: UIBlockEventDispatcher, data: JsonElement) -> Unit)) {
+    fun setOnTrigger(onTrigger: ((trigger: UIBlockAction, data: JsonElement) -> Unit)) {
         this.onTrigger = onTrigger
     }
 }

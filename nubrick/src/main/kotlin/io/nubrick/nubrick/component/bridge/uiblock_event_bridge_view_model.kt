@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import io.nubrick.nubrick.component.provider.container.ContainerContext
 import io.nubrick.nubrick.component.provider.data.DataContext
 import io.nubrick.nubrick.component.provider.event.LocalEventListener
-import io.nubrick.nubrick.schema.UIBlockEventDispatcher
+import io.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -19,12 +19,12 @@ import kotlinx.serialization.json.JsonElement
 // forcefully dispatch uiblock event in the page compose context, from anywhere.
 // dispatch(event) in flutter -> listen the event in the page context, and dispatch event from the page.
 public class UIBlockEventBridgeViewModel : ViewModel() {
-    private val _events = MutableSharedFlow<UIBlockEventDispatcher>()
-    internal val events: SharedFlow<UIBlockEventDispatcher> = _events
+    private val _events = MutableSharedFlow<UIBlockAction>()
+    internal val events: SharedFlow<UIBlockAction> = _events
 
     suspend fun dispatch(event: String) {
         val json = Json.decodeFromString<JsonElement>(event)
-        val dispatcher = UIBlockEventDispatcher.decode(json) ?: return
+        val dispatcher = UIBlockAction.decode(json) ?: return
         _events.emit(dispatcher)
     }
 }
@@ -34,7 +34,7 @@ public class UIBlockEventBridgeViewModel : ViewModel() {
 @DelicateCoroutinesApi
 @Composable
 internal fun UIBlockEventBridgeCollector(
-    events: SharedFlow<UIBlockEventDispatcher>?,
+    events: SharedFlow<UIBlockAction>?,
     isCurrentPage: Boolean
 ) {
     val container = ContainerContext.value

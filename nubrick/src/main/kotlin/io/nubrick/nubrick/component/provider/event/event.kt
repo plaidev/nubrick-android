@@ -27,7 +27,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import io.nubrick.nubrick.component.provider.container.ContainerContext
 import io.nubrick.nubrick.component.provider.data.DataContext
 import io.nubrick.nubrick.data.FormValueListener
-import io.nubrick.nubrick.schema.UIBlockEventDispatcher
+import io.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -40,16 +40,16 @@ internal var LocalEventListener = compositionLocalOf<EventListenerState> {
 }
 
 internal data class EventListenerState(
-    internal val listener: (event: UIBlockEventDispatcher, data: JsonElement) -> Unit
+    internal val listener: (event: UIBlockAction, data: JsonElement) -> Unit
 ) {
-    fun dispatch(event: UIBlockEventDispatcher, data: JsonElement) {
+    fun dispatch(event: UIBlockAction, data: JsonElement) {
         this.listener(event, data)
     }
 }
 
 @Composable
 internal fun rememberEventListenerState(
-    listener: (event: UIBlockEventDispatcher, data: JsonElement) -> Unit
+    listener: (event: UIBlockAction, data: JsonElement) -> Unit
 ): EventListenerState {
     val state: EventListenerState by remember {
         mutableStateOf(EventListenerState(listener))
@@ -61,7 +61,7 @@ internal fun rememberEventListenerState(
 
 @Composable
 internal fun EventListenerProvider(
-    listener: (event: UIBlockEventDispatcher, data: JsonElement) -> Unit,
+    listener: (event: UIBlockAction, data: JsonElement) -> Unit,
     content: @Composable () -> Unit,
 ) {
     val state = rememberEventListenerState(listener)
@@ -74,7 +74,7 @@ internal fun EventListenerProvider(
 
 @Composable
 internal fun Modifier.eventDispatcher(
-    eventDispatcher: UIBlockEventDispatcher?
+    eventDispatcher: UIBlockAction?
 ): Modifier = composed {
     val container = ContainerContext.value
     val data = DataContext.state.data

@@ -55,7 +55,7 @@ import io.nubrick.nubrick.schema.ModalScreenSize
 import io.nubrick.nubrick.schema.PageKind
 import io.nubrick.nubrick.schema.Property
 import io.nubrick.nubrick.schema.PropertyType
-import io.nubrick.nubrick.schema.UIBlockEventDispatcher
+import io.nubrick.nubrick.schema.UIBlockAction
 import io.nubrick.nubrick.schema.UIPageBlock
 import io.nubrick.nubrick.schema.UIRootBlock
 import io.nubrick.nubrick.template.compile
@@ -63,9 +63,9 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
-private fun parseUIEventToEvent(event: UIBlockEventDispatcher): Event {
+private fun parseUIEventToEvent(event: UIBlockAction): Event {
     return Event(
-        name = event.name,
+        name = event.eventName,
         deepLink = event.deepLink,
         payload = event.payload?.map { p ->
             EventProperty(
@@ -84,7 +84,7 @@ private fun parseUIEventToEvent(event: UIBlockEventDispatcher): Event {
 
 internal data class WebviewData(
     val url: String,
-    val trigger: UIBlockEventDispatcher?,
+    val trigger: UIBlockAction?,
 ) {}
 
 internal class RootViewModel(
@@ -93,7 +93,7 @@ internal class RootViewModel(
     private val onNextTooltip: ((pageId: String) -> Unit) = {},
     private val onDismiss: ((root: UIRootBlock) -> Unit) = {},
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
-    private val onTrigger: ((trigger: UIBlockEventDispatcher) -> Unit) = {},
+    private val onTrigger: ((trigger: UIBlockAction) -> Unit) = {},
     private val onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
 ) : ViewModel() {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
@@ -127,7 +127,7 @@ internal class RootViewModel(
         }
     }
 
-    fun handleNavigate(event: UIBlockEventDispatcher, data: JsonElement) {
+    fun handleNavigate(event: UIBlockAction, data: JsonElement) {
         val deepLink = event.deepLink?.let { compile(it, data) } ?: ""
         if (deepLink.isNotEmpty()) {
             onOpenDeepLink(deepLink)
@@ -293,7 +293,7 @@ internal fun Root(
         ModalBottomSheetDefaults.properties(shouldDismissOnBackPress = false)
     }
     val listener = remember(viewModel, onEvent, container) {
-        { event: UIBlockEventDispatcher, data: JsonElement ->
+        { event: UIBlockAction, data: JsonElement ->
             viewModel.handleNavigate(event, data)
 
             val e = parseUIEventToEvent(event)

@@ -1920,7 +1920,7 @@ internal enum class TriggerEventNameDefs {
 
 
 internal class TriggerSetting (
-	val onTrigger: UIBlockEventDispatcher? = null,
+	val onTrigger: UIBlockAction? = null,
 	val trigger: TriggerEventDef? = null,
 ) {
 	companion object {
@@ -1933,7 +1933,7 @@ internal class TriggerSetting (
 			}
 
 			return TriggerSetting(
-				onTrigger = UIBlockEventDispatcher.decode(element.jsonObject["onTrigger"]),
+				onTrigger = UIBlockAction.decode(element.jsonObject["onTrigger"]),
 				trigger = TriggerEventDef.decode(element.jsonObject["trigger"]),
 			)
 		}
@@ -1946,7 +1946,7 @@ internal class TriggerSetting (
 			val map = mutableMapOf<String, JsonElement>()
 			map["__typename"] = JsonPrimitive("TriggerSetting")
 			data.onTrigger?.let { value ->
-				UIBlockEventDispatcher.encode(value)?.let { map["onTrigger"] = it }
+				UIBlockAction.encode(value)?.let { map["onTrigger"] = it }
 			}
 			data.trigger?.let { value ->
 				TriggerEventDef.encode(value)?.let { map["trigger"] = it }
@@ -2099,7 +2099,8 @@ internal sealed class UIBlock {
 }
 
 
-internal class UIBlockEventDispatcher (
+internal class UIBlockAction (
+	val eventName: String? = null,
 	val name: String? = null,
 	val destinationPageId: String? = null,
 	val deepLink: String? = null,
@@ -2109,7 +2110,7 @@ internal class UIBlockEventDispatcher (
 	val httpResponseAssertion: ApiHttpResponseAssertion? = null,
 ) {
 	companion object {
-		fun decode(element: JsonElement?): UIBlockEventDispatcher? {
+		fun decode(element: JsonElement?): UIBlockAction? {
 			if (element == null) {
 				return null
 			}
@@ -2117,7 +2118,9 @@ internal class UIBlockEventDispatcher (
 				return null
 			}
 
-			return UIBlockEventDispatcher(
+			return UIBlockAction(
+				eventName = StringDecoder.decode(element.jsonObject["eventName"])
+					?: StringDecoder.decode(element.jsonObject["name"]),
 				name = StringDecoder.decode(element.jsonObject["name"]),
 				destinationPageId = StringDecoder.decode(element.jsonObject["destinationPageId"]),
 				deepLink = StringDecoder.decode(element.jsonObject["deepLink"]),
@@ -2132,13 +2135,16 @@ internal class UIBlockEventDispatcher (
 			)
 		}
 
-		fun encode(data: UIBlockEventDispatcher?): JsonElement? {
+		fun encode(data: UIBlockAction?): JsonElement? {
 			if (data == null) {
 				return JsonNull
 			}
 
 			val map = mutableMapOf<String, JsonElement>()
-			map["__typename"] = JsonPrimitive("UIBlockEventDispatcher")
+			map["__typename"] = JsonPrimitive("UIBlockAction")
+			data.eventName?.let { value ->
+				StringEncoder.encode(value)?.let { map["eventName"] = it }
+			}
 			data.name?.let { value ->
 				StringEncoder.encode(value)?.let { map["name"] = it }
 			}
@@ -2212,7 +2218,7 @@ internal class UICarouselBlockData (
 	val children: List<UIBlock>? = null,
 	val frame: FrameData? = null,
 	val gap: Int? = null,
-	val onClick: UIBlockEventDispatcher? = null,
+	val onClick: UIBlockAction? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UICarouselBlockData? {
@@ -2229,7 +2235,7 @@ internal class UICarouselBlockData (
 			},
 				frame = FrameData.decode(element.jsonObject["frame"]),
 				gap = IntDecoder.decode(element.jsonObject["gap"]),
-				onClick = UIBlockEventDispatcher.decode(element.jsonObject["onClick"]),
+				onClick = UIBlockAction.decode(element.jsonObject["onClick"]),
 			)
 		}
 
@@ -2252,7 +2258,7 @@ internal class UICarouselBlockData (
 				IntEncoder.encode(value)?.let { map["gap"] = it }
 			}
 			data.onClick?.let { value ->
-				UIBlockEventDispatcher.encode(value)?.let { map["onClick"] = it }
+				UIBlockAction.encode(value)?.let { map["onClick"] = it }
 			}
 
 			return JsonObject(map)
@@ -2312,7 +2318,7 @@ internal class UICollectionBlockData (
 	val pageControl: Boolean? = null,
 	val autoScroll: Boolean? = null,
 	val autoScrollInterval: Float? = null,
-	val onClick: UIBlockEventDispatcher? = null,
+	val onClick: UIBlockAction? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UICollectionBlockData? {
@@ -2339,7 +2345,7 @@ internal class UICollectionBlockData (
 				pageControl = BooleanDecoder.decode(element.jsonObject["pageControl"]),
 				autoScroll = BooleanDecoder.decode(element.jsonObject["autoScroll"]),
 				autoScrollInterval = FloatDecoder.decode(element.jsonObject["autoScrollInterval"]),
-				onClick = UIBlockEventDispatcher.decode(element.jsonObject["onClick"]),
+				onClick = UIBlockAction.decode(element.jsonObject["onClick"]),
 			)
 		}
 
@@ -2392,7 +2398,7 @@ internal class UICollectionBlockData (
 				FloatEncoder.encode(value)?.let { map["autoScrollInterval"] = it }
 			}
 			data.onClick?.let { value ->
-				UIBlockEventDispatcher.encode(value)?.let { map["onClick"] = it }
+				UIBlockAction.encode(value)?.let { map["onClick"] = it }
 			}
 
 			return JsonObject(map)
@@ -2446,7 +2452,7 @@ internal class UIFlexContainerBlockData (
 	val gap: Int? = null,
 	val frame: FrameData? = null,
 	val overflow: Overflow? = null,
-	val onClick: UIBlockEventDispatcher? = null,
+	val onClick: UIBlockAction? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UIFlexContainerBlockData? {
@@ -2467,7 +2473,7 @@ internal class UIFlexContainerBlockData (
 				gap = IntDecoder.decode(element.jsonObject["gap"]),
 				frame = FrameData.decode(element.jsonObject["frame"]),
 				overflow = Overflow.decode(element.jsonObject["overflow"]),
-				onClick = UIBlockEventDispatcher.decode(element.jsonObject["onClick"]),
+				onClick = UIBlockAction.decode(element.jsonObject["onClick"]),
 			)
 		}
 
@@ -2502,7 +2508,7 @@ internal class UIFlexContainerBlockData (
 				Overflow.encode(value)?.let { map["overflow"] = it }
 			}
 			data.onClick?.let { value ->
-				UIBlockEventDispatcher.encode(value)?.let { map["onClick"] = it }
+				UIBlockAction.encode(value)?.let { map["onClick"] = it }
 			}
 
 			return JsonObject(map)
@@ -2552,7 +2558,7 @@ internal class UIImageBlockData (
 	val src: String? = null,
 	val contentMode: ImageContentMode? = null,
 	val frame: FrameData? = null,
-	val onClick: UIBlockEventDispatcher? = null,
+	val onClick: UIBlockAction? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UIImageBlockData? {
@@ -2567,7 +2573,7 @@ internal class UIImageBlockData (
 				src = StringDecoder.decode(element.jsonObject["src"]),
 				contentMode = ImageContentMode.decode(element.jsonObject["contentMode"]),
 				frame = FrameData.decode(element.jsonObject["frame"]),
-				onClick = UIBlockEventDispatcher.decode(element.jsonObject["onClick"]),
+				onClick = UIBlockAction.decode(element.jsonObject["onClick"]),
 			)
 		}
 
@@ -2588,7 +2594,7 @@ internal class UIImageBlockData (
 				FrameData.encode(value)?.let { map["frame"] = it }
 			}
 			data.onClick?.let { value ->
-				UIBlockEventDispatcher.encode(value)?.let { map["onClick"] = it }
+				UIBlockAction.encode(value)?.let { map["onClick"] = it }
 			}
 
 			return JsonObject(map)
@@ -3288,7 +3294,7 @@ internal class UITextBlockData (
 	val weight: FontWeight? = null,
 	val maxLines: Int? = null,
 	val frame: FrameData? = null,
-	val onClick: UIBlockEventDispatcher? = null,
+	val onClick: UIBlockAction? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UITextBlockData? {
@@ -3307,7 +3313,7 @@ internal class UITextBlockData (
 				weight = FontWeight.decode(element.jsonObject["weight"]),
 				maxLines = IntDecoder.decode(element.jsonObject["maxLines"]),
 				frame = FrameData.decode(element.jsonObject["frame"]),
-				onClick = UIBlockEventDispatcher.decode(element.jsonObject["onClick"]),
+				onClick = UIBlockAction.decode(element.jsonObject["onClick"]),
 			)
 		}
 
@@ -3340,7 +3346,7 @@ internal class UITextBlockData (
 				FrameData.encode(value)?.let { map["frame"] = it }
 			}
 			data.onClick?.let { value ->
-				UIBlockEventDispatcher.encode(value)?.let { map["onClick"] = it }
+				UIBlockAction.encode(value)?.let { map["onClick"] = it }
 			}
 
 			return JsonObject(map)
