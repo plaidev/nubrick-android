@@ -199,6 +199,14 @@ private class NubrickRuntime(
         return this.user.getProperty(key)
     }
 
+    fun setUserProperties(props: Map<String, Any>) {
+        this.user.setProperties(props)
+    }
+
+    fun getUserProperties(): Map<String, String> {
+        return this.user.getProperties().toMap()
+    }
+
     @Composable
     fun Overlay() {
         Trigger(trigger = this.trigger)
@@ -341,6 +349,16 @@ object NubrickSDK {
     fun getUserProperty(key: String): String? {
         val current = runtimeOrNull(throwInDebug = false) ?: return null
         return current.getUserProperty(key)
+    }
+
+    fun setUserProperties(props: Map<String, Any>) {
+        val current = runtimeOrNull(throwInDebug = false) ?: return
+        current.setUserProperties(props)
+    }
+
+    fun getUserProperties(): Map<String, String> {
+        val current = runtimeOrNull(throwInDebug = false) ?: return emptyMap()
+        return current.getUserProperties()
     }
 
     @Composable

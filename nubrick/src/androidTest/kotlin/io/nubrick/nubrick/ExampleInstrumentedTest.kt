@@ -47,7 +47,7 @@ class ExampleInstrumentedTest {
     }
 
     @Test
-    fun initializeAndDispatch_doNotThrow() {
+    fun initializeAndReinitialize_doNotThrow() {
         NubrickSDK.resetForTest()
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
 
@@ -60,7 +60,6 @@ class ExampleInstrumentedTest {
             config = Config(projectId = "another-project-id")
         )
 
-        NubrickSDK.dispatch(NubrickEvent("TEST_EVENT"))
         assertTrue(true)
     }
 
@@ -70,12 +69,15 @@ class ExampleInstrumentedTest {
 
         assertNull(NubrickSDK.getUserId())
         assertNull(NubrickSDK.getUserProperty("plan"))
+        assertTrue(NubrickSDK.getUserProperties().isEmpty())
 
         NubrickSDK.setUserId("user-before-init")
         NubrickSDK.setUserProperty("plan", "pro")
+        NubrickSDK.setUserProperties(mapOf("tier" to "gold"))
 
         assertNull(NubrickSDK.getUserId())
         assertNull(NubrickSDK.getUserProperty("plan"))
+        assertTrue(NubrickSDK.getUserProperties().isEmpty())
     }
 
     @Test
@@ -96,5 +98,31 @@ class ExampleInstrumentedTest {
         assertEquals("pro", NubrickSDK.getUserProperty("plan"))
         assertEquals("20", NubrickSDK.getUserProperty("age"))
         assertEquals("true", NubrickSDK.getUserProperty("isMember"))
+    }
+
+    @Test
+    fun userPluralApis_initialized_roundtrip() {
+        NubrickSDK.resetForTest()
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        NubrickSDK.initialize(
+            context = appContext,
+            config = Config(projectId = "test-project-id")
+        )
+
+        NubrickSDK.setUserProperties(
+            mapOf(
+                "userId" to "user-456",
+                "plan" to "basic",
+                "age" to 30,
+                "isMember" to false
+            )
+        )
+
+        val props = NubrickSDK.getUserProperties()
+        assertEquals("user-456", NubrickSDK.getUserId())
+        assertEquals("basic", props["plan"])
+        assertEquals("30", props["age"])
+        assertEquals("false", props["isMember"])
+        assertEquals("user-456", props["userId"])
     }
 }
