@@ -2,12 +2,10 @@ package io.nubrick.nubrick
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -39,7 +37,6 @@ import io.nubrick.nubrick.schema.UIRootBlock
 import io.nubrick.nubrick.schema.UIPageBlock
 import io.nubrick.nubrick.schema.PageKind
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
@@ -85,7 +82,7 @@ data class Config(
     val onEvent: ((event: Event) -> Unit)? = null,
     val cachePolicy: CachePolicy = CachePolicy(),
     val onDispatch: ((event: NubrickEvent) -> Unit)? = null,
-    val trackCrashes : Boolean = true,
+    val trackCrashes: Boolean = true,
 )
 
 enum class CacheStorage {
@@ -102,98 +99,26 @@ data class NubrickEvent(
     val name: String
 )
 
-internal var LocalNubrickClient = compositionLocalOf<NubrickClient> {
-    error("NubrickClient is not found")
-}
+private class NubrickUninitializedException : IllegalStateException(
+    "NubrickSDK used before NubrickSDK.initialize(...)."
+)
 
-object Nubrick {
-    /**
-     * Retrieves the current [NubrickClient] at the call site's position in the hierarchy.
-     */
-    val client: NubrickClient
-        @Composable
-        @ReadOnlyComposable
-        get() = LocalNubrickClient.current
-}
-
-@Composable
-fun NubrickProvider(
-    client: NubrickClient,
-    content: @Composable() () -> Unit
-) {
-    CompositionLocalProvider(
-        LocalNubrickClient provides client
-    ) {
-        NubrickTheme {
-            client.experiment.Overlay()
-        }
-        content()
-    }
-}
-
-
-class NubrickClient private constructor(
-    private val config: Config,
+private class NubrickRuntime(
+    config: Config,
     context: Context,
     onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
 ) {
+    private val user: NubrickUser
     private val db: SQLiteDatabase
-    val user: NubrickUser
-    val experiment: NubrickExperiment
-
-    constructor(config: Config, context: Context) : this(config, context, onTooltip = null)
-
-    companion object {
-        @FlutterBridgeApi
-        fun create(
-            config: Config,
-            context: Context,
-            onTooltip: (data: String, experimentId: String) -> Unit
-        ): NubrickClient {
-            return NubrickClient(config, context, onTooltip)
-        }
-    }
+    private val defaultExceptionHandler: Thread.UncaughtExceptionHandler?
+    private val installedExceptionHandler: Thread.UncaughtExceptionHandler?
+    private val trigger: TriggerViewModel
+    val container: Container
 
     init {
-        this.user = NubrickUser(context)
-        val helper = NubrickDbHelper(context)
-        this.db = helper.writableDatabase
-        this.experiment = NubrickExperiment(
-            config = this.config,
-            user = this.user,
-            db = this.db,
-            context = context,
-            onTooltip = onTooltip,
-        )
-
-        if (this.config.trackCrashes) {
-            val existingHandler = Thread.getDefaultUncaughtExceptionHandler()
-            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-                try {
-                    this.experiment.storeNativeCrash(throwable)
-                } finally {
-                    existingHandler?.uncaughtException(thread, throwable)
-                }
-            }
-        }
-    }
-
-    fun close() {
-        this.db.close()
-    }
-}
-
-class NubrickExperiment {
-    internal val container: Container
-    private val trigger: TriggerViewModel
-
-    internal constructor(
-        config: Config,
-        user: NubrickUser,
-        db: SQLiteDatabase,
-        context: Context,
-        onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
-    ) {
+        val appContext = context.applicationContext
+        this.user = NubrickUser(appContext)
+        this.db = NubrickDbHelper(appContext).writableDatabase
         this.container = ContainerImpl(
             config = config.copy(onEvent = { event ->
                 val name = event.name ?: ""
@@ -202,13 +127,39 @@ class NubrickExperiment {
                 }
                 config.onEvent?.let { it(event) }
             }),
-            user = user,
-            db = db,
+            user = this.user,
+            db = this.db,
             formRepository = FormRepositoryImpl(),
             cache = CacheStore(config.cachePolicy),
-            context = context,
+            context = appContext,
         )
-        this.trigger = TriggerViewModel(this.container, user, onTooltip)
+        this.trigger = TriggerViewModel(this.container, this.user, onTooltip)
+
+        if (config.trackCrashes) {
+            val existingHandler = Thread.getDefaultUncaughtExceptionHandler()
+            val crashHandler = Thread.UncaughtExceptionHandler { thread, throwable ->
+                try {
+                    this.storeNativeCrash(throwable)
+                } finally {
+                    existingHandler?.uncaughtException(thread, throwable)
+                }
+            }
+            Thread.setDefaultUncaughtExceptionHandler(crashHandler)
+            this.defaultExceptionHandler = existingHandler
+            this.installedExceptionHandler = crashHandler
+        } else {
+            this.defaultExceptionHandler = null
+            this.installedExceptionHandler = null
+        }
+    }
+
+    fun close() {
+        if (this.installedExceptionHandler != null &&
+            Thread.getDefaultUncaughtExceptionHandler() === this.installedExceptionHandler
+        ) {
+            Thread.setDefaultUncaughtExceptionHandler(this.defaultExceptionHandler)
+        }
+        this.db.close()
     }
 
     fun dispatch(event: NubrickEvent) {
@@ -219,20 +170,33 @@ class NubrickExperiment {
         this.container.storeNativeCrash(throwable)
     }
 
-    /**
-     * Reports a crash event
-     *
-     * @param crashEvent The crash event containing exceptions, platform, and SDK version
-     */
-    @FlutterBridgeApi
     fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         this.container.sendFlutterCrash(crashEvent)
     }
 
-    @FlutterBridgeApi
     fun appendTooltipExperimentHistory(experimentId: String) {
         if (experimentId.isEmpty()) return
         this.container.appendExperimentHistory(experimentId)
+    }
+
+    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String) -> Unit)?) {
+        this.trigger.updateOnTooltip(onTooltip)
+    }
+
+    fun setUserId(id: String) {
+        this.user.setUserId(id)
+    }
+
+    fun getUserId(): String? {
+        return this.user.getProperty("userId")
+    }
+
+    fun setUserProperty(key: String, value: Any) {
+        this.user.setProperty(key, value)
+    }
+
+    fun getUserProperty(key: String): String? {
+        return this.user.getProperty(key)
     }
 
     @Composable
@@ -251,7 +215,7 @@ class NubrickExperiment {
         NubrickTheme {
             Embedding(
                 container = this.container.initWith(arguments),
-                id,
+                experimentId = id,
                 modifier = modifier,
                 onEvent = onEvent,
                 content = content
@@ -260,7 +224,10 @@ class NubrickExperiment {
     }
 
     @Composable
-    fun RemoteConfig(id: String, content: @Composable (RemoteConfigLoadingState) -> Unit) {
+    fun RemoteConfig(
+        id: String,
+        content: @Composable (RemoteConfigLoadingState) -> Unit
+    ) {
         return io.nubrick.nubrick.remoteconfig.RemoteConfigView(
             container = this.container,
             experimentId = id,
@@ -268,7 +235,6 @@ class NubrickExperiment {
         )
     }
 
-    // This is for flutter SDK
     fun remoteConfig(id: String): io.nubrick.nubrick.remoteconfig.RemoteConfig {
         return io.nubrick.nubrick.remoteconfig.RemoteConfig(
             container = this.container,
@@ -277,13 +243,174 @@ class NubrickExperiment {
     }
 }
 
+object NubrickSDK {
+    @Volatile
+    private var runtime: NubrickRuntime? = null
+
+    private fun warn(message: String) {
+        Log.w("NubrickSDK", message)
+    }
+
+    private fun runtimeOrNull(throwInDebug: Boolean): NubrickRuntime? {
+        val current = runtime
+        if (current != null) {
+            return current
+        }
+        warn("NubrickSDK used before NubrickSDK.initialize(...).")
+        if (throwInDebug && BuildConfig.DEBUG) {
+            throw NubrickUninitializedException()
+        }
+        return null
+    }
+
+    @Synchronized
+    private fun initializeInternal(
+        context: Context,
+        config: Config,
+        onTooltip: ((data: String, experimentId: String) -> Unit)?
+    ) {
+        val currentRuntime = runtime
+        if (currentRuntime != null) {
+            warn("NubrickSDK.initialize(...) called more than once. Subsequent calls are ignored.")
+            currentRuntime.updateOnTooltip(onTooltip)
+            return
+        }
+        runtime = NubrickRuntime(
+            config = config,
+            context = context,
+            onTooltip = onTooltip
+        )
+    }
+
+    @Synchronized
+    fun initialize(
+        context: Context,
+        config: Config
+    ) {
+        initializeInternal(context = context, config = config, onTooltip = null)
+    }
+
+    @Synchronized
+    @FlutterBridgeApi
+    fun initialize(
+        context: Context,
+        config: Config,
+        onTooltip: ((data: String, experimentId: String) -> Unit)?
+    ) {
+        initializeInternal(context = context, config = config, onTooltip = onTooltip)
+    }
+
+    @Synchronized
+    internal fun resetForTest() {
+        runtime?.close()
+        runtime = null
+    }
+
+    fun dispatch(event: NubrickEvent) {
+        val current = runtimeOrNull(throwInDebug = true) ?: return
+        current.dispatch(event)
+    }
+
+    @FlutterBridgeApi
+    fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
+        val current = runtimeOrNull(throwInDebug = true) ?: return
+        current.sendFlutterCrash(crashEvent)
+    }
+
+    @FlutterBridgeApi
+    fun appendTooltipExperimentHistory(experimentId: String) {
+        val current = runtimeOrNull(throwInDebug = true) ?: return
+        current.appendTooltipExperimentHistory(experimentId)
+    }
+
+    fun setUserId(id: String) {
+        val current = runtimeOrNull(throwInDebug = false) ?: return
+        current.setUserId(id)
+    }
+
+    fun getUserId(): String? {
+        val current = runtimeOrNull(throwInDebug = false) ?: return null
+        return current.getUserId()
+    }
+
+    fun setUserProperty(key: String, value: Any) {
+        val current = runtimeOrNull(throwInDebug = false) ?: return
+        current.setUserProperty(key, value)
+    }
+
+    fun getUserProperty(key: String): String? {
+        val current = runtimeOrNull(throwInDebug = false) ?: return null
+        return current.getUserProperty(key)
+    }
+
+    @Composable
+    fun Embedding(
+        id: String,
+        modifier: Modifier = Modifier,
+        arguments: Any? = null,
+        onEvent: ((event: Event) -> Unit)? = null,
+        content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null
+    ) {
+        val current = runtimeOrNull(throwInDebug = true) ?: return
+        current.Embedding(
+            id = id,
+            modifier = modifier,
+            arguments = arguments,
+            onEvent = onEvent,
+            content = content
+        )
+    }
+
+    @Composable
+    fun RemoteConfig(
+        id: String,
+        content: @Composable (RemoteConfigLoadingState) -> Unit
+    ) {
+        val current = runtimeOrNull(throwInDebug = false)
+        if (current == null) {
+            content(RemoteConfigLoadingState.Failed(NubrickUninitializedException()))
+            return
+        }
+        current.RemoteConfig(id = id, content = content)
+    }
+
+    fun remoteConfig(id: String): Result<io.nubrick.nubrick.remoteconfig.RemoteConfig> {
+        val current = runtimeOrNull(throwInDebug = false)
+        if (current == null) {
+            return Result.failure(NubrickUninitializedException())
+        }
+        return Result.success(current.remoteConfig(id))
+    }
+
+    @Composable
+    internal fun Overlay() {
+        val current = runtimeOrNull(throwInDebug = true) ?: return
+        current.Overlay()
+    }
+
+    internal fun containerOrNull(): Container? {
+        return runtime?.container
+    }
+}
+
+@Composable
+fun NubrickProvider(
+    content: @Composable() () -> Unit
+) {
+    NubrickTheme {
+        NubrickSDK.Overlay()
+    }
+    content()
+}
+
 /**
  * This is for flutter SDK
  */
 @FlutterBridgeApi
-class FlutterBridge(private val client: NubrickClient) {
+object FlutterBridge {
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
-        return client.experiment.container.fetchEmbedding(experimentId, componentId)
+        val container = NubrickSDK.containerOrNull() ?: return Result.failure(NubrickUninitializedException())
+        return container.fetchEmbedding(experimentId, componentId).map { it }
     }
 
     fun computeInitialSize(embedding: Any?): Pair<Int?, Int?> {
@@ -297,7 +424,6 @@ class FlutterBridge(private val client: NubrickClient) {
             it.id == triggerDestinationId
         }
         return Pair(triggerDestinationPage?.data?.frameWidth, triggerDestinationPage?.data?.frameHeight)
-        
     }
 
     private fun extractRootBlock(data: Any?): UIRootBlock? {
@@ -321,10 +447,13 @@ class FlutterBridge(private val client: NubrickClient) {
         onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
         eventBridge: UIBlockEventBridgeViewModel? = null,
     ) {
+        val runtime = NubrickSDK.run {
+            containerOrNull()
+        } ?: return
         var width: Int? by remember(data) { mutableStateOf(null) }
         var height: Int? by remember(data) { mutableStateOf(null) }
-        val container = remember(arguments) {
-            client.experiment.container.initWith(arguments)
+        val container = remember(arguments, runtime) {
+            runtime.initWith(arguments)
         }
         val widthModifier = width?.takeIf { it != 0 }?.let { Modifier.width(it.dp) } ?: Modifier.fillMaxWidth()
         val heightModifier = height?.takeIf { it != 0 }?.let { Modifier.height(it.dp) } ?: Modifier.fillMaxHeight()
@@ -334,23 +463,21 @@ class FlutterBridge(private val client: NubrickClient) {
                 modifier = modifier,
                 contentAlignment = Alignment.Center
             ) {
-                        Root(
-                            modifier = widthModifier.then(heightModifier),
-                            container = container,
-                            root = it,
-                            onEvent = onEvent,
-                            onNextTooltip = onNextTooltip,
-                            onDismiss = { onDismiss() },
-                            eventBridge = eventBridge,
-                            onSizeChange = { newWidth, newHeight ->
-                                width = newWidth
-                                height = newHeight
-                                onSizeChange?.invoke(newWidth, newHeight)
-                            },
-                        )
-                    
-                }
-            
+                Root(
+                    modifier = widthModifier.then(heightModifier),
+                    container = container,
+                    root = it,
+                    onEvent = onEvent,
+                    onNextTooltip = onNextTooltip,
+                    onDismiss = { onDismiss() },
+                    eventBridge = eventBridge,
+                    onSizeChange = { newWidth, newHeight ->
+                        width = newWidth
+                        height = newHeight
+                        onSizeChange?.invoke(newWidth, newHeight)
+                    },
+                )
             }
         }
+    }
 }

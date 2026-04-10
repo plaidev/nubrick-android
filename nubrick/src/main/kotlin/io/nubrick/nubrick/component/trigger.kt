@@ -29,10 +29,17 @@ import kotlinx.serialization.json.Json
 internal class TriggerViewModel(
     internal val container: Container,
     internal val user: NubrickUser,
-    private val onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
+    onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
 ) : ViewModel() {
+    @Volatile
+    private var onTooltip: ((data: String, experimentId: String) -> Unit)? = onTooltip
+
     private val ignoreFirstUserEventToForegroundEvent = mutableStateOf(true)
     internal val modalStacks = mutableStateListOf<UIRootBlock>()
+
+    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String) -> Unit)?) {
+        this.onTooltip = onTooltip
+    }
 
     internal fun ignoreFirstCall(): Boolean {
         return if (this.ignoreFirstUserEventToForegroundEvent.value) {

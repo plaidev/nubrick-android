@@ -21,4 +21,56 @@ class ExampleInstrumentedTest {
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
         assertEquals("io.nubrick.nubrick.test", appContext.packageName)
     }
+
+    @Test
+    fun initializeAndDispatch_doNotThrow() {
+        NubrickSDK.resetForTest()
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+
+        NubrickSDK.initialize(
+            context = appContext,
+            config = Config(projectId = "test-project-id")
+        )
+        NubrickSDK.initialize(
+            context = appContext,
+            config = Config(projectId = "another-project-id")
+        )
+
+        NubrickSDK.dispatch(NubrickEvent("TEST_EVENT"))
+        assertTrue(true)
+    }
+
+    @Test
+    fun userApis_uninitialized_returnNullAndDoNotThrow() {
+        NubrickSDK.resetForTest()
+
+        assertNull(NubrickSDK.getUserId())
+        assertNull(NubrickSDK.getUserProperty("plan"))
+
+        NubrickSDK.setUserId("user-before-init")
+        NubrickSDK.setUserProperty("plan", "pro")
+
+        assertNull(NubrickSDK.getUserId())
+        assertNull(NubrickSDK.getUserProperty("plan"))
+    }
+
+    @Test
+    fun userApis_initialized_roundtrip() {
+        NubrickSDK.resetForTest()
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        NubrickSDK.initialize(
+            context = appContext,
+            config = Config(projectId = "test-project-id")
+        )
+
+        NubrickSDK.setUserId("user-123")
+        NubrickSDK.setUserProperty("plan", "pro")
+        NubrickSDK.setUserProperty("age", 20)
+        NubrickSDK.setUserProperty("isMember", true)
+
+        assertEquals("user-123", NubrickSDK.getUserId())
+        assertEquals("pro", NubrickSDK.getUserProperty("plan"))
+        assertEquals("20", NubrickSDK.getUserProperty("age"))
+        assertEquals("true", NubrickSDK.getUserProperty("isMember"))
+    }
 }
