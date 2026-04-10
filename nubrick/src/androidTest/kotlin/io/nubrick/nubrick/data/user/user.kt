@@ -1,6 +1,7 @@
 package io.nubrick.nubrick.data.user
 
 
+import android.content.Context
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -16,6 +17,13 @@ class UserAndroidTest {
     fun shouldInitiateUser() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
+        appContext
+            .applicationContext
+            .getSharedPreferences("${appContext.packageName}.nubrik.io.user", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+
         val user = NubrickUser(context = appContext, 0)
         Assert.assertEquals(true, user.id.count() == 36)
         Assert.assertEquals(0.22964408192413588, user.getNormalizedUserRnd(0), 0.0001)

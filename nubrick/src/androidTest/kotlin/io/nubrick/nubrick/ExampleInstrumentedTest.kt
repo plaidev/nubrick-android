@@ -1,8 +1,11 @@
 package io.nubrick.nubrick
 
+import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
 
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -15,6 +18,27 @@ import org.junit.Assert.*
  */
 @RunWith(AndroidJUnit4::class)
 class ExampleInstrumentedTest {
+    @Before
+    fun setup() {
+        NubrickSDK.resetForTest()
+        clearUserPreferences()
+    }
+
+    @After
+    fun teardown() {
+        NubrickSDK.resetForTest()
+        clearUserPreferences()
+    }
+
+    private fun clearUserPreferences() {
+        val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        appContext
+            .getSharedPreferences("${appContext.packageName}.nubrik.io.user", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+    }
+
     @Test
     fun useAppContext() {
         // Context of the app under test.
