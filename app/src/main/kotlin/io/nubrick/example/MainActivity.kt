@@ -19,23 +19,20 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.nubrick.example.ui.theme.NubrickAndroidTheme
 import io.nubrick.nubrick.Config
-import io.nubrick.nubrick.Nubrick
-import io.nubrick.nubrick.NubrickClient
 import io.nubrick.nubrick.NubrickProvider
+import io.nubrick.nubrick.NubrickSDK
 
 class MainActivity : ComponentActivity() {
-    private lateinit var nubrick: NubrickClient
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        this.nubrick = NubrickClient(
-            config = Config(projectId = "cgv3p3223akg00fod19g"),
+        NubrickSDK.initialize(
             context = this.applicationContext,
+            config = Config(projectId = "cgv3p3223akg00fod19g"),
         )
 
         setContent {
             NubrickAndroidTheme {
-                NubrickProvider(client = nubrick) {
+                NubrickProvider {
                     // A surface container using the 'background' color from the theme
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -46,12 +43,12 @@ class MainActivity : ComponentActivity() {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Top,
                         ) {
-                            Nubrick.client.experiment.Embedding(
+                            NubrickSDK.Embedding(
                                 "HEADER_INFORMATION",
                                 arguments = emptyMap<String, String>(),
                                 modifier = Modifier.height(100f.dp),
                             )
-                            Nubrick.client.experiment.Embedding(
+                            NubrickSDK.Embedding(
                                 "TOP_COMPONENT",
                                 arguments = emptyMap<String, String>(),
                                 modifier = Modifier.height(270f.dp),
@@ -63,10 +60,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        this.nubrick.close()
-        super.onDestroy()
-    }
 }
 
 @Composable

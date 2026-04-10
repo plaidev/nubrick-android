@@ -147,20 +147,33 @@ class NubrickUser {
         this.comeBack()
     }
 
-    fun setProperties(props: Map<String, Any>) {
-        val editor = this.preferences?.edit()
-        props.forEach { (key, value) ->
-            if (key == BuiltinUserProperty.userId.toString()) {
-                val strValue = value.toString()
-                this.properties[key] = strValue
-                editor?.putString(BuiltinUserProperty.userId.toString(), strValue)
-                return@forEach
-            }
-            val strValue = value.toString()
-            this.customProperties[key] = strValue
-            editor?.putString(USER_CUSTOM_PROPERTY_KEY_PREFIX + key, strValue)
+    fun setUserId(id: String) {
+        val userIdKey = BuiltinUserProperty.userId.toString()
+        this.properties[userIdKey] = id
+        this.preferences?.edit()?.putString(userIdKey, id)?.apply()
+    }
+
+    fun setProperty(key: String, value: Any) {
+        if (key == BuiltinUserProperty.userId.toString()) {
+            this.setUserId(value.toString())
+            return
         }
-        editor?.apply()
+        val strValue = value.toString()
+        this.customProperties[key] = strValue
+        this.preferences?.edit()?.putString(USER_CUSTOM_PROPERTY_KEY_PREFIX + key, strValue)?.apply()
+    }
+
+    fun getProperty(key: String): String? {
+        if (key == BuiltinUserProperty.userId.toString()) {
+            return this.id.ifEmpty { null }
+        }
+        return this.customProperties[key]
+    }
+
+    fun setProperties(props: Map<String, Any>) {
+        props.forEach { (key, value) ->
+            this.setProperty(key, value)
+        }
     }
 
     fun getProperties(): Map<String, String> {
