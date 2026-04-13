@@ -50,13 +50,6 @@ import kotlin.time.toDuration
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 annotation class FlutterBridgeApi
 
-const val VERSION = BuildConfig.VERSION_NAME
-
-data class Endpoint(
-    val cdn: String = "https://cdn.nativebrik.com",
-    val track: String = "https://track.nativebrik.com/track/v1",
-)
-
 enum class EventPropertyType {
     INTEGER,
     STRING,
@@ -78,7 +71,6 @@ data class Event(
 
 data class Config(
     val projectId: String,
-    val endpoint: Endpoint = Endpoint(),
     val onEvent: ((event: Event) -> Unit)? = null,
     val cachePolicy: CachePolicy = CachePolicy(),
     val onDispatch: ((event: NubrickEvent) -> Unit)? = null,

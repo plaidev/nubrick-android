@@ -1,6 +1,7 @@
 package io.nubrick.nubrick.data
 
 import io.nubrick.nubrick.Config
+import io.nubrick.nubrick.SdkConstants
 import io.nubrick.nubrick.schema.UIBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,7 +15,7 @@ internal interface ComponentRepository {
 internal class ComponentRepositoryImpl(private val config: Config, private val cache: CacheStore): ComponentRepository {
     override suspend fun fetchComponent(experimentId: String, id: String): Result<UIBlock> {
         return withContext(Dispatchers.IO) {
-            val url = config.endpoint.cdn + "/projects/" + config.projectId + "/experiments/components/" + experimentId + "/" + id
+            val url = SdkConstants.endpoint.cdn + "/projects/" + config.projectId + "/experiments/components/" + experimentId + "/" + id
             val response: String = getRequestWithCache(url, cache).getOrElse {
                 return@withContext Result.failure(it)
             }
