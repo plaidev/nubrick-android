@@ -1,6 +1,7 @@
 package io.nubrick.nubrick.data
 
 import io.nubrick.nubrick.Config
+import io.nubrick.nubrick.SdkConstants
 import io.nubrick.nubrick.schema.ExperimentConfigs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,7 +18,7 @@ internal class ExperimentRepositoryImpl(private val config: Config, private val 
         id: String
     ): Result<ExperimentConfigs> {
         return withContext(Dispatchers.IO) {
-            val url = config.endpoint.cdn + "/projects/" + config.projectId + "/experiments/id/" + id
+            val url = SdkConstants.endpoint.cdn + "/projects/" + config.projectId + "/experiments/id/" + id
             val response: String = getRequestWithCache(url, cache, syncDateTime = true).getOrElse {
                 return@withContext Result.failure(it)
             }
@@ -29,7 +30,7 @@ internal class ExperimentRepositoryImpl(private val config: Config, private val 
 
     override suspend fun fetchTriggerExperimentConfigs(name: String): Result<ExperimentConfigs> {
         return withContext(Dispatchers.IO) {
-            val url = config.endpoint.cdn + "/projects/" + config.projectId + "/experiments/trigger/" + name
+            val url = SdkConstants.endpoint.cdn + "/projects/" + config.projectId + "/experiments/trigger/" + name
             val response: String = getRequestWithCache(url, cache, syncDateTime = true).getOrElse {
                 return@withContext Result.failure(it)
             }

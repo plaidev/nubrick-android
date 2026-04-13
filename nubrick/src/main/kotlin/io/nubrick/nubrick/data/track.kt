@@ -3,6 +3,7 @@ package io.nubrick.nubrick.data
 import android.os.Build
 import io.nubrick.nubrick.Config
 import io.nubrick.nubrick.FlutterBridgeApi
+import io.nubrick.nubrick.SdkConstants
 import io.nubrick.nubrick.VERSION
 import io.nubrick.nubrick.data.user.NubrickUser
 import io.nubrick.nubrick.data.user.formatISO8601
@@ -239,7 +240,7 @@ internal class TrackRepositoryImpl: TrackRepository {
         val body = Json.encodeToString(request.encode())
         this.timer?.cancel()
         this.timer = null
-        postRequest(this.config.endpoint.track, body).onFailure {
+        postRequest(SdkConstants.endpoint.track, body).onFailure {
             this.buffer.addAll(tempBuffer)
         }
     }
