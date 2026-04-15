@@ -21,9 +21,9 @@ import io.nubrick.nubrick.component.Embedding
 import io.nubrick.nubrick.component.EmbeddingLoadingState
 import io.nubrick.nubrick.component.Root
 import io.nubrick.nubrick.component.Trigger
-import io.nubrick.nubrick.component.TriggerViewModel
+import io.nubrick.nubrick.component.TriggerStateHolder
 import io.nubrick.nubrick.component.NubrickTheme
-import io.nubrick.nubrick.component.bridge.UIBlockActionBridgeViewModel
+import io.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import io.nubrick.nubrick.data.CacheStore
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
@@ -36,7 +36,12 @@ import io.nubrick.nubrick.schema.UIBlock
 import io.nubrick.nubrick.schema.UIRootBlock
 import io.nubrick.nubrick.schema.UIPageBlock
 import io.nubrick.nubrick.schema.PageKind
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
@@ -102,9 +107,10 @@ private class NubrickRuntime(
 ) {
     private val user: NubrickUser
     private val db: SQLiteDatabase
+    private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val defaultExceptionHandler: Thread.UncaughtExceptionHandler?
     private val installedExceptionHandler: Thread.UncaughtExceptionHandler?
-    private val trigger: TriggerViewModel
+    private val trigger: TriggerStateHolder
     val container: Container
 
     init {
@@ -125,7 +131,7 @@ private class NubrickRuntime(
             cache = CacheStore(config.cachePolicy),
             context = appContext,
         )
-        this.trigger = TriggerViewModel(this.container, this.user, onTooltip)
+        this.trigger = TriggerStateHolder(this.container, this.user, this.sdkScope, onTooltip)
 
         if (config.trackCrashes) {
             val existingHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -146,6 +152,8 @@ private class NubrickRuntime(
     }
 
     fun close() {
+        if (!this.sdkScope.isActive) return
+        this.sdkScope.cancel()
         if (this.installedExceptionHandler != null &&
             Thread.getDefaultUncaughtExceptionHandler() === this.installedExceptionHandler
         ) {
@@ -455,7 +463,7 @@ object FlutterBridge {
         onNextTooltip: ((pageId: String) -> Unit) = {},
         onDismiss: (() -> Unit) = {},
         onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
-        eventBridge: UIBlockActionBridgeViewModel? = null,
+        eventBridge: UIBlockActionBridge? = null,
     ) {
         val runtime = NubrickSDK.run {
             containerOrNull()

@@ -35,12 +35,11 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ViewModel
 import io.nubrick.nubrick.Event
 import io.nubrick.nubrick.EventProperty
 import io.nubrick.nubrick.EventPropertyType
 import io.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
-import io.nubrick.nubrick.component.bridge.UIBlockActionBridgeViewModel
+import io.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import io.nubrick.nubrick.component.provider.container.ContainerProvider
 import io.nubrick.nubrick.component.provider.data.PageDataProvider
 import io.nubrick.nubrick.component.provider.event.EventListenerProvider
@@ -87,15 +86,15 @@ internal data class WebviewData(
     val trigger: UIBlockAction?,
 ) {}
 
-internal class RootViewModel(
+internal class RootStateHolder(
     private val root: UIRootBlock,
-    private val modalViewModel: ModalViewModel,
+    private val modalStateHolder: ModalStateHolder,
     private val onNextTooltip: ((pageId: String) -> Unit) = {},
     private val onDismiss: ((root: UIRootBlock) -> Unit) = {},
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
     private val onTrigger: ((trigger: UIBlockAction) -> Unit) = {},
     private val onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
-) : ViewModel() {
+) {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
     val webviewData = mutableStateOf<WebviewData?>(null)
@@ -169,16 +168,16 @@ internal class RootViewModel(
         }
 
         if (destBlock.data?.kind == PageKind.MODAL) {
-            val index = modalViewModel.modalState.modalStack.indexOfFirst {
+            val index = modalStateHolder.modalState.modalStack.indexOfFirst {
                 it.block.id == destId
             }
             if (index > 0) {
                 // if it's already in modal stack, jump to the target stack
-                modalViewModel.backTo(index)
+                modalStateHolder.backTo(index)
                 return
             }
 
-            modalViewModel.show(
+            modalStateHolder.show(
                 block = PageBlockData(destBlock, properties),
                 modalPresentationStyle = destBlock.data.modalPresentationStyle
                     ?: ModalPresentationStyle.UNKNOWN,
@@ -192,13 +191,13 @@ internal class RootViewModel(
         }
 
         // Before displaying the page, we close displayed modals. but never emit dismiss event.
-        modalViewModel.close(forceReset = true, emitDispatch = false)
+        modalStateHolder.close(forceReset = true, emitDispatch = false)
         this.displayedPageBlock.value = PageBlockData(destBlock, properties)
     }
 
     private fun dismiss(emitDispatch: Boolean = true) {
         this.currentPageBlock.value = null
-        modalViewModel.close(forceReset = true, emitDispatch = emitDispatch)
+        modalStateHolder.close(forceReset = true, emitDispatch = emitDispatch)
     }
 
     fun handleWebviewDismiss() {
@@ -211,7 +210,7 @@ internal class RootViewModel(
 internal fun ModalPage(
     container: Container,
     blockData: PageBlockData,
-    eventBridge: UIBlockActionBridgeViewModel?,
+    eventBridge: UIBlockActionBridge?,
     currentPageBlock: UIPageBlock?,
     modifier: Modifier = Modifier,
     isFullscreen: Boolean,
@@ -253,20 +252,20 @@ internal fun Root(
     onEvent: (event: Event) -> Unit = {},
     onNextTooltip: (pageId: String) -> Unit = {},
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
-    eventBridge: UIBlockActionBridgeViewModel? = null,
+    eventBridge: UIBlockActionBridge? = null,
     onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    val modalViewModel = remember(sheetState, scope) {
-        ModalViewModel(sheetState, largeSheetState, scope, onDismiss = { onDismiss(root) })
+    val modalStateHolder = remember(sheetState, scope) {
+        ModalStateHolder(sheetState, largeSheetState, scope, onDismiss = { onDismiss(root) })
     }
     val context = LocalContext.current
-    val viewModel = remember(root, modalViewModel, onDismiss, context) {
-        RootViewModel(
+    val rootStateHolder = remember(root, modalStateHolder, onDismiss, context) {
+        RootStateHolder(
             root,
-            modalViewModel,
+            modalStateHolder,
             onNextTooltip,
             onDismiss,
             onOpenDeepLink = { link ->
@@ -287,14 +286,14 @@ internal fun Root(
         )
     }
     LaunchedEffect(Unit) {
-        viewModel.initialize()
+        rootStateHolder.initialize()
     }
     val bottomSheetProps = remember {
         ModalBottomSheetDefaults.properties(shouldDismissOnBackPress = false)
     }
-    val listener = remember(viewModel, onEvent, container) {
+    val listener = remember(rootStateHolder, onEvent, container) {
         { event: UIBlockAction, data: JsonElement ->
-            viewModel.handleNavigate(event, data)
+            rootStateHolder.handleNavigate(event, data)
 
             val e = parseUIEventToEvent(event)
             onEvent(e)
@@ -302,14 +301,14 @@ internal fun Root(
         }
     }
     LaunchedEffect(Unit) {
-        modalViewModel.setOnTrigger { trigger, data ->
+        modalStateHolder.setOnTrigger { trigger, data ->
             listener(trigger, data)
         }
     }
 
-    val currentPageBlock = viewModel.currentPageBlock.value
-    val displayedPageBlock = viewModel.displayedPageBlock.value
-    val modalState = modalViewModel.modalState
+    val currentPageBlock = rootStateHolder.currentPageBlock.value
+    val displayedPageBlock = rootStateHolder.displayedPageBlock.value
+    val modalState = modalStateHolder.modalState
 
     ContainerProvider(container = container) {
         EventListenerProvider(listener = listener) {
@@ -340,7 +339,7 @@ internal fun Root(
 
                 if (modalState.modalVisibility) {
                     BackHandler(true) {
-                        modalViewModel.back(JsonNull)
+                        modalStateHolder.back(JsonNull)
                     }
                     val isLarge =
                         modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
@@ -351,7 +350,7 @@ internal fun Root(
                     ModalBottomSheet(
                         sheetState = if (isLarge) largeSheetState else sheetState,
                         onDismissRequest = {
-                            modalViewModel.close()
+                            modalStateHolder.close()
                         },
                         properties = bottomSheetProps,
                         dragHandle = {},
@@ -360,7 +359,7 @@ internal fun Root(
                         tonalElevation = 0.dp, // to have the right background color as set in theme
                     ) {
                         ModalBottomSheetBackHandler {
-                            modalViewModel.back(JsonNull)
+                            modalStateHolder.back(JsonNull)
                         }
                         Column(
                             modifier = if (modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN) {
@@ -392,8 +391,8 @@ internal fun Root(
                                 NavigationHeader(
                                     it,
                                     stack.block,
-                                    onClose = { modalViewModel.close() },
-                                    onBack = { modalViewModel.back(JsonNull) },
+                                    onClose = { modalStateHolder.close() },
+                                    onBack = { modalStateHolder.back(JsonNull) },
                                     isFullscreen,
                                 )
                                 ModalPage(
@@ -408,7 +407,7 @@ internal fun Root(
                     }
                 }
 
-                val webviewData = viewModel.webviewData.value
+                val webviewData = rootStateHolder.webviewData.value
                 val pendingWebviewReturn = remember { mutableStateOf(false) }
 
                 LaunchedEffect(webviewData) {
@@ -422,7 +421,7 @@ internal fun Root(
                             webviewData.trigger?.let { trigger ->
                                 listener(trigger, JsonNull)
                             }
-                            viewModel.handleWebviewDismiss()
+                            rootStateHolder.handleWebviewDismiss()
                         }
                     }
                 }
@@ -435,7 +434,7 @@ internal fun Root(
                                 webviewData?.trigger?.let { trigger ->
                                     listener(trigger, JsonNull)
                                 }
-                                viewModel.handleWebviewDismiss()
+                                rootStateHolder.handleWebviewDismiss()
                                 pendingWebviewReturn.value = false
                             }
                         }

@@ -23,7 +23,7 @@ internal data class ModalState(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
-internal class ModalViewModel(
+internal class ModalStateHolder(
     private val sheetState: SheetState,
     // NOTE: This is a workaround for the issue where the skipPartiallyExpanded can not be conditionally set.
     private val largeSheetState: SheetState,
