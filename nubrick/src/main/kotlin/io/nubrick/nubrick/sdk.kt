@@ -23,7 +23,7 @@ import io.nubrick.nubrick.component.Root
 import io.nubrick.nubrick.component.Trigger
 import io.nubrick.nubrick.component.TriggerViewModel
 import io.nubrick.nubrick.component.NubrickTheme
-import io.nubrick.nubrick.component.bridge.UIBlockEventBridgeViewModel
+import io.nubrick.nubrick.component.bridge.UIBlockActionBridgeViewModel
 import io.nubrick.nubrick.data.CacheStore
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
@@ -455,7 +455,7 @@ object FlutterBridge {
         onNextTooltip: ((pageId: String) -> Unit) = {},
         onDismiss: (() -> Unit) = {},
         onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
-        eventBridge: UIBlockEventBridgeViewModel? = null,
+        eventBridge: UIBlockActionBridgeViewModel? = null,
     ) {
         val runtime = NubrickSDK.run {
             containerOrNull()

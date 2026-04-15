@@ -2,23 +2,21 @@ package io.nubrick.nubrick.component.bridge
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.ViewModel
 import io.nubrick.nubrick.component.provider.container.ContainerContext
 import io.nubrick.nubrick.component.provider.data.DataContext
 import io.nubrick.nubrick.component.provider.event.LocalEventListener
 import io.nubrick.nubrick.schema.UIBlockAction
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 // forcefully dispatch uiblock event in the page compose context, from anywhere.
 // dispatch(event) in flutter -> listen the event in the page context, and dispatch event from the page.
-public class UIBlockEventBridgeViewModel : ViewModel() {
+public class UIBlockActionBridgeViewModel : ViewModel() {
     private val _events = MutableSharedFlow<UIBlockAction>()
     internal val events: SharedFlow<UIBlockAction> = _events
 
@@ -31,41 +29,25 @@ public class UIBlockEventBridgeViewModel : ViewModel() {
 
 // Watch the event stream, and when it has events, then dispatch them.
 // This composable won't render anything.
-@DelicateCoroutinesApi
 @Composable
-internal fun UIBlockEventBridgeCollector(
+internal fun UIBlockActionBridgeCollector(
     events: SharedFlow<UIBlockAction>?,
     isCurrentPage: Boolean
 ) {
-    val container = ContainerContext.value
-    val data = DataContext.state.data
-    val eventListener = LocalEventListener.current
-    LaunchedEffect(Unit) {
-        if (!isCurrentPage) {
+    val latestContainer = rememberUpdatedState(ContainerContext.value)
+    val latestData = rememberUpdatedState(DataContext.state.data)
+    val latestEventListener = rememberUpdatedState(LocalEventListener.current)
+    LaunchedEffect(events, isCurrentPage) {
+        if (!isCurrentPage || events == null) {
             return@LaunchedEffect
         }
 
-        events?.collect { event ->
+        events.collect { event ->
+            val data = latestData.value
             val req = event.httpRequest
-            if (req != null) {
-                GlobalScope.launch(Dispatchers.IO) {
-                    container
-                        .sendHttpRequest(req, data)
-                        .onSuccess {
-                            GlobalScope.launch(Dispatchers.Main) {
-                                eventListener.dispatch(event, data)
-                            }
-                        }
-                        .onFailure {
-                            GlobalScope.launch(Dispatchers.Main) {
-                                eventListener.dispatch(event, data)
-                            }
-                        }
-                }
-            } else {
-                eventListener.dispatch(event, data)
-            }
+            req?.runCatching { latestContainer.value.sendHttpRequest(this, data) }
+                ?.onFailure { if (it is CancellationException) throw it }
+            latestEventListener.value.dispatch(event, data)
         }
     }
-    return Unit
 }

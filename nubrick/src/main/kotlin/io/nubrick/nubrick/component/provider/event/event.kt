@@ -28,9 +28,7 @@ import io.nubrick.nubrick.component.provider.container.ContainerContext
 import io.nubrick.nubrick.component.provider.data.DataContext
 import io.nubrick.nubrick.data.FormValueListener
 import io.nubrick.nubrick.schema.UIBlockAction
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.coroutines.cancellation.CancellationException
@@ -115,9 +113,7 @@ internal fun Modifier.eventDispatcher(
             isLoading = true
             scope.launch {
                 try {
-                    withContext(Dispatchers.IO) {
-                        container.sendHttpRequest(req, data).getOrThrow()
-                    }
+                    container.sendHttpRequest(req, data).getOrThrow()
                     // onSuccess
                     eventListener.dispatch(event, data)
                 } catch (ce: CancellationException) {

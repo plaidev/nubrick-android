@@ -19,6 +19,8 @@ import io.nubrick.nubrick.schema.ExperimentVariant
 import io.nubrick.nubrick.schema.Property
 import io.nubrick.nubrick.schema.UIBlock
 import io.nubrick.nubrick.template.compile
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 
 internal data class ExtractedVariant(
@@ -147,7 +149,7 @@ internal class ContainerImpl(
     override suspend fun sendHttpRequest(
         req: ApiHttpRequest,
         variable: JsonElement?
-    ): Result<JsonElement> {
+    ): Result<JsonElement> = withContext(Dispatchers.IO) {
         val mergedVariable = mergeJsonElements(variable, createVariableForTemplate())
         val compiledReq = ApiHttpRequest(
             url = req.url?.let { compile(it, mergedVariable) },
@@ -160,7 +162,7 @@ internal class ContainerImpl(
             },
             body = req.body?.let { compile(it, mergedVariable) },
         )
-        return this.httpRequestRepository.request(compiledReq)
+        httpRequestRepository.request(compiledReq)
     }
 
     override suspend fun fetchEmbedding(
