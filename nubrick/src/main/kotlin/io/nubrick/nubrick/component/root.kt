@@ -39,8 +39,8 @@ import androidx.lifecycle.ViewModel
 import io.nubrick.nubrick.Event
 import io.nubrick.nubrick.EventProperty
 import io.nubrick.nubrick.EventPropertyType
-import io.nubrick.nubrick.component.bridge.UIBlockEventBridgeCollector
-import io.nubrick.nubrick.component.bridge.UIBlockEventBridgeViewModel
+import io.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
+import io.nubrick.nubrick.component.bridge.UIBlockActionBridgeViewModel
 import io.nubrick.nubrick.component.provider.container.ContainerProvider
 import io.nubrick.nubrick.component.provider.data.PageDataProvider
 import io.nubrick.nubrick.component.provider.event.EventListenerProvider
@@ -211,7 +211,7 @@ internal class RootViewModel(
 internal fun ModalPage(
     container: Container,
     blockData: PageBlockData,
-    eventBridge: UIBlockEventBridgeViewModel?,
+    eventBridge: UIBlockActionBridgeViewModel?,
     currentPageBlock: UIPageBlock?,
     modifier: Modifier = Modifier,
     isFullscreen: Boolean,
@@ -233,7 +233,7 @@ internal fun ModalPage(
         blockData,
     ) {
         PageDataProvider(container = container, request = blockData.block.data?.httpRequest) {
-            UIBlockEventBridgeCollector(
+            UIBlockActionBridgeCollector(
                 events = eventBridge?.events,
                 isCurrentPage = blockData.block.id == currentPageBlock?.id
             )
@@ -253,7 +253,7 @@ internal fun Root(
     onEvent: (event: Event) -> Unit = {},
     onNextTooltip: (pageId: String) -> Unit = {},
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
-    eventBridge: UIBlockEventBridgeViewModel? = null,
+    eventBridge: UIBlockActionBridgeViewModel? = null,
     onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -328,7 +328,7 @@ internal fun Root(
                                 container = container,
                                 request = it.block.data?.httpRequest
                             ) {
-                                UIBlockEventBridgeCollector(
+                                UIBlockActionBridgeCollector(
                                     events = eventBridge?.events,
                                     isCurrentPage = it.block.id == currentPageBlock?.id
                                 )
