@@ -16,7 +16,6 @@ internal const val READ_TIMEOUT = 5 * 1000
 internal fun getRequestWithCache(endpoint: String, cache: CacheStore, syncDateTime: Boolean = false): Result<String> {
     val cached = cache.get(endpoint).getOrElse {
         val result = getRequest(endpoint, syncDateTime).getOrElse { error ->
-            cache.invalidate(endpoint)
             return Result.failure(error)
         }
         cache.set(endpoint, result).getOrNull()
@@ -24,10 +23,7 @@ internal fun getRequestWithCache(endpoint: String, cache: CacheStore, syncDateTi
     }
     if (cached.isStale()) {
         CoroutineScope(Dispatchers.IO).launch {
-            val result = getRequest(endpoint, syncDateTime).getOrElse {
-                cache.invalidate(endpoint)
-                return@launch
-            }
+            val result = getRequest(endpoint, syncDateTime).getOrNull() ?: return@launch
             cache.set(endpoint, result).getOrNull()
         }
     }

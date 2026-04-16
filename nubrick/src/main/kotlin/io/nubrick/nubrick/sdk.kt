@@ -24,7 +24,9 @@ import io.nubrick.nubrick.component.Trigger
 import io.nubrick.nubrick.component.TriggerStateHolder
 import io.nubrick.nubrick.component.NubrickTheme
 import io.nubrick.nubrick.component.bridge.UIBlockActionBridge
+import android.net.http.HttpResponseCache
 import io.nubrick.nubrick.data.CacheStore
+import java.io.File
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
 import io.nubrick.nubrick.data.FormRepositoryImpl
@@ -43,9 +45,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.Json
-import kotlin.time.Duration
-import kotlin.time.DurationUnit
-import kotlin.time.toDuration
 
 @RequiresOptIn(
     message = "This API is internal to the Flutter bridge and should not be used directly.",
@@ -77,19 +76,8 @@ data class Event(
 data class Config(
     val projectId: String,
     val onEvent: ((event: Event) -> Unit)? = null,
-    val cachePolicy: CachePolicy = CachePolicy(),
     val onDispatch: ((event: NubrickEvent) -> Unit)? = null,
     val trackCrashes: Boolean = true,
-)
-
-enum class CacheStorage {
-    IN_MEMORY
-}
-
-data class CachePolicy(
-    val cacheTime: Duration = 24.toDuration(DurationUnit.HOURS),
-    val staleTime: Duration = Duration.ZERO,
-    val storage: CacheStorage = CacheStorage.IN_MEMORY,
 )
 
 data class NubrickEvent(
@@ -115,6 +103,13 @@ private class NubrickRuntime(
 
     init {
         val appContext = context.applicationContext
+
+        // Install HTTP disk cache if not already installed
+        if (HttpResponseCache.getInstalled() == null) {
+            val cacheDir = File(appContext.cacheDir, "http")
+            HttpResponseCache.install(cacheDir, 10L * 1024 * 1024) // 10MB
+        }
+
         this.user = NubrickUser(appContext)
         this.db = NubrickDbHelper(appContext).writableDatabase
         this.container = ContainerImpl(
@@ -128,7 +123,7 @@ private class NubrickRuntime(
             user = this.user,
             db = this.db,
             formRepository = FormRepositoryImpl(),
-            cache = CacheStore(config.cachePolicy),
+            cache = CacheStore(),
             context = appContext,
         )
         this.trigger = TriggerStateHolder(this.container, this.user, this.sdkScope, onTooltip)
@@ -154,6 +149,7 @@ private class NubrickRuntime(
     fun close() {
         if (!this.sdkScope.isActive) return
         this.sdkScope.cancel()
+        this.container.close()
         if (this.installedExceptionHandler != null &&
             Thread.getDefaultUncaughtExceptionHandler() === this.installedExceptionHandler
         ) {

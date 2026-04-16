@@ -2,9 +2,7 @@ package io.nubrick.nubrick.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -18,6 +16,7 @@ import io.nubrick.nubrick.schema.ExperimentKind
 import io.nubrick.nubrick.schema.TriggerEventNameDefs
 import io.nubrick.nubrick.schema.UIBlock
 import io.nubrick.nubrick.schema.UIRootBlock
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,7 +33,7 @@ internal class TriggerStateHolder(
     @Volatile
     private var onTooltip: ((data: String, experimentId: String) -> Unit)? = onTooltip
 
-    private val ignoreFirstUserEventToForegroundEvent = mutableStateOf(true)
+    private val isFirstStart = AtomicBoolean(true)
     internal val modalStacks = mutableStateListOf<UIRootBlock>()
 
     fun updateOnTooltip(onTooltip: ((data: String, experimentId: String) -> Unit)?) {
@@ -42,12 +41,7 @@ internal class TriggerStateHolder(
     }
 
     internal fun ignoreFirstCall(): Boolean {
-        return if (this.ignoreFirstUserEventToForegroundEvent.value) {
-            this.ignoreFirstUserEventToForegroundEvent.value = false
-            true
-        } else {
-            false
-        }
+        return isFirstStart.compareAndSet(true, false)
     }
 
     internal fun callWhenUserComesBack() {
@@ -119,21 +113,6 @@ internal class TriggerStateHolder(
 @Composable
 internal fun Trigger(trigger: TriggerStateHolder) {
     val context = LocalContext.current
-    LaunchedEffect("") {
-        // dispatch user boot
-        trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
-
-        // dispatch the first time visit
-        val preferences = getNubrickUserSharedPreferences(context)
-        val countKey = "NATIVEBRIK_SDK_INITIALIZED_COUNT"
-        val count: Int = preferences?.getInt(countKey, 0) ?: 0
-        preferences?.edit()?.putInt(countKey, count + 1)?.apply()
-        if (count == 0) {
-            trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
-        }
-
-        trigger.callWhenUserComesBack()
-    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val observer = remember {
@@ -141,9 +120,18 @@ internal fun Trigger(trigger: TriggerStateHolder) {
             when (event) {
                 Lifecycle.Event.ON_START -> {
                     if (trigger.ignoreFirstCall()) {
-                        return@LifecycleEventObserver
+                        trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
+
+                        val preferences = getNubrickUserSharedPreferences(context)
+                        val countKey = "NATIVEBRIK_SDK_INITIALIZED_COUNT"
+                        val count: Int = preferences?.getInt(countKey, 0) ?: 0
+                        preferences?.edit()?.putInt(countKey, count + 1)?.apply()
+                        if (count == 0) {
+                            trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
+                        }
+                    } else {
+                        trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
                     }
-                    trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
                     trigger.callWhenUserComesBack()
                 }
                 else -> {}
