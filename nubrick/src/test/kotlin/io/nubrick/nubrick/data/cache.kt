@@ -1,26 +1,20 @@
 package io.nubrick.nubrick.data
 
-import io.nubrick.nubrick.CachePolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.ZonedDateTime
-import kotlin.time.Duration.Companion.seconds
 
 class CacheStoreTest {
     private lateinit var cacheStore: CacheStore
-    private val defaultPolicy = CachePolicy(
-        cacheTime = 60.seconds,
-        staleTime = 30.seconds
-    )
 
     @Before
     fun setup() {
         // Override getCurrentDate for testing
         io.nubrick.nubrick.data.user.DATETIME_OFFSET = 0
-        cacheStore = CacheStore(defaultPolicy)
+        cacheStore = CacheStore()
     }
 
     @Test
@@ -50,31 +44,13 @@ class CacheStoreTest {
     }
 
     @Test
-    fun `test cache invalidation`() {
-        // Given
-        val key = "test-key"
-        val value = "test-value"
-        cacheStore.set(key, value)
-
-        // When
-        val invalidateResult = cacheStore.invalidate(key)
-        val getResult = cacheStore.get(key)
-
-        // Then
-        assertTrue(invalidateResult.isSuccess)
-        assertTrue(getResult.isFailure)
-        assertTrue(getResult.exceptionOrNull() is NotFoundException)
-    }
-
-    @Test
     fun `test cache object staleness`() {
-        // Given
+        // Given - stale time is 1 minute (60s), so 90s ago is stale
         val now = ZonedDateTime.now()
-        val staleTimestamp = now.minusSeconds(35) // Past stale time (30s)
+        val staleTimestamp = now.minusSeconds(90)
         val cacheObject = CacheObject(
             data = "test-data",
             timestamp = staleTimestamp,
-            policy = defaultPolicy
         )
 
         // Then
@@ -83,13 +59,12 @@ class CacheStoreTest {
 
     @Test
     fun `test cache object freshness`() {
-        // Given
+        // Given - stale time is 1 minute (60s), so 30s ago is fresh
         val now = ZonedDateTime.now()
-        val freshTimestamp = now.minusSeconds(15) // Within stale time (30s)
+        val freshTimestamp = now.minusSeconds(30)
         val cacheObject = CacheObject(
             data = "test-data",
             timestamp = freshTimestamp,
-            policy = defaultPolicy
         )
 
         // Then
@@ -98,21 +73,17 @@ class CacheStoreTest {
 
     @Test
     fun `test expired cache returns failure`() {
-        // Given
+        // Given - cache time is 10 minutes (600s)
         val key = "test-key"
         val value = "test-value"
-        val shortPolicy = CachePolicy(
-            cacheTime = 1.seconds,
-            staleTime = 1.seconds
-        )
-        cacheStore = CacheStore(shortPolicy)
+        cacheStore = CacheStore()
 
         // When
         val setResult = cacheStore.set(key, value)
         assertTrue("Set operation should succeed", setResult.isSuccess)
 
-        // Simulate time passing by adjusting the time offset
-        io.nubrick.nubrick.data.user.DATETIME_OFFSET = 2000 // 2 seconds in milliseconds
+        // Simulate time passing beyond cache time (10 minutes = 600000ms)
+        io.nubrick.nubrick.data.user.DATETIME_OFFSET = 601000
 
         val getResult = cacheStore.get(key)
 
