@@ -1,6 +1,7 @@
 package io.nubrick.nubrick.data
 
 import android.os.Build
+import android.util.Log
 import io.nubrick.nubrick.Config
 import io.nubrick.nubrick.FlutterBridgeApi
 import io.nubrick.nubrick.SdkConstants
@@ -169,6 +170,7 @@ internal interface TrackRepository {
 
     fun storeNativeCrash(throwable: Throwable)
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
+    fun close() {}
 }
 
 internal class TrackRepositoryImpl(
@@ -191,10 +193,7 @@ internal class TrackRepositoryImpl(
             var lastFlushTime = System.currentTimeMillis()
 
             while (isActive) {
-                val elapsed = System.currentTimeMillis() - lastFlushTime
-                val waitTime = (flushIntervalMs - elapsed).coerceAtLeast(0)
-
-                val event = withTimeoutOrNull(waitTime) {
+                val event = withTimeoutOrNull(flushIntervalMs) {
                     eventChannel.receive()
                 }
 
@@ -216,7 +215,9 @@ internal class TrackRepositoryImpl(
     }
 
     private fun enqueue(event: TrackEvent) {
-        eventChannel.trySend(event)
+        if (eventChannel.trySend(event).isFailure) {
+            Log.w("NubrickSDK", "Event dropped: channel full")
+        }
     }
 
     private fun sendBatch(events: List<TrackEvent>) {
@@ -235,7 +236,13 @@ internal class TrackRepositoryImpl(
         )
         val body = Json.encodeToString(request.encode())
         postRequest(SdkConstants.endpoint.track, body).onFailure {
-            events.forEach { eventChannel.trySend(it) }
+            var dropped = 0
+            events.forEach { event ->
+                if (eventChannel.trySend(event).isFailure) dropped++
+            }
+            if (dropped > 0) {
+                Log.w("NubrickSDK", "Failed to re-enqueue $dropped events after send failure")
+            }
         }
     }
 
@@ -319,7 +326,7 @@ internal class TrackRepositoryImpl(
         sendCrashToBackend(crashEvent)
     }
 
-    fun close() {
+    override fun close() {
         eventChannel.close()
         scope.cancel()
     }

@@ -149,6 +149,7 @@ private class NubrickRuntime(
     fun close() {
         if (!this.sdkScope.isActive) return
         this.sdkScope.cancel()
+        this.container.close()
         if (this.installedExceptionHandler != null &&
             Thread.getDefaultUncaughtExceptionHandler() === this.installedExceptionHandler
         ) {

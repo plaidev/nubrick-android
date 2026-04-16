@@ -41,6 +41,7 @@ class SkipHttpRequestException : Exception("Skip http request")
 
 internal interface Container {
     fun initWith(arguments: Any?): Container
+    fun close() {}
 
     fun handleEvent(it: Event) {}
 
@@ -310,5 +311,9 @@ internal class ContainerImpl(
         this.config.onDispatch?.let { handle ->
             handle(it)
         }
+    }
+
+    override fun close() {
+        trackRepository.close()
     }
 }
