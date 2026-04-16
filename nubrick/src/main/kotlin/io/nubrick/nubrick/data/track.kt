@@ -11,7 +11,12 @@ import io.nubrick.nubrick.data.user.getCurrentDate
 import io.nubrick.nubrick.schema.TriggerEventNameDefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -19,11 +24,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
-import okio.withLock
 import java.time.ZonedDateTime
-import java.util.Timer
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.fixedRateTimer
 
 private val CRASH_RECORD_KEY = "CRASH_RECORD_KEY"
 
@@ -170,63 +171,58 @@ internal interface TrackRepository {
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
 }
 
-internal class TrackRepositoryImpl: TrackRepository {
-    private val queueLock: ReentrantLock = ReentrantLock()
-    private val config: Config
+internal class TrackRepositoryImpl(
+    private val config: Config,
     private val user: NubrickUser
-    private var timer: Timer? = null
-    private val maxBatchSize: Int = 50
-    private val maxQueueSize: Int = 300
-    private var buffer: MutableList<TrackEvent> = mutableListOf()
+) : TrackRepository {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val eventChannel = Channel<TrackEvent>(capacity = 300)
+    private val maxBatchSize = 50
+    private val flushIntervalMs = 4000L
 
-    internal constructor(config: Config, user: NubrickUser) {
-        this.config = config
-        this.user = user
-
-        this.sendStoredCrash()
+    init {
+        startConsumer()
+        sendStoredCrash()
     }
 
-    override fun trackEvent(event: TrackUserEvent) {
-        this.enqueue(TrackEvent.UserEvent(event))
-    }
+    private fun startConsumer() {
+        scope.launch {
+            val buffer = mutableListOf<TrackEvent>()
+            var lastFlushTime = System.currentTimeMillis()
 
-    override fun trackExperimentEvent(event: TrackExperimentEvent) {
-        this.enqueue(TrackEvent.ExperimentEvent(event))
-    }
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - lastFlushTime
+                val waitTime = (flushIntervalMs - elapsed).coerceAtLeast(0)
 
-    private fun enqueue(event: TrackEvent) {
-        this.queueLock.withLock {
-            if (this.timer == null) {
-                val self = this
-                CoroutineScope(Dispatchers.Main).launch {
-                    self.timer?.cancel()
-                    self.timer = fixedRateTimer(initialDelay = 0, period = 4000) {
-                        CoroutineScope(Dispatchers.IO).launch {
-                            self.sendAndFlush()
-                        }
-                    }
+                val event = withTimeoutOrNull(waitTime) {
+                    eventChannel.receive()
                 }
-            }
-            if (this.buffer.size >= this.maxBatchSize) {
-                val self = this
-                CoroutineScope(Dispatchers.IO).launch {
-                    self.sendAndFlush()
+
+                if (event != null) {
+                    buffer.add(event)
                 }
-            }
-            this.buffer.add(event)
-            if (buffer.size >= this.maxQueueSize) {
-                this.buffer.drop(this.maxQueueSize - this.buffer.size)
+
+                val shouldFlush = buffer.size >= maxBatchSize ||
+                    (buffer.isNotEmpty() && System.currentTimeMillis() - lastFlushTime >= flushIntervalMs)
+
+                if (shouldFlush) {
+                    val batch = buffer.toList()
+                    buffer.clear()
+                    lastFlushTime = System.currentTimeMillis()
+                    scope.launch { sendBatch(batch) }
+                }
             }
         }
     }
 
-    private fun sendAndFlush() {
-        val tempBuffer = this.buffer
-        if (tempBuffer.isEmpty()) return
-        this.buffer = mutableListOf()
+    private fun enqueue(event: TrackEvent) {
+        eventChannel.trySend(event)
+    }
+
+    private fun sendBatch(events: List<TrackEvent>) {
         val meta = TrackEventMeta(
-            appId = this.user.packageName,
-            appVersion = this.user.appVersion,
+            appId = user.packageName,
+            appVersion = user.appVersion,
             osVersion = Build.VERSION.SDK_INT.toString(),
             osName = "Android",
             sdkVersion = VERSION
@@ -234,15 +230,21 @@ internal class TrackRepositoryImpl: TrackRepository {
         val request = TrackRequest(
             projectId = config.projectId,
             userId = user.id,
-            events = tempBuffer,
+            events = events,
             meta = meta,
         )
         val body = Json.encodeToString(request.encode())
-        this.timer?.cancel()
-        this.timer = null
         postRequest(SdkConstants.endpoint.track, body).onFailure {
-            this.buffer.addAll(tempBuffer)
+            events.forEach { eventChannel.trySend(it) }
         }
+    }
+
+    override fun trackEvent(event: TrackUserEvent) {
+        enqueue(TrackEvent.UserEvent(event))
+    }
+
+    override fun trackExperimentEvent(event: TrackExperimentEvent) {
+        enqueue(TrackEvent.ExperimentEvent(event))
     }
 
     private fun sendCrashToBackend(crashEvent: TrackCrashEvent) {
@@ -255,54 +257,40 @@ internal class TrackRepositoryImpl: TrackRepository {
             }
         }
 
-        // Only send error tracking events for error or fatal severity
         if (crashEvent.severity.isErrorLevel) {
-            this.buffer.add(TrackEvent.UserEvent(TrackUserEvent(
+            enqueue(TrackEvent.UserEvent(TrackUserEvent(
                 name = TriggerEventNameDefs.N_ERROR_RECORD.name
             )))
         }
 
         if (causedByNubrick) {
             if (crashEvent.severity.isErrorLevel) {
-                buffer.add(TrackEvent.UserEvent(TrackUserEvent(
+                enqueue(TrackEvent.UserEvent(TrackUserEvent(
                     name = TriggerEventNameDefs.N_ERROR_IN_SDK_RECORD.name
                 )))
             }
-            buffer.add(TrackEvent.CrashEvent(crashEvent))
-        }
-        val self = this
-        CoroutineScope(Dispatchers.IO).launch {
-            self.sendAndFlush()
+            enqueue(TrackEvent.CrashEvent(crashEvent))
         }
     }
 
     private fun sendStoredCrash() {
-        val data = this.queueLock.withLock {
-            val data = this.user.preferences?.getString(CRASH_RECORD_KEY, "") ?: ""
-            if (data.isNotEmpty()) {
-                this.user.preferences?.edit()?.remove(CRASH_RECORD_KEY)?.commit()
-            }
-            data
-        }
-        if (data.isEmpty()) {
-            return
-        }
+        val data = user.preferences?.getString(CRASH_RECORD_KEY, "") ?: ""
+        if (data.isEmpty()) return
 
-        val exceptionsList : List<ExceptionRecord>
-        try {
-            exceptionsList = Json.decodeFromString<List<ExceptionRecord>>(data)
-        }
-        catch (e: Exception) {
-            return // in case there was exception in json decoding we stop here
+        user.preferences?.edit()?.remove(CRASH_RECORD_KEY)?.commit()
+
+        val exceptionsList: List<ExceptionRecord> = try {
+            Json.decodeFromString(data)
+        } catch (e: Exception) {
+            return
         }
 
         sendCrashToBackend(TrackCrashEvent(exceptions = exceptionsList))
     }
 
     override fun storeNativeCrash(throwable: Throwable) {
-        // Loop on chained exceptions (up to 20 times max)
         var counter = 0
-        var currentException : Throwable? = throwable
+        var currentException: Throwable? = throwable
         val exceptionsList = mutableListOf<ExceptionRecord>()
 
         while (currentException != null && counter < 20) {
@@ -320,14 +308,19 @@ internal class TrackRepositoryImpl: TrackRepository {
                 }
             ))
             currentException = currentException.cause
-            counter ++
+            counter++
         }
 
         val data = Json.encodeToString(exceptionsList)
-        this.user.preferences?.edit()?.putString(CRASH_RECORD_KEY, data)?.commit()
+        user.preferences?.edit()?.putString(CRASH_RECORD_KEY, data)?.commit()
     }
 
     override fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         sendCrashToBackend(crashEvent)
+    }
+
+    fun close() {
+        eventChannel.close()
+        scope.cancel()
     }
 }

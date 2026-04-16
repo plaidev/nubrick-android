@@ -3,6 +3,8 @@ package io.nubrick.nubrick.data
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArraySet
 
 internal sealed class FormValue {
     class Bool(val bool: Boolean) : FormValue()
@@ -30,8 +32,8 @@ internal interface FormRepository {
 }
 
 internal class FormRepositoryImpl : FormRepository {
-    private val map: MutableMap<String, FormValue> = mutableMapOf()
-    private val listeners: MutableSet<FormValueListener> = mutableSetOf()
+    private val map: MutableMap<String, FormValue> = ConcurrentHashMap()
+    private val listeners: MutableSet<FormValueListener> = CopyOnWriteArraySet()
 
     override fun getFormData(): Map<String, JsonElement> {
         return this.map.entries.associate { it.key to it.value.toJsonElement() }

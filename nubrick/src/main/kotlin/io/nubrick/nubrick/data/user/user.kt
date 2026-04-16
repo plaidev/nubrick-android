@@ -16,6 +16,7 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 
@@ -29,6 +30,7 @@ internal fun getNubrickUserSharedPreferences(context: Context): SharedPreference
 internal const val USER_SEED_MAX = 100000000
 internal const val USER_SEED_KEY = "NATIVEBRIK_USER_SEED"
 
+@Volatile
 internal var DATETIME_OFFSET: Long = 0
 
 internal fun getCurrentDate(): ZonedDateTime {
@@ -76,8 +78,8 @@ internal data class UserProperty(
 private const val USER_CUSTOM_PROPERTY_KEY_PREFIX = "NATIVEBRIK_CUSTOM_"
 
 class NubrickUser {
-    private var properties: MutableMap<String, String> = mutableMapOf()
-    private var customProperties: MutableMap<String, String> = mutableMapOf()
+    private val properties: MutableMap<String, String> = ConcurrentHashMap()
+    private val customProperties: MutableMap<String, String> = ConcurrentHashMap()
     internal var preferences: SharedPreferences? = null
     private var lastBootTime: ZonedDateTime = getCurrentDate()
     internal var packageName: String? = null
