@@ -33,7 +33,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.coroutines.cancellation.CancellationException
 
-internal var LocalEventListener = compositionLocalOf<EventListenerState> {
+internal val LocalEventListener = compositionLocalOf<EventListenerState> {
     error("LocalEventListener is not found")
 }
 

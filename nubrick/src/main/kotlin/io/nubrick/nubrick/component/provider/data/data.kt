@@ -16,7 +16,7 @@ import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.schema.ApiHttpRequest
 import kotlinx.serialization.json.JsonElement
 
-private var LocalData = compositionLocalOf<DataState> {
+private val LocalData = compositionLocalOf<DataState> {
     error("LocalData is not found")
 }
 

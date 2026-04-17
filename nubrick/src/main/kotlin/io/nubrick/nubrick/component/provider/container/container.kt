@@ -7,7 +7,7 @@ import androidx.compose.runtime.compositionLocalOf
 import io.nubrick.nubrick.data.Container
 
 
-private var LocalContainer = compositionLocalOf<Container> {
+private val LocalContainer = compositionLocalOf<Container> {
     error("LocalContainer is not found")
 }
 

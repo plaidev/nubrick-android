@@ -80,7 +80,8 @@ private const val USER_CUSTOM_PROPERTY_KEY_PREFIX = "NATIVEBRIK_CUSTOM_"
 class NubrickUser {
     private val properties: MutableMap<String, String> = ConcurrentHashMap()
     private val customProperties: MutableMap<String, String> = ConcurrentHashMap()
-    internal var preferences: SharedPreferences? = null
+    internal val preferences: SharedPreferences?
+    @Volatile
     private var lastBootTime: ZonedDateTime = getCurrentDate()
     internal var packageName: String? = null
     internal var appVersion: String? = null
