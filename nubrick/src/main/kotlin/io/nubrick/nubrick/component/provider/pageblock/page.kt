@@ -18,7 +18,7 @@ internal data class PageBlockData(val block: UIPageBlock, val properties: List<P
     }
 }
 
-internal var LocalPageBlock = compositionLocalOf<PageBlockData> {
+internal val LocalPageBlock = compositionLocalOf<PageBlockData> {
     error("LocalPageBlock is not found")
 }
 
