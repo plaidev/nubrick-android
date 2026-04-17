@@ -11,9 +11,6 @@ import io.nubrick.nubrick.data.user.formatISO8601
 import io.nubrick.nubrick.data.user.getCurrentDate
 import io.nubrick.nubrick.schema.TriggerEventNameDefs
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -175,9 +172,9 @@ internal interface TrackRepository {
 
 internal class TrackRepositoryImpl(
     private val config: Config,
-    private val user: NubrickUser
+    private val user: NubrickUser,
+    private val scope: CoroutineScope,
 ) : TrackRepository {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val eventChannel = Channel<TrackEvent>(capacity = 300)
     private val maxBatchSize = 50
     private val flushIntervalMs = 4000L
@@ -328,6 +325,5 @@ internal class TrackRepositoryImpl(
 
     override fun close() {
         eventChannel.close()
-        scope.cancel()
     }
 }

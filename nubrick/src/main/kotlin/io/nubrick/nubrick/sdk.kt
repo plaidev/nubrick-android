@@ -26,12 +26,18 @@ import io.nubrick.nubrick.component.NubrickTheme
 import io.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import android.net.http.HttpResponseCache
 import io.nubrick.nubrick.data.CacheStore
-import java.io.File
+import io.nubrick.nubrick.data.ComponentRepositoryImpl
 import io.nubrick.nubrick.data.Container
 import io.nubrick.nubrick.data.ContainerImpl
+import io.nubrick.nubrick.data.ExperimentRepositoryImpl
 import io.nubrick.nubrick.data.FormRepositoryImpl
+import io.nubrick.nubrick.data.HttpRequestRepositoryImpl
+import io.nubrick.nubrick.data.NetworkRepository
 import io.nubrick.nubrick.data.TrackCrashEvent
+import io.nubrick.nubrick.data.TrackRepositoryImpl
+import io.nubrick.nubrick.data.database.DatabaseRepositoryImpl
 import io.nubrick.nubrick.data.database.NubrickDbHelper
+import java.io.File
 import io.nubrick.nubrick.data.user.NubrickUser
 import io.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
 import io.nubrick.nubrick.schema.UIBlock
@@ -112,6 +118,16 @@ private class NubrickRuntime(
 
         this.user = NubrickUser(appContext)
         this.db = NubrickDbHelper(appContext).writableDatabase
+
+        // Create all repositories at SDK level
+        val cache = CacheStore()
+        val networkRepository = NetworkRepository(this.sdkScope, cache)
+        val componentRepository = ComponentRepositoryImpl(config, networkRepository)
+        val experimentRepository = ExperimentRepositoryImpl(config, networkRepository)
+        val trackRepository = TrackRepositoryImpl(config, this.user, this.sdkScope)
+        val httpRequestRepository = HttpRequestRepositoryImpl()
+        val databaseRepository = DatabaseRepositoryImpl(this.db)
+
         this.container = ContainerImpl(
             config = config.copy(onEvent = { event ->
                 val name = event.name ?: ""
@@ -121,10 +137,12 @@ private class NubrickRuntime(
                 config.onEvent?.let { it(event) }
             }),
             user = this.user,
-            db = this.db,
+            componentRepository = componentRepository,
+            experimentRepository = experimentRepository,
+            trackRepository = trackRepository,
+            httpRequestRepository = httpRequestRepository,
+            databaseRepository = databaseRepository,
             formRepository = FormRepositoryImpl(),
-            cache = CacheStore(),
-            context = appContext,
         )
         this.trigger = TriggerStateHolder(this.container, this.user, this.sdkScope, onTooltip)
 
