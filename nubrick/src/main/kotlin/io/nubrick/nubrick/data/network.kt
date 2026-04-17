@@ -13,21 +13,26 @@ import java.net.URL
 internal const val CONNECT_TIMEOUT = 10 * 1000
 internal const val READ_TIMEOUT = 5 * 1000
 
-internal fun getRequestWithCache(endpoint: String, cache: CacheStore, syncDateTime: Boolean = false): Result<String> {
-    val cached = cache.get(endpoint).getOrElse {
-        val result = getRequest(endpoint, syncDateTime).getOrElse { error ->
-            return Result.failure(error)
-        }
-        cache.set(endpoint, result).getOrNull()
-        return Result.success(result)
-    }
-    if (cached.isStale()) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val result = getRequest(endpoint, syncDateTime).getOrNull() ?: return@launch
+internal class NetworkRepository(
+    private val scope: CoroutineScope,
+    private val cache: CacheStore,
+) {
+    fun getWithCache(endpoint: String, syncDateTime: Boolean = false): Result<String> {
+        val cached = cache.get(endpoint).getOrElse {
+            val result = getRequest(endpoint, syncDateTime).getOrElse { error ->
+                return Result.failure(error)
+            }
             cache.set(endpoint, result).getOrNull()
+            return Result.success(result)
         }
+        if (cached.isStale()) {
+            scope.launch(Dispatchers.IO) {
+                val result = getRequest(endpoint, syncDateTime).getOrNull() ?: return@launch
+                cache.set(endpoint, result).getOrNull()
+            }
+        }
+        return Result.success(cached.data)
     }
-    return Result.success(cached.data)
 }
 
 internal fun getRequest(endpoint: String, syncDateTime: Boolean = false): Result<String> {

@@ -1,12 +1,9 @@
 package io.nubrick.nubrick.data
 
-import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import io.nubrick.nubrick.Config
 import io.nubrick.nubrick.Event
 import io.nubrick.nubrick.NubrickEvent
 import io.nubrick.nubrick.data.database.DatabaseRepository
-import io.nubrick.nubrick.data.database.DatabaseRepositoryImpl
 import io.nubrick.nubrick.data.extraction.extractComponentId
 import io.nubrick.nubrick.data.extraction.extractExperimentConfig
 import io.nubrick.nubrick.data.extraction.extractExperimentVariant
@@ -74,37 +71,26 @@ internal interface Container {
 internal class ContainerImpl(
     private val config: Config,
     private val user: NubrickUser,
-    private val db: SQLiteDatabase,
+    private val componentRepository: ComponentRepository,
+    private val experimentRepository: ExperimentRepository,
+    private val trackRepository: TrackRepository,
+    private val httpRequestRepository: HttpRequestRepository,
+    private val databaseRepository: DatabaseRepository,
     private val arguments: Any? = null,
     private val formRepository: FormRepository? = null,
-    private val cache: CacheStore,
-    private val context: Context,
 ) : Container {
-    private val componentRepository: ComponentRepository by lazy {
-        ComponentRepositoryImpl(config, cache)
-    }
-    private val experimentRepository: ExperimentRepository by lazy {
-        ExperimentRepositoryImpl(config, cache)
-    }
-    private val trackRepository: TrackRepository by lazy {
-        TrackRepositoryImpl(config, user)
-    }
-    private val httpRequestRepository: HttpRequestRepository by lazy {
-        HttpRequestRepositoryImpl()
-    }
-    private val databaseRepository: DatabaseRepository by lazy {
-        DatabaseRepositoryImpl(db)
-    }
 
     override fun initWith(arguments: Any?): Container {
         return ContainerImpl(
             config = this.config,
             user = this.user,
-            db = this.db,
+            componentRepository = this.componentRepository,
+            experimentRepository = this.experimentRepository,
+            trackRepository = this.trackRepository,
+            httpRequestRepository = this.httpRequestRepository,
+            databaseRepository = this.databaseRepository,
             arguments = arguments,
             formRepository = FormRepositoryImpl(),
-            cache = cache,
-            context = this.context,
         )
     }
 
