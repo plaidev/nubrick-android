@@ -29,11 +29,11 @@ private fun parseToPlaceholder(value: String): Placeholder? {
     )
 }
 
-fun hasPlaceholder(value: String): Boolean {
+internal fun hasPlaceholder(value: String): Boolean {
     return placeholderRegex.containsMatchIn(value)
 }
 
-fun variableByPath(path: String, variable: JsonElement?): JsonElement? {
+internal fun variableByPath(path: String, variable: JsonElement?): JsonElement? {
     val keys = path.split(".")
     if (keys.isEmpty()) return null
     var current = variable
@@ -52,7 +52,7 @@ fun variableByPath(path: String, variable: JsonElement?): JsonElement? {
     return current
 }
 
-fun compile(template: String, variable: JsonElement?): String {
+internal fun compile(template: String, variable: JsonElement?): String {
     var result = template
     return result.replace(placeholderRegex) {
         val placeholder = parseToPlaceholder(it.value) ?: return@replace ""

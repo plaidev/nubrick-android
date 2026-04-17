@@ -27,7 +27,7 @@ sealed class EmbeddingLoadingState {
     class Loading(): EmbeddingLoadingState()
     class Completed(var view: @Composable() () -> Unit): EmbeddingLoadingState()
     class NotFound(): EmbeddingLoadingState()
-    class Failed(e: Throwable): EmbeddingLoadingState()
+    class Failed(val e: Throwable): EmbeddingLoadingState()
 }
 
 @Composable

@@ -17,7 +17,7 @@ sealed class RemoteConfigLoadingState {
     class Loading(): RemoteConfigLoadingState()
     class Completed(var variant: RemoteConfigVariant): RemoteConfigLoadingState()
     class NotFound(): RemoteConfigLoadingState()
-    class Failed(e: Throwable): RemoteConfigLoadingState()
+    class Failed(val e: Throwable): RemoteConfigLoadingState()
 }
 
 @Composable

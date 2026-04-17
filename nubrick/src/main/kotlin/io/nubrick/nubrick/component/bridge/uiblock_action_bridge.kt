@@ -3,6 +3,7 @@ package io.nubrick.nubrick.component.bridge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
+import io.nubrick.nubrick.FlutterBridgeApi
 import io.nubrick.nubrick.component.provider.container.ContainerContext
 import io.nubrick.nubrick.component.provider.data.DataContext
 import io.nubrick.nubrick.component.provider.event.LocalEventListener
@@ -15,6 +16,7 @@ import kotlinx.serialization.json.JsonElement
 
 // forcefully dispatch uiblock event in the page compose context, from anywhere.
 // dispatch(event) in flutter -> listen the event in the page context, and dispatch event from the page.
+@FlutterBridgeApi
 public class UIBlockActionBridge {
     private val _events = MutableSharedFlow<UIBlockAction>()
     internal val events: SharedFlow<UIBlockAction> = _events

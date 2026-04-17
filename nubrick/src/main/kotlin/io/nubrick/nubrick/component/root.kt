@@ -58,7 +58,6 @@ import io.nubrick.nubrick.schema.UIBlockAction
 import io.nubrick.nubrick.schema.UIPageBlock
 import io.nubrick.nubrick.schema.UIRootBlock
 import io.nubrick.nubrick.template.compile
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
@@ -205,7 +204,6 @@ internal class RootStateHolder(
     }
 }
 
-@DelicateCoroutinesApi
 @Composable
 internal fun ModalPage(
     container: Container,
@@ -241,7 +239,6 @@ internal fun ModalPage(
     }
 }
 
-@DelicateCoroutinesApi
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Root(
