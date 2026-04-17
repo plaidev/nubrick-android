@@ -164,6 +164,7 @@ private class NubrickRuntime(
         }
     }
 
+    // Only used by resetForTest(); the runtime is process-scoped and does not need public teardown.
     fun close() {
         if (!this.sdkScope.isActive) return
         this.sdkScope.cancel()

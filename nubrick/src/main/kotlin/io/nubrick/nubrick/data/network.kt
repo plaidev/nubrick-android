@@ -4,14 +4,22 @@ import io.nubrick.nubrick.data.user.syncDateFromHttpResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.io.InputStreamReader
+import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 
 internal const val CONNECT_TIMEOUT = 10 * 1000
 internal const val READ_TIMEOUT = 5 * 1000
+private const val MAX_RETRIES = 2
+private val RETRY_DELAYS = longArrayOf(1000, 2000)
+private const val MAX_RESPONSE_SIZE = 5 * 1024 * 1024
+private const val MAX_ERROR_BODY_SIZE = 4 * 1024
+
+internal class HttpException(val statusCode: Int, body: String?) :
+    Exception("HTTP $statusCode" + if (body.isNullOrBlank()) "" else ": $body")
 
 internal class NetworkRepository(
     private val scope: CoroutineScope,
@@ -35,7 +43,48 @@ internal class NetworkRepository(
     }
 }
 
+private fun readStream(stream: InputStream, maxSize: Int = MAX_RESPONSE_SIZE): String {
+    return stream.use { input ->
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        var totalRead = 0
+        var count: Int
+        while (input.read(buffer).also { count = it } != -1) {
+            if (totalRead + count > maxSize) {
+                throw IOException("Response body exceeded max size of $maxSize bytes")
+            }
+            output.write(buffer, 0, count)
+            totalRead += count
+        }
+        output.toString(Charsets.UTF_8.name())
+    }
+}
+
+private fun readErrorBody(connection: HttpURLConnection): String? {
+    return try {
+        connection.errorStream?.let { readStream(it, MAX_ERROR_BODY_SIZE) }
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun isRetryable(e: Throwable): Boolean {
+    return e is SocketTimeoutException || (e is HttpException && e.statusCode >= 500)
+}
+
 internal fun getRequest(endpoint: String, syncDateTime: Boolean = false): Result<String> {
+    var lastResult: Result<String> = Result.failure(IOException("No attempts made"))
+    for (attempt in 0..MAX_RETRIES) {
+        if (attempt > 0) Thread.sleep(RETRY_DELAYS[attempt - 1])
+        lastResult = getRequestOnce(endpoint, syncDateTime)
+        if (lastResult.isSuccess) return lastResult
+        val error = lastResult.exceptionOrNull() ?: break
+        if (!isRetryable(error)) break
+    }
+    return lastResult
+}
+
+private fun getRequestOnce(endpoint: String, syncDateTime: Boolean): Result<String> {
     var connection: HttpURLConnection? = null
     try {
         val t0 = System.currentTimeMillis()
@@ -55,18 +104,11 @@ internal fun getRequest(endpoint: String, syncDateTime: Boolean = false): Result
         }
 
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            val sb = StringBuilder()
-            var line: String?
-            val br = BufferedReader(InputStreamReader(connection.inputStream))
-            while (br.readLine().also { line = it } != null) {
-                sb.append(line)
-            }
-
-            return Result.success(sb.toString())
+            return Result.success(readStream(connection.inputStream))
         } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
             return Result.failure(NotFoundException())
         } else {
-            return Result.failure(Exception("Something happened: http status code = ${responseCode.toString()}"))
+            return Result.failure(HttpException(responseCode, readErrorBody(connection)))
         }
     } catch (e: IOException) {
         return Result.failure(e)
@@ -90,27 +132,20 @@ internal fun postRequest(endpoint: String, data: String): Result<String> {
 
         val bodyData = data.toByteArray()
         connection.setRequestProperty("Content-Length", bodyData.size.toString())
-        val outputStream = connection.outputStream
-        outputStream.write(bodyData)
-        outputStream.flush()
-        outputStream.close()
+        connection.outputStream.use { outputStream ->
+            outputStream.write(bodyData)
+            outputStream.flush()
+        }
 
         connection.connect()
 
         val responseCode = connection.responseCode
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            val sb = StringBuilder()
-            var line: String?
-            val br = BufferedReader(InputStreamReader(connection.inputStream))
-            while (br.readLine().also { line = it } != null) {
-                sb.append(line)
-            }
-
-            return Result.success(sb.toString())
+            return Result.success(readStream(connection.inputStream))
         } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
             return Result.failure(NotFoundException())
         } else {
-            return Result.failure(Exception("Something happened: http status code = ${responseCode.toString()}"))
+            return Result.failure(HttpException(responseCode, readErrorBody(connection)))
         }
 
     } catch (e: IOException) {
@@ -120,10 +155,13 @@ internal fun postRequest(endpoint: String, data: String): Result<String> {
     }
 }
 
-internal fun createHttpUrlConnection(url: String): Result<HttpURLConnection> {
+internal fun createHttpUrlConnection(endpoint: String): Result<HttpURLConnection> {
     try {
-        val url = URL(url)
-        val connection = url.openConnection() as HttpURLConnection
+        val parsed = URL(endpoint)
+        if (parsed.protocol != "https" && parsed.protocol != "http") {
+            return Result.failure(IOException("Unsupported URL scheme: ${parsed.protocol}"))
+        }
+        val connection = parsed.openConnection() as HttpURLConnection
         connection.connectTimeout = CONNECT_TIMEOUT
         connection.readTimeout = READ_TIMEOUT
         return Result.success(connection)
@@ -139,10 +177,10 @@ internal fun setBody(connection: HttpURLConnection, body: String) {
 
     val bodyData = body.toByteArray()
     connection.setRequestProperty("Content-Length", bodyData.size.toString())
-    val outputStream = connection.outputStream
-    outputStream.write(bodyData)
-    outputStream.flush()
-    outputStream.close()
+    connection.outputStream.use { outputStream ->
+        outputStream.write(bodyData)
+        outputStream.flush()
+    }
 }
 
 internal fun connectAndGetResponse(connection: HttpURLConnection): Result<String> {
@@ -150,17 +188,11 @@ internal fun connectAndGetResponse(connection: HttpURLConnection): Result<String
         connection.connect()
         val responseCode = connection.responseCode
         if (responseCode == HttpURLConnection.HTTP_OK) {
-            val sb = StringBuilder()
-            var line: String?
-            val br = BufferedReader(InputStreamReader(connection.inputStream))
-            while (br.readLine().also { line = it } != null) {
-                sb.append(line)
-            }
-            return Result.success(sb.toString())
+            return Result.success(readStream(connection.inputStream))
         } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
             return Result.failure(NotFoundException())
         } else {
-            return Result.failure(Exception("Something happened: http status code = ${responseCode.toString()}"))
+            return Result.failure(HttpException(responseCode, readErrorBody(connection)))
         }
     } catch (e: IOException) {
         return Result.failure(e)
@@ -168,4 +200,3 @@ internal fun connectAndGetResponse(connection: HttpURLConnection): Result<String
         connection.disconnect()
     }
 }
-
