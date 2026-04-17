@@ -51,6 +51,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+        freeCompilerArgs += "-opt-in=io.nubrick.nubrick.FlutterBridgeApi"
     }
     publishing {
         singleVariant("release") {

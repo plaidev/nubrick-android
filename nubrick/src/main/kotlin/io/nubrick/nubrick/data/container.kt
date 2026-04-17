@@ -32,9 +32,9 @@ internal data class TriggerContent(
     val block: UIBlock,
 )
 
-class NotFoundException : Exception("Not found")
-class FailedToDecodeException : Exception("Failed to decode")
-class SkipHttpRequestException : Exception("Skip http request")
+internal class NotFoundException : Exception("Not found")
+internal class FailedToDecodeException : Exception("Failed to decode")
+internal class SkipHttpRequestException : Exception("Skip http request")
 
 internal interface Container {
     fun initWith(arguments: Any?): Container

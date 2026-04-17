@@ -45,7 +45,6 @@ import io.nubrick.nubrick.schema.UIRootBlock
 import io.nubrick.nubrick.schema.UIPageBlock
 import io.nubrick.nubrick.schema.PageKind
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -468,7 +467,6 @@ object FlutterBridge {
         }
     }
 
-    @DelicateCoroutinesApi
     @Composable
     fun render(
         modifier: Modifier = Modifier,
