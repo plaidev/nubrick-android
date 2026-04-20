@@ -1,5 +1,7 @@
 package io.nubrick.nubrick.data
 
+import io.nubrick.nubrick.schema.ApiHttpRequest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,11 +91,23 @@ class NetworkTest {
         assertTrue(result.exceptionOrNull() is IOException)
     }
 
+    @Test
+    fun `custom http request returns failure for invalid json response`() {
+        val (result, requestCount) = withLocalServer(response(200, "{")) { endpoint ->
+            runBlocking {
+                HttpRequestRepositoryImpl().request(ApiHttpRequest(url = endpoint))
+            }
+        }
+
+        assertTrue(result.isFailure)
+        assertEquals(1, requestCount)
+    }
+
     companion object {
-        private fun withLocalServer(
+        private fun <T> withLocalServer(
             vararg responses: String,
-            request: (String) -> Result<String>
-        ): Pair<Result<String>, Int> {
+            request: (String) -> T
+        ): Pair<T, Int> {
             val serverSocket = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
             serverSocket.soTimeout = 5000
             val requestCount = AtomicInteger(0)

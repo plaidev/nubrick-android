@@ -87,10 +87,16 @@ internal fun buildJsonElement(value: Any?): JsonElement {
         is Int -> {
             return JsonPrimitive(value)
         }
+        is Long -> {
+            return JsonPrimitive(value)
+        }
         is Float -> {
             return JsonPrimitive(value)
         }
         is Double -> {
+            return JsonPrimitive(value)
+        }
+        is Boolean -> {
             return JsonPrimitive(value)
         }
         is String -> {

@@ -123,11 +123,14 @@ internal fun isInDistributionTarget(distribution: List<ExperimentCondition>?, pr
         val conditionValue = condition.value ?: return@firstOrNull true
         val op = condition.operator ?: return@firstOrNull true
         val prop = props[propKey] ?: return@firstOrNull true
+        val operator = ConditionOperator.entries.firstOrNull { it.name == op }
+            ?: return@firstOrNull true
+        if (operator == ConditionOperator.UNKNOWN) return@firstOrNull true
         !comparePropWithConditionValue(
             prop = prop,
             asType = condition.asType,
             value = conditionValue,
-            op = ConditionOperator.valueOf(op)
+            op = operator
         )
     }
     return foundNotMatched == null

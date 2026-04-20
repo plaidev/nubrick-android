@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,31 +33,36 @@ sealed class EmbeddingLoadingState {
 
 @Composable
 internal fun rememberEmbeddingState(container: Container, experimentId: String, componentId: String?, onEvent: ((event: Event) -> Unit)?, onSizeChange: (width: Int?, height: Int?) -> Unit): EmbeddingLoadingState {
-    var loadingState: EmbeddingLoadingState by remember { mutableStateOf(EmbeddingLoadingState.Loading()) }
-    LaunchedEffect("key") {
-        onSizeChange(null, null)
+    val currentContainer = rememberUpdatedState(container)
+    val currentOnEvent = rememberUpdatedState(onEvent)
+    val currentOnSizeChange = rememberUpdatedState(onSizeChange)
+    var loadingState: EmbeddingLoadingState by remember(experimentId, componentId) {
+        mutableStateOf(EmbeddingLoadingState.Loading())
+    }
+    LaunchedEffect(experimentId, componentId) {
+        currentOnSizeChange.value(null, null)
         container.fetchEmbedding(experimentId, componentId).onSuccess {
             loadingState = when (it) {
                 is UIBlock.UnionUIRootBlock -> {
                     EmbeddingLoadingState.Completed {
                         Root(
-                            container = container,
+                            container = currentContainer.value,
                             root = it.data,
                             modifier = Modifier
                                 .fillMaxSize(),
-                            onEvent = onEvent ?: {},
-                            onSizeChange = onSizeChange
+                            onEvent = currentOnEvent.value ?: {},
+                            onSizeChange = currentOnSizeChange.value
                         )
                     }
                 }
 
                 else -> {
-                    onSizeChange(null, null)
+                    currentOnSizeChange.value(null, null)
                     EmbeddingLoadingState.NotFound()
                 }
             }
         }.onFailure {
-            onSizeChange(null, null)
+            currentOnSizeChange.value(null, null)
             loadingState = when (it) {
                 is NotFoundException -> {
                     EmbeddingLoadingState.NotFound()

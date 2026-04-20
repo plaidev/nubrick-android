@@ -26,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -170,7 +171,7 @@ internal class RootStateHolder(
             val index = modalStateHolder.modalState.modalStack.indexOfFirst {
                 it.block.id == destId
             }
-            if (index > 0) {
+            if (index >= 0) {
                 // if it's already in modal stack, jump to the target stack
                 modalStateHolder.backTo(index)
                 return
@@ -255,16 +256,21 @@ internal fun Root(
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    val modalStateHolder = remember(sheetState, scope) {
-        ModalStateHolder(sheetState, largeSheetState, scope, onDismiss = { onDismiss(root) })
+    val currentContainer = rememberUpdatedState(container)
+    val currentOnEvent = rememberUpdatedState(onEvent)
+    val currentOnNextTooltip = rememberUpdatedState(onNextTooltip)
+    val currentOnDismiss = rememberUpdatedState(onDismiss)
+    val currentOnSizeChange = rememberUpdatedState(onSizeChange)
+    val modalStateHolder = remember(sheetState, largeSheetState, scope, root) {
+        ModalStateHolder(sheetState, largeSheetState, scope, onDismiss = { currentOnDismiss.value(root) })
     }
     val context = LocalContext.current
-    val rootStateHolder = remember(root, modalStateHolder, onDismiss, context) {
+    val rootStateHolder = remember(root, modalStateHolder, context) {
         RootStateHolder(
             root,
             modalStateHolder,
-            onNextTooltip,
-            onDismiss,
+            onNextTooltip = { pageId -> currentOnNextTooltip.value(pageId) },
+            onDismiss = { dismissedRoot -> currentOnDismiss.value(dismissedRoot) },
             onOpenDeepLink = { link ->
                 val intent = Intent(Intent.ACTION_VIEW, link.toUri()).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -276,28 +282,30 @@ internal fun Root(
             },
             onTrigger = { trigger ->
                 val e = parseUIEventToEvent(trigger)
-                onEvent(e)
-                container.handleEvent(e)
+                currentOnEvent.value(e)
+                currentContainer.value.handleEvent(e)
             },
-            onSizeChange = onSizeChange,
+            onSizeChange = { width, height ->
+                currentOnSizeChange.value?.invoke(width, height)
+            },
         )
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(rootStateHolder) {
         rootStateHolder.initialize()
     }
     val bottomSheetProps = remember {
         ModalBottomSheetDefaults.properties(shouldDismissOnBackPress = false)
     }
-    val listener = remember(rootStateHolder, onEvent, container) {
+    val listener = remember(rootStateHolder) {
         { event: UIBlockAction, data: JsonElement ->
             rootStateHolder.handleNavigate(event, data)
 
             val e = parseUIEventToEvent(event)
-            onEvent(e)
-            container.handleEvent(e)
+            currentOnEvent.value(e)
+            currentContainer.value.handleEvent(e)
         }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(modalStateHolder, listener) {
         modalStateHolder.setOnTrigger { trigger, data ->
             listener(trigger, data)
         }
