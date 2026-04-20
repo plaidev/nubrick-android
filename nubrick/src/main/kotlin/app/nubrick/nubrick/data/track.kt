@@ -191,11 +191,18 @@ internal class TrackRepositoryImpl(
 
             while (isActive) {
                 val event = withTimeoutOrNull(flushIntervalMs) {
-                    eventChannel.receive()
+                    eventChannel.receiveCatching().getOrNull()
                 }
 
                 if (event != null) {
                     buffer.add(event)
+                }
+
+                if (eventChannel.isClosedForReceive) {
+                    if (buffer.isNotEmpty()) {
+                        sendBatch(buffer.toList())
+                    }
+                    break
                 }
 
                 val shouldFlush = buffer.size >= maxBatchSize ||
