@@ -1,0 +1,45 @@
+package app.nubrick.nubrick.data
+
+import app.nubrick.nubrick.Config
+import app.nubrick.nubrick.SdkConstants
+import app.nubrick.nubrick.schema.ExperimentConfigs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+
+internal interface ExperimentRepository {
+    suspend fun fetchExperimentConfigs(id: String): Result<ExperimentConfigs>
+    suspend fun fetchTriggerExperimentConfigs(name: String): Result<ExperimentConfigs>
+}
+
+internal class ExperimentRepositoryImpl(
+    private val config: Config,
+    private val networkRepository: NetworkRepository,
+): ExperimentRepository {
+    override suspend fun fetchExperimentConfigs(
+        id: String
+    ): Result<ExperimentConfigs> {
+        return withContext(Dispatchers.IO) {
+            val url = SdkConstants.endpoint.cdn + "/projects/" + config.projectId + "/experiments/id/" + id
+            val response: String = networkRepository.getWithCache(url, syncDateTime = true).getOrElse {
+                return@withContext Result.failure(it)
+            }
+            val json = Json.decodeFromString<JsonElement>(response)
+            val configs = ExperimentConfigs.decode(json) ?: return@withContext Result.failure(FailedToDecodeException())
+            return@withContext Result.success(configs)
+        }
+    }
+
+    override suspend fun fetchTriggerExperimentConfigs(name: String): Result<ExperimentConfigs> {
+        return withContext(Dispatchers.IO) {
+            val url = SdkConstants.endpoint.cdn + "/projects/" + config.projectId + "/experiments/trigger/" + name
+            val response: String = networkRepository.getWithCache(url, syncDateTime = true).getOrElse {
+                return@withContext Result.failure(it)
+            }
+            val json = Json.decodeFromString<JsonElement>(response)
+            val configs = ExperimentConfigs.decode(json) ?: return@withContext Result.failure(FailedToDecodeException())
+            return@withContext Result.success(configs)
+        }
+    }
+}

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.nubrick.e2e"
+    namespace = "app.nubrick.e2e"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.nubrick.e2e"
+        applicationId = "app.nubrick.e2e"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
