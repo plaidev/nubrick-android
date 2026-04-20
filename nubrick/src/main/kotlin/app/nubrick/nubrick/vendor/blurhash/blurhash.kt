@@ -1,6 +1,6 @@
 // from: https://github.com/woltapp/blurhash/blob/master/Kotlin/lib/src/main/java/com/wolt/blurhashkt/BlurHashDecoder.kt
 // MIT License
-package io.nubrick.nubrick.vendor.blurhash
+package app.nubrick.nubrick.vendor.blurhash
 
 import android.graphics.Bitmap
 import android.graphics.Color

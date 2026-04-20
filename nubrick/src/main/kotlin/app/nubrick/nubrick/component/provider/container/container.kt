@@ -1,10 +1,10 @@
-package io.nubrick.nubrick.component.provider.container
+package app.nubrick.nubrick.component.provider.container
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
-import io.nubrick.nubrick.data.Container
+import app.nubrick.nubrick.data.Container
 
 
 private val LocalContainer = compositionLocalOf<Container> {

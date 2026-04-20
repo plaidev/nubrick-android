@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component.renderer
+package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,11 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import io.nubrick.nubrick.component.provider.data.DataContext
-import io.nubrick.nubrick.component.provider.data.NestedDataProvider
-import io.nubrick.nubrick.schema.FlexDirection
-import io.nubrick.nubrick.schema.UICollectionBlock
-import io.nubrick.nubrick.template.variableByPath
+import app.nubrick.nubrick.component.provider.data.DataContext
+import app.nubrick.nubrick.component.provider.data.NestedDataProvider
+import app.nubrick.nubrick.schema.FlexDirection
+import app.nubrick.nubrick.schema.UICollectionBlock
+import app.nubrick.nubrick.template.variableByPath
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonArray
 

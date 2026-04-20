@@ -1,10 +1,10 @@
-package io.nubrick.nubrick.data.database
+package app.nubrick.nubrick.data.database
 
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import android.provider.BaseColumns
-import io.nubrick.nubrick.data.user.formatISO8601
-import io.nubrick.nubrick.data.user.getCurrentDate
+import app.nubrick.nubrick.data.user.formatISO8601
+import app.nubrick.nubrick.data.user.getCurrentDate
 import java.time.ZonedDateTime
 
 private object ExperimentHistoryTable {

@@ -1,8 +1,8 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
-import io.nubrick.nubrick.Config
-import io.nubrick.nubrick.SdkConstants
-import io.nubrick.nubrick.schema.ExperimentConfigs
+import app.nubrick.nubrick.Config
+import app.nubrick.nubrick.SdkConstants
+import app.nubrick.nubrick.schema.ExperimentConfigs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json

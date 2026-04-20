@@ -1,4 +1,4 @@
-package io.nubrick.example.ui.theme
+package app.nubrick.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

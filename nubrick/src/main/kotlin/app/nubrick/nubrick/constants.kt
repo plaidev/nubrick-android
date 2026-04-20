@@ -1,4 +1,4 @@
-package io.nubrick.nubrick
+package app.nubrick.nubrick
 
 const val VERSION = BuildConfig.VERSION_NAME
 

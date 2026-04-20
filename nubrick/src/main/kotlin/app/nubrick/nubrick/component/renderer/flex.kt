@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component.renderer
+package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,18 +34,18 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import io.nubrick.nubrick.component.provider.data.DataContext
-import io.nubrick.nubrick.component.provider.event.eventDispatcher
-import io.nubrick.nubrick.schema.AlignItems
-import io.nubrick.nubrick.schema.FlexDirection
-import io.nubrick.nubrick.schema.FrameData
-import io.nubrick.nubrick.schema.JustifyContent
-import io.nubrick.nubrick.schema.Overflow
-import io.nubrick.nubrick.schema.UIBlock
-import io.nubrick.nubrick.schema.UIFlexContainerBlock
-import io.nubrick.nubrick.template.compile
-import io.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
-import io.nubrick.nubrick.schema.Color as SchemaColor
+import app.nubrick.nubrick.component.provider.data.DataContext
+import app.nubrick.nubrick.component.provider.event.eventDispatcher
+import app.nubrick.nubrick.schema.AlignItems
+import app.nubrick.nubrick.schema.FlexDirection
+import app.nubrick.nubrick.schema.FrameData
+import app.nubrick.nubrick.schema.JustifyContent
+import app.nubrick.nubrick.schema.Overflow
+import app.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.schema.UIFlexContainerBlock
+import app.nubrick.nubrick.template.compile
+import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
+import app.nubrick.nubrick.schema.Color as SchemaColor
 import androidx.core.math.MathUtils
 
 private fun calcWeight(frameData: FrameData?, flexDirection: FlexDirection): Float? {

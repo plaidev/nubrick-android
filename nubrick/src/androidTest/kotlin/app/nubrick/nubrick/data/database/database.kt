@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.data.database
+package app.nubrick.nubrick.data.database
 
 import org.junit.Assert
 import org.junit.Test

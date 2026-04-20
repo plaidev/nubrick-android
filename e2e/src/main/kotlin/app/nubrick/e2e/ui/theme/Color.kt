@@ -1,4 +1,4 @@
-package io.nubrick.e2e.ui.theme
+package app.nubrick.e2e.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

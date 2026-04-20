@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "io.nubrick.example"
+    namespace = "app.nubrick.example"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.nubrick.example"
+        applicationId = "app.nubrick.example"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

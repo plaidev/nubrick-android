@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component.renderer
+package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.text.BasicText
@@ -12,17 +12,17 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
-import io.nubrick.nubrick.component.provider.data.DataContext
-import io.nubrick.nubrick.component.provider.event.eventDispatcher
-import io.nubrick.nubrick.component.provider.event.skeleton
-import io.nubrick.nubrick.schema.Color
-import io.nubrick.nubrick.schema.FontDesign
-import io.nubrick.nubrick.schema.FontWeight
-import io.nubrick.nubrick.schema.TextAlign
-import io.nubrick.nubrick.schema.UITextBlock
-import io.nubrick.nubrick.template.compile
-import io.nubrick.nubrick.template.hasPlaceholder
-import io.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
+import app.nubrick.nubrick.component.provider.data.DataContext
+import app.nubrick.nubrick.component.provider.event.eventDispatcher
+import app.nubrick.nubrick.component.provider.event.skeleton
+import app.nubrick.nubrick.schema.Color
+import app.nubrick.nubrick.schema.FontDesign
+import app.nubrick.nubrick.schema.FontWeight
+import app.nubrick.nubrick.schema.TextAlign
+import app.nubrick.nubrick.schema.UITextBlock
+import app.nubrick.nubrick.template.compile
+import app.nubrick.nubrick.template.hasPlaceholder
+import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color as PrimitiveColor
 import androidx.compose.ui.text.font.FontFamily as PrimitiveFontFamily

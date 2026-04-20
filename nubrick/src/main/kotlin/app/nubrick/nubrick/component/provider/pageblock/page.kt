@@ -1,11 +1,11 @@
-package io.nubrick.nubrick.component.provider.pageblock
+package app.nubrick.nubrick.component.provider.pageblock
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
-import io.nubrick.nubrick.schema.Property
-import io.nubrick.nubrick.schema.UIPageBlock
+import app.nubrick.nubrick.schema.Property
+import app.nubrick.nubrick.schema.UIPageBlock
 
 internal data class PageBlockData(val block: UIPageBlock, val properties: List<Property>? = null) {
     fun toProperties(): List<Property>? {

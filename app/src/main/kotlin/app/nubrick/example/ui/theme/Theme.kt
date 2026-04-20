@@ -1,4 +1,4 @@
-package io.nubrick.example.ui.theme
+package app.nubrick.example.ui.theme
 
 import android.app.Activity
 import android.os.Build

@@ -7,11 +7,11 @@ plugins {
     id("signing")
 }
 
-group = "io.nubrick"
+group = "app.nubrick"
 version = "0.10.0"
 
 android {
-    namespace = "io.nubrick.nubrick"
+    namespace = "app.nubrick.nubrick"
     compileSdk = 36
 
     defaultConfig {
@@ -51,7 +51,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
-        freeCompilerArgs += "-opt-in=io.nubrick.nubrick.FlutterBridgeApi"
+        freeCompilerArgs += "-opt-in=app.nubrick.nubrick.FlutterBridgeApi"
     }
     publishing {
         singleVariant("release") {
@@ -86,8 +86,8 @@ tasks.register<Jar>("javadocEmptyJar") {
 }
 tasks.register<Zip>("makeArchive") {
     dependsOn("publishMavenPublicationToMavenRepository")
-    from(layout.buildDirectory.dir("repos/io/nubrick/nubrick/$version"))
-    into("io/nubrick/nubrick/$version")
+    from(layout.buildDirectory.dir("repos/app/nubrick/nubrick/$version"))
+    into("app/nubrick/nubrick/$version")
 }
 
 afterEvaluate {

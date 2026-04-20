@@ -1,12 +1,12 @@
-package io.nubrick.nubrick.data.user
+package app.nubrick.nubrick.data.user
 
 
 import android.content.Context
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import io.nubrick.nubrick.VERSION
-import io.nubrick.nubrick.schema.BuiltinUserProperty
+import app.nubrick.nubrick.VERSION
+import app.nubrick.nubrick.schema.BuiltinUserProperty
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith

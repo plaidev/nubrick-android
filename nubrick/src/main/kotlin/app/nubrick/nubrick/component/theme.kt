@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component
+package app.nubrick.nubrick.component
 
 import androidx.compose.foundation.isSystemInDarkTheme
   import androidx.compose.material3.MaterialTheme

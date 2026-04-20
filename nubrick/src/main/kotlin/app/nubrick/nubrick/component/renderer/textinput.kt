@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component.renderer
+package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.BasicText
@@ -9,9 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import io.nubrick.nubrick.component.provider.container.ContainerContext
-import io.nubrick.nubrick.data.FormValue
-import io.nubrick.nubrick.schema.UITextInputBlock
+import app.nubrick.nubrick.component.provider.container.ContainerContext
+import app.nubrick.nubrick.data.FormValue
+import app.nubrick.nubrick.schema.UITextInputBlock
 
 @Composable
 internal fun TextInput(block: UITextInputBlock, modifier: Modifier = Modifier) {

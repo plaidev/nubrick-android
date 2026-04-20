@@ -1,4 +1,4 @@
-package io.nubrick.example
+package app.nubrick.example
 
 import org.junit.Test
 

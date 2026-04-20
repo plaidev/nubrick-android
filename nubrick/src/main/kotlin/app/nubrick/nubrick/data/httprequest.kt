@@ -1,7 +1,7 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
-import io.nubrick.nubrick.schema.ApiHttpRequest
-import io.nubrick.nubrick.schema.ApiHttpRequestMethod
+import app.nubrick.nubrick.schema.ApiHttpRequest
+import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 

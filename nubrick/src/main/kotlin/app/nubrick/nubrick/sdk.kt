@@ -1,4 +1,4 @@
-package io.nubrick.nubrick
+package app.nubrick.nubrick
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
@@ -17,33 +17,33 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
-import io.nubrick.nubrick.component.Embedding
-import io.nubrick.nubrick.component.EmbeddingLoadingState
-import io.nubrick.nubrick.component.Root
-import io.nubrick.nubrick.component.Trigger
-import io.nubrick.nubrick.component.TriggerStateHolder
-import io.nubrick.nubrick.component.NubrickTheme
-import io.nubrick.nubrick.component.bridge.UIBlockActionBridge
+import app.nubrick.nubrick.component.Embedding
+import app.nubrick.nubrick.component.EmbeddingLoadingState
+import app.nubrick.nubrick.component.Root
+import app.nubrick.nubrick.component.Trigger
+import app.nubrick.nubrick.component.TriggerStateHolder
+import app.nubrick.nubrick.component.NubrickTheme
+import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import android.net.http.HttpResponseCache
-import io.nubrick.nubrick.data.CacheStore
-import io.nubrick.nubrick.data.ComponentRepositoryImpl
-import io.nubrick.nubrick.data.Container
-import io.nubrick.nubrick.data.ContainerImpl
-import io.nubrick.nubrick.data.ExperimentRepositoryImpl
-import io.nubrick.nubrick.data.FormRepositoryImpl
-import io.nubrick.nubrick.data.HttpRequestRepositoryImpl
-import io.nubrick.nubrick.data.NetworkRepository
-import io.nubrick.nubrick.data.TrackCrashEvent
-import io.nubrick.nubrick.data.TrackRepositoryImpl
-import io.nubrick.nubrick.data.database.DatabaseRepositoryImpl
-import io.nubrick.nubrick.data.database.NubrickDbHelper
+import app.nubrick.nubrick.data.CacheStore
+import app.nubrick.nubrick.data.ComponentRepositoryImpl
+import app.nubrick.nubrick.data.Container
+import app.nubrick.nubrick.data.ContainerImpl
+import app.nubrick.nubrick.data.ExperimentRepositoryImpl
+import app.nubrick.nubrick.data.FormRepositoryImpl
+import app.nubrick.nubrick.data.HttpRequestRepositoryImpl
+import app.nubrick.nubrick.data.NetworkRepository
+import app.nubrick.nubrick.data.TrackCrashEvent
+import app.nubrick.nubrick.data.TrackRepositoryImpl
+import app.nubrick.nubrick.data.database.DatabaseRepositoryImpl
+import app.nubrick.nubrick.data.database.NubrickDbHelper
 import java.io.File
-import io.nubrick.nubrick.data.user.NubrickUser
-import io.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
-import io.nubrick.nubrick.schema.UIBlock
-import io.nubrick.nubrick.schema.UIRootBlock
-import io.nubrick.nubrick.schema.UIPageBlock
-import io.nubrick.nubrick.schema.PageKind
+import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
+import app.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.schema.UIRootBlock
+import app.nubrick.nubrick.schema.UIPageBlock
+import app.nubrick.nubrick.schema.PageKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -250,15 +250,15 @@ private class NubrickRuntime(
         id: String,
         content: @Composable (RemoteConfigLoadingState) -> Unit
     ) {
-        return io.nubrick.nubrick.remoteconfig.RemoteConfigView(
+        return app.nubrick.nubrick.remoteconfig.RemoteConfigView(
             container = this.container,
             experimentId = id,
             content = content
         )
     }
 
-    fun remoteConfig(id: String): io.nubrick.nubrick.remoteconfig.RemoteConfig {
-        return io.nubrick.nubrick.remoteconfig.RemoteConfig(
+    fun remoteConfig(id: String): app.nubrick.nubrick.remoteconfig.RemoteConfig {
+        return app.nubrick.nubrick.remoteconfig.RemoteConfig(
             container = this.container,
             experimentId = id,
         )
@@ -406,7 +406,7 @@ object NubrickSDK {
         current.RemoteConfig(id = id, content = content)
     }
 
-    fun remoteConfig(id: String): Result<io.nubrick.nubrick.remoteconfig.RemoteConfig> {
+    fun remoteConfig(id: String): Result<app.nubrick.nubrick.remoteconfig.RemoteConfig> {
         val current = runtimeOrNull(throwInDebug = false)
         if (current == null) {
             return Result.failure(NubrickUninitializedException())

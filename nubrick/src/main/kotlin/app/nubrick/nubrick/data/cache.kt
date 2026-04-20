@@ -1,6 +1,6 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
-import io.nubrick.nubrick.data.user.getCurrentDate
+import app.nubrick.nubrick.data.user.getCurrentDate
 import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 

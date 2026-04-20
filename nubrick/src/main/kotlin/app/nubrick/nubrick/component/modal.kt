@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component
+package app.nubrick.nubrick.component
 
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SheetState
@@ -6,10 +6,10 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.nubrick.nubrick.component.provider.pageblock.PageBlockData
-import io.nubrick.nubrick.schema.ModalPresentationStyle
-import io.nubrick.nubrick.schema.ModalScreenSize
-import io.nubrick.nubrick.schema.UIBlockAction
+import app.nubrick.nubrick.component.provider.pageblock.PageBlockData
+import app.nubrick.nubrick.schema.ModalPresentationStyle
+import app.nubrick.nubrick.schema.ModalScreenSize
+import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement

@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component
+package app.nubrick.nubrick.component
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -19,10 +19,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.nubrick.nubrick.Event
-import io.nubrick.nubrick.data.Container
-import io.nubrick.nubrick.data.NotFoundException
-import io.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.Event
+import app.nubrick.nubrick.data.Container
+import app.nubrick.nubrick.data.NotFoundException
+import app.nubrick.nubrick.schema.UIBlock
 
 sealed class EmbeddingLoadingState {
     class Loading(): EmbeddingLoadingState()

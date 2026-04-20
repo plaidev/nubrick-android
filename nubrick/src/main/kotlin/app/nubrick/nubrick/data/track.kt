@@ -1,15 +1,15 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
 import android.os.Build
 import android.util.Log
-import io.nubrick.nubrick.Config
-import io.nubrick.nubrick.FlutterBridgeApi
-import io.nubrick.nubrick.SdkConstants
-import io.nubrick.nubrick.VERSION
-import io.nubrick.nubrick.data.user.NubrickUser
-import io.nubrick.nubrick.data.user.formatISO8601
-import io.nubrick.nubrick.data.user.getCurrentDate
-import io.nubrick.nubrick.schema.TriggerEventNameDefs
+import app.nubrick.nubrick.Config
+import app.nubrick.nubrick.FlutterBridgeApi
+import app.nubrick.nubrick.SdkConstants
+import app.nubrick.nubrick.VERSION
+import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.data.user.formatISO8601
+import app.nubrick.nubrick.data.user.getCurrentDate
+import app.nubrick.nubrick.schema.TriggerEventNameDefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
@@ -255,7 +255,7 @@ internal class TrackRepositoryImpl(
         val causedByNubrick = crashEvent.exceptions.any { exception ->
             exception.callStacks.orEmpty().any { frame ->
                 val className = frame.className ?: return@any false
-                className.contains("io.nubrick.nubrick") ||
+                className.contains("app.nubrick.nubrick") ||
                 className.contains("app.nubrick.flutter.nubrick_flutter") ||
                 className.contains("package:nubrick_flutter")
             }

@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

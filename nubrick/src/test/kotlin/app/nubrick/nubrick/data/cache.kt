@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,7 +13,7 @@ class CacheStoreTest {
     @Before
     fun setup() {
         // Override getCurrentDate for testing
-        io.nubrick.nubrick.data.user.DATETIME_OFFSET = 0
+        app.nubrick.nubrick.data.user.DATETIME_OFFSET = 0
         cacheStore = CacheStore()
     }
 
@@ -83,7 +83,7 @@ class CacheStoreTest {
         assertTrue("Set operation should succeed", setResult.isSuccess)
 
         // Simulate time passing beyond cache time (10 minutes = 600000ms)
-        io.nubrick.nubrick.data.user.DATETIME_OFFSET = 601000
+        app.nubrick.nubrick.data.user.DATETIME_OFFSET = 601000
 
         val getResult = cacheStore.get(key)
 

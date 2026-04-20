@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component.provider.event
+package app.nubrick.nubrick.component.provider.event
 
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -24,10 +24,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import io.nubrick.nubrick.component.provider.container.ContainerContext
-import io.nubrick.nubrick.component.provider.data.DataContext
-import io.nubrick.nubrick.data.FormValueListener
-import io.nubrick.nubrick.schema.UIBlockAction
+import app.nubrick.nubrick.component.provider.container.ContainerContext
+import app.nubrick.nubrick.component.provider.data.DataContext
+import app.nubrick.nubrick.data.FormValueListener
+import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive

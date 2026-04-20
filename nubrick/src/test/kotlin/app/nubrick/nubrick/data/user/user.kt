@@ -1,8 +1,8 @@
-package io.nubrick.nubrick.data.user
+package app.nubrick.nubrick.data.user
 
 import android.content.Context
 import android.content.SharedPreferences
-import io.nubrick.nubrick.schema.BuiltinUserProperty
+import app.nubrick.nubrick.schema.BuiltinUserProperty
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -88,8 +88,8 @@ class UtilsUnitTest {
         val preferences = mock(SharedPreferences::class.java)
         val editor = mock(SharedPreferences.Editor::class.java)
 
-        `when`(context.packageName).thenReturn("io.nubrick.test")
-        `when`(context.getSharedPreferences("io.nubrick.test.nubrik.io.user", Context.MODE_PRIVATE))
+        `when`(context.packageName).thenReturn("app.nubrick.test")
+        `when`(context.getSharedPreferences("app.nubrick.test.nubrik.io.user", Context.MODE_PRIVATE))
             .thenReturn(preferences)
         `when`(preferences.getString(anyString(), anyString())).thenAnswer { invocation ->
             invocation.arguments[1] as String?

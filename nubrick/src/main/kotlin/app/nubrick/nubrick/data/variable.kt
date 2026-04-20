@@ -1,8 +1,8 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
-import io.nubrick.nubrick.data.user.NubrickUser
-import io.nubrick.nubrick.schema.BuiltinUserProperty
-import io.nubrick.nubrick.schema.Property
+import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.schema.BuiltinUserProperty
+import app.nubrick.nubrick.schema.Property
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull

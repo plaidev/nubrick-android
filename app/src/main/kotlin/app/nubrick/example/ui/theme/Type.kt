@@ -1,4 +1,4 @@
-package io.nubrick.example.ui.theme
+package app.nubrick.example.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

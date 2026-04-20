@@ -1,4 +1,4 @@
-package io.nubrick.e2e
+package app.nubrick.e2e
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -14,12 +14,12 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.nubrick.e2e.ui.theme.NubrickAndroidTheme
-import io.nubrick.nubrick.Config
-import io.nubrick.nubrick.NubrickProvider
-import io.nubrick.nubrick.NubrickSDK
-import io.nubrick.nubrick.component.EmbeddingLoadingState
-import io.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
+import app.nubrick.e2e.ui.theme.NubrickAndroidTheme
+import app.nubrick.nubrick.Config
+import app.nubrick.nubrick.NubrickProvider
+import app.nubrick.nubrick.NubrickSDK
+import app.nubrick.nubrick.component.EmbeddingLoadingState
+import app.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

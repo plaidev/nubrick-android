@@ -1,8 +1,8 @@
-package io.nubrick.nubrick.data.extraction
+package app.nubrick.nubrick.data.extraction
 
-import io.nubrick.nubrick.data.user.UserProperty
-import io.nubrick.nubrick.schema.ConditionOperator
-import io.nubrick.nubrick.schema.UserPropertyType
+import app.nubrick.nubrick.data.user.UserProperty
+import app.nubrick.nubrick.schema.ConditionOperator
+import app.nubrick.nubrick.schema.UserPropertyType
 import java.time.ZonedDateTime
 import java.util.Locale
 import java.util.regex.Pattern

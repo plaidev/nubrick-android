@@ -1,6 +1,6 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
-import io.nubrick.nubrick.data.user.syncDateFromHttpResponse
+import app.nubrick.nubrick.data.user.syncDateFromHttpResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

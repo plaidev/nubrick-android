@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.component
+package app.nubrick.nubrick.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -8,14 +8,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import io.nubrick.nubrick.NubrickEvent
-import io.nubrick.nubrick.data.Container
-import io.nubrick.nubrick.data.user.NubrickUser
-import io.nubrick.nubrick.data.user.getNubrickUserSharedPreferences
-import io.nubrick.nubrick.schema.ExperimentKind
-import io.nubrick.nubrick.schema.TriggerEventNameDefs
-import io.nubrick.nubrick.schema.UIBlock
-import io.nubrick.nubrick.schema.UIRootBlock
+import app.nubrick.nubrick.NubrickEvent
+import app.nubrick.nubrick.data.Container
+import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.data.user.getNubrickUserSharedPreferences
+import app.nubrick.nubrick.schema.ExperimentKind
+import app.nubrick.nubrick.schema.TriggerEventNameDefs
+import app.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.schema.UIRootBlock
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

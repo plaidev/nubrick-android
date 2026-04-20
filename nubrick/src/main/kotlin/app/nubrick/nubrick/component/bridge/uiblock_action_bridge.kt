@@ -1,13 +1,13 @@
-package io.nubrick.nubrick.component.bridge
+package app.nubrick.nubrick.component.bridge
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
-import io.nubrick.nubrick.FlutterBridgeApi
-import io.nubrick.nubrick.component.provider.container.ContainerContext
-import io.nubrick.nubrick.component.provider.data.DataContext
-import io.nubrick.nubrick.component.provider.event.LocalEventListener
-import io.nubrick.nubrick.schema.UIBlockAction
+import app.nubrick.nubrick.FlutterBridgeApi
+import app.nubrick.nubrick.component.provider.container.ContainerContext
+import app.nubrick.nubrick.component.provider.data.DataContext
+import app.nubrick.nubrick.component.provider.event.LocalEventListener
+import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow

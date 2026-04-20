@@ -1,12 +1,12 @@
-package io.nubrick.nubrick.data.database
+package app.nubrick.nubrick.data.database
 
 import android.content.ContentValues
 import android.database.sqlite.SQLiteDatabase
 import android.provider.BaseColumns
-import io.nubrick.nubrick.data.user.formatISO8601
-import io.nubrick.nubrick.data.user.getCurrentDate
-import io.nubrick.nubrick.schema.DateTime
-import io.nubrick.nubrick.schema.FrequencyUnit
+import app.nubrick.nubrick.data.user.formatISO8601
+import app.nubrick.nubrick.data.user.getCurrentDate
+import app.nubrick.nubrick.schema.DateTime
+import app.nubrick.nubrick.schema.FrequencyUnit
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneOffset

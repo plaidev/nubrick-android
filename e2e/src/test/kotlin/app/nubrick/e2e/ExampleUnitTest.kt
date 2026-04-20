@@ -1,4 +1,4 @@
-package io.nubrick.e2e
+package app.nubrick.e2e
 
 import org.junit.Test
 

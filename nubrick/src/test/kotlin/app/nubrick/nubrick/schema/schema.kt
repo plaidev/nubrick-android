@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.schema
+package app.nubrick.nubrick.schema
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

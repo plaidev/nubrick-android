@@ -1,6 +1,6 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
-import io.nubrick.nubrick.schema.ApiHttpRequest
+import app.nubrick.nubrick.schema.ApiHttpRequest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

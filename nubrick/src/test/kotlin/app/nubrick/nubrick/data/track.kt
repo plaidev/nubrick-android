@@ -1,4 +1,4 @@
-package io.nubrick.nubrick.data
+package app.nubrick.nubrick.data
 
 import kotlinx.coroutines.channels.Channel
 import org.junit.Assert.assertEquals

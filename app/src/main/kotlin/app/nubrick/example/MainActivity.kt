@@ -1,4 +1,4 @@
-package io.nubrick.example
+package app.nubrick.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,10 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.nubrick.example.ui.theme.NubrickAndroidTheme
-import io.nubrick.nubrick.Config
-import io.nubrick.nubrick.NubrickProvider
-import io.nubrick.nubrick.NubrickSDK
+import app.nubrick.example.ui.theme.NubrickAndroidTheme
+import app.nubrick.nubrick.Config
+import app.nubrick.nubrick.NubrickProvider
+import app.nubrick.nubrick.NubrickSDK
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

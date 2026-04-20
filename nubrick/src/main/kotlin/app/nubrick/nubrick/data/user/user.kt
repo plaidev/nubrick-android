@@ -1,11 +1,11 @@
-package io.nubrick.nubrick.data.user
+package app.nubrick.nubrick.data.user
 
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
-import io.nubrick.nubrick.VERSION
-import io.nubrick.nubrick.schema.BuiltinUserProperty
-import io.nubrick.nubrick.schema.UserPropertyType
+import app.nubrick.nubrick.VERSION
+import app.nubrick.nubrick.schema.BuiltinUserProperty
+import app.nubrick.nubrick.schema.UserPropertyType
 import java.net.HttpURLConnection
 import java.text.SimpleDateFormat
 import java.time.Instant

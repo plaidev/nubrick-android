@@ -1,4 +1,4 @@
-package io.nubrick.nubrick
+package app.nubrick.nubrick
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
@@ -43,7 +43,7 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("io.nubrick.nubrick.test", appContext.packageName)
+        assertEquals("app.nubrick.nubrick.test", appContext.packageName)
     }
 
     @Test
