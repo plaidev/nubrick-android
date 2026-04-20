@@ -25,8 +25,10 @@ internal fun rememberRemoteConfigState(
     container: Container,
     experimentId: String
 ): RemoteConfigLoadingState {
-    var loadingState: RemoteConfigLoadingState by remember { mutableStateOf(RemoteConfigLoadingState.Loading()) }
-    LaunchedEffect("key") {
+    var loadingState: RemoteConfigLoadingState by remember(experimentId) {
+        mutableStateOf(RemoteConfigLoadingState.Loading())
+    }
+    LaunchedEffect(experimentId) {
         container.fetchRemoteConfig(experimentId).onSuccess {
             loadingState = RemoteConfigLoadingState.Completed(RemoteConfigVariant(
                 container = container,

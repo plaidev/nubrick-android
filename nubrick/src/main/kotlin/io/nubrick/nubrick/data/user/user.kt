@@ -180,7 +180,7 @@ class NubrickUser {
     }
 
     fun getProperties(): Map<String, String> {
-        val props = this.customProperties
+        val props = this.customProperties.toMutableMap()
         props[BuiltinUserProperty.userId.toString()] = this.id
         return props
     }
@@ -273,7 +273,7 @@ class NubrickUser {
             ),
             UserProperty(
                 name = BuiltinUserProperty.localMinute.toString(),
-                value = (now.hour * 60 * now.minute).toString(),
+                value = (now.hour * 60 + now.minute).toString(),
                 type = UserPropertyType.INTEGER,
             ),
             UserProperty(

@@ -32,7 +32,11 @@ internal class HttpRequestRepositoryImpl : HttpRequestRepository {
         val response: String = connectAndGetResponse(connection).getOrElse {
             return Result.failure(it)
         }
-        val json = Json.decodeFromString<JsonElement>(response)
+        val json = try {
+            Json.decodeFromString<JsonElement>(response)
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
         return Result.success(json)
     }
 }

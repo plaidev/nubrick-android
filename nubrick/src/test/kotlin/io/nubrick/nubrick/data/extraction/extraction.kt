@@ -156,6 +156,26 @@ class ExtractionUnitTest {
     }
 
     @Test
+    fun isInDistributionTarget_shouldBeFalseWhenOperatorIsInvalid() {
+        val properties: List<UserProperty> = listOf(
+            UserProperty(
+                name = "name",
+                value = "Nubrick",
+                type = UserPropertyType.STRING
+            )
+        )
+        val distribution: List<ExperimentCondition> = listOf(
+            ExperimentCondition(
+                property = "name",
+                operator = "InvalidOperator",
+                value = "Nubrick"
+            )
+        )
+
+        Assert.assertEquals(false, isInDistributionTarget(distribution, properties))
+    }
+
+    @Test
     fun extractExperimentConfig_shouldSelectHighestPriority() {
         val configs = ExperimentConfigs(
             configs = listOf(
