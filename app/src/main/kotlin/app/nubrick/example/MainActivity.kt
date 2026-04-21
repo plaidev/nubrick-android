@@ -18,18 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.nubrick.example.ui.theme.NubrickAndroidTheme
-import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.NubrickProvider
 import app.nubrick.nubrick.NubrickSDK
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        NubrickSDK.initialize(
-            context = this.applicationContext,
-            config = Config(projectId = "cgv3p3223akg00fod19g"),
-        )
-
         setContent {
             NubrickAndroidTheme {
                 NubrickProvider {
