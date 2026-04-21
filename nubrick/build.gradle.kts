@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "app.nubrick"
-version = "0.12.0"
+version = "0.12.1"
 
 android {
     namespace = "app.nubrick.nubrick"
