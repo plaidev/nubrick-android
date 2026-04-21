@@ -2,6 +2,7 @@ package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.Event
+import app.nubrick.nubrick.FlutterBridgeApi
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.extraction.extractComponentId
@@ -32,7 +33,8 @@ internal data class TriggerContent(
     val block: UIBlock,
 )
 
-internal class NotFoundException : Exception("Not found")
+@FlutterBridgeApi
+class NotFoundException : Exception("Not found")
 internal class FailedToDecodeException : Exception("Failed to decode")
 internal class SkipHttpRequestException : Exception("Skip http request")
 
