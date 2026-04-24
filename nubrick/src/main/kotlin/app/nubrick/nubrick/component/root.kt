@@ -39,6 +39,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.EventProperty
 import app.nubrick.nubrick.EventPropertyType
+import app.nubrick.nubrick.NubrickSize
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import app.nubrick.nubrick.component.provider.container.ContainerProvider
@@ -93,7 +94,7 @@ internal class RootStateHolder(
     private val onDismiss: ((root: UIRootBlock) -> Unit) = {},
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
     private val onTrigger: ((trigger: UIBlockAction) -> Unit) = {},
-    private val onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
+    private val onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
 ) {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
@@ -187,7 +188,11 @@ internal class RootStateHolder(
         }
 
         if (destBlock.data?.kind == PageKind.COMPONENT) {
-            onSizeChange?.invoke(destBlock.data.frameWidth, destBlock.data.frameHeight)
+            val frameWidth = destBlock.data.frameWidth ?: 0
+            val frameHeight = destBlock.data.frameHeight ?: 0
+            val width = if (frameWidth == 0) NubrickSize.Fill else NubrickSize.Fixed(frameWidth)
+            val height = if (frameHeight == 0) NubrickSize.Fill else NubrickSize.Fixed(frameHeight)
+            onSizeChange?.invoke(width, height)
         }
 
         // Before displaying the page, we close displayed modals. but never emit dismiss event.
@@ -251,7 +256,7 @@ internal fun Root(
     onNextTooltip: (pageId: String) -> Unit = {},
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
     eventBridge: UIBlockActionBridge? = null,
-    onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
+    onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)

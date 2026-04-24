@@ -89,6 +89,11 @@ data class NubrickEvent(
     val name: String
 )
 
+sealed class NubrickSize {
+    data class Fixed(val value: Int) : NubrickSize()
+    data object Fill : NubrickSize()
+}
+
 private class NubrickUninitializedException : IllegalStateException(
     "NubrickSDK used before NubrickSDK.initialize(...)."
 )
@@ -232,7 +237,8 @@ private class NubrickRuntime(
         modifier: Modifier = Modifier,
         arguments: Any? = null,
         onEvent: ((event: Event) -> Unit)? = null,
-        content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null
+        content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
+        onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
     ) {
         NubrickTheme {
             Embedding(
@@ -240,7 +246,8 @@ private class NubrickRuntime(
                 experimentId = id,
                 modifier = modifier,
                 onEvent = onEvent,
-                content = content
+                content = content,
+                onSizeChange = onSizeChange
             )
         }
     }
@@ -381,7 +388,8 @@ object NubrickSDK {
         modifier: Modifier = Modifier,
         arguments: Any? = null,
         onEvent: ((event: Event) -> Unit)? = null,
-        content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null
+        content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
+        onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
     ) {
         val current = runtimeOrNull(throwInDebug = true) ?: return
         current.Embedding(
@@ -389,7 +397,8 @@ object NubrickSDK {
             modifier = modifier,
             arguments = arguments,
             onEvent = onEvent,
-            content = content
+            content = content,
+            onSizeChange = onSizeChange
         )
     }
 
@@ -445,7 +454,7 @@ object FlutterBridge {
         return container.fetchEmbedding(experimentId, componentId).map { it }
     }
 
-    fun computeInitialSize(embedding: Any?): Pair<Int?, Int?> {
+    fun computeInitialSize(embedding: Any?): Pair<NubrickSize, NubrickSize> {
         val root: UIRootBlock? = extractRootBlock(embedding)
         val pages: List<UIPageBlock>? = root?.data?.pages
         val triggerPage = pages?.firstOrNull {
@@ -455,7 +464,12 @@ object FlutterBridge {
         val triggerDestinationPage = pages?.firstOrNull {
             it.id == triggerDestinationId
         }
-        return Pair(triggerDestinationPage?.data?.frameWidth, triggerDestinationPage?.data?.frameHeight)
+        val frameWidth = triggerDestinationPage?.data?.frameWidth ?: 0
+        val frameHeight = triggerDestinationPage?.data?.frameHeight ?: 0
+        return Pair(
+            if (frameWidth == 0) NubrickSize.Fill else NubrickSize.Fixed(frameWidth),
+            if (frameHeight == 0) NubrickSize.Fill else NubrickSize.Fixed(frameHeight)
+        )
     }
 
     private fun extractRootBlock(data: Any?): UIRootBlock? {
@@ -475,19 +489,25 @@ object FlutterBridge {
         onEvent: ((event: Event) -> Unit),
         onNextTooltip: ((pageId: String) -> Unit) = {},
         onDismiss: (() -> Unit) = {},
-        onSizeChange: ((width: Int?, height: Int?) -> Unit)? = null,
+        onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
         eventBridge: UIBlockActionBridge? = null,
     ) {
         val runtime = NubrickSDK.run {
             containerOrNull()
         } ?: return
-        var width: Int? by remember(data) { mutableStateOf(null) }
-        var height: Int? by remember(data) { mutableStateOf(null) }
+        var width: NubrickSize by remember(data) { mutableStateOf(NubrickSize.Fill) }
+        var height: NubrickSize by remember(data) { mutableStateOf(NubrickSize.Fill) }
         val container = remember(arguments, runtime) {
             runtime.initWith(arguments)
         }
-        val widthModifier = width?.takeIf { it != 0 }?.let { Modifier.width(it.dp) } ?: Modifier.fillMaxWidth()
-        val heightModifier = height?.takeIf { it != 0 }?.let { Modifier.height(it.dp) } ?: Modifier.fillMaxHeight()
+        val widthModifier = when (width) {
+            is NubrickSize.Fixed -> Modifier.width((width as NubrickSize.Fixed).value.dp)
+            NubrickSize.Fill -> Modifier.fillMaxWidth()
+        }
+        val heightModifier = when (height) {
+            is NubrickSize.Fixed -> Modifier.height((height as NubrickSize.Fixed).value.dp)
+            NubrickSize.Fill -> Modifier.fillMaxHeight()
+        }
         val rootBlock: UIRootBlock? = extractRootBlock(data)
         rootBlock?.let {
             Box(
