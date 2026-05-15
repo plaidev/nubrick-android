@@ -217,6 +217,12 @@ private class NubrickRuntime(
         if (onTooltip != null) this.trigger.updateOnTooltip(onTooltip)
     }
 
+    fun clearCallbacks() {
+        this.onEvent = null
+        this.onDispatch = null
+        this.trigger.updateOnTooltip(null)
+    }
+
     fun setUserId(id: String) {
         this.user.setUserId(id)
     }
@@ -353,14 +359,18 @@ object NubrickSDK {
         current.dispatch(event)
     }
 
-    @FlutterBridgeApi
-    fun updateCallbacks(
+    internal fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)? = null,
         onDispatch: ((event: NubrickEvent) -> Unit)? = null,
         onTooltip: ((data: String, experimentId: String) -> Unit)? = null
     ) {
         val current = runtimeOrNull(throwInDebug = false) ?: return
         current.updateCallbacks(onEvent, onDispatch, onTooltip)
+    }
+
+    internal fun clearCallbacks() {
+        val current = runtimeOrNull(throwInDebug = false) ?: return
+        current.clearCallbacks()
     }
 
     @FlutterBridgeApi
@@ -472,6 +482,18 @@ fun NubrickProvider(
  */
 @FlutterBridgeApi
 object FlutterBridge {
+    fun updateCallbacks(
+        onEvent: ((event: Event) -> Unit)? = null,
+        onDispatch: ((event: NubrickEvent) -> Unit)? = null,
+        onTooltip: ((data: String, experimentId: String) -> Unit)? = null
+    ) {
+        NubrickSDK.updateCallbacks(onEvent, onDispatch, onTooltip)
+    }
+
+    fun clearCallbacks() {
+        NubrickSDK.clearCallbacks()
+    }
+
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         val container = NubrickSDK.containerOrNull() ?: return Result.failure(NubrickUninitializedException())
         return container.fetchEmbedding(experimentId, componentId).map { it }
