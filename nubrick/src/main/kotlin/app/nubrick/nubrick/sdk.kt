@@ -103,6 +103,8 @@ private class NubrickRuntime(
     context: Context,
     onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
 ) {
+    @Volatile private var onEvent: ((event: Event) -> Unit)? = null
+    @Volatile private var onDispatch: ((event: NubrickEvent) -> Unit)? = null
     private val user: NubrickUser
     private val db: SQLiteDatabase
     private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -132,14 +134,21 @@ private class NubrickRuntime(
         val httpRequestRepository = HttpRequestRepositoryImpl()
         val databaseRepository = DatabaseRepositoryImpl(this.db)
 
+        this.onEvent = config.onEvent
+        this.onDispatch = config.onDispatch
         this.container = ContainerImpl(
-            config = config.copy(onEvent = { event ->
-                val name = event.name ?: ""
-                if (name.isNotEmpty()) {
-                    this.dispatch(NubrickEvent(name))
-                }
-                config.onEvent?.let { it(event) }
-            }),
+            config = config.copy(
+                onEvent = { event ->
+                    val name = event.name ?: ""
+                    if (name.isNotEmpty()) {
+                        this.dispatch(NubrickEvent(name))
+                    }
+                    this.onEvent?.invoke(event)
+                },
+                onDispatch = { event ->
+                    this.onDispatch?.invoke(event)
+                },
+            ),
             user = this.user,
             componentRepository = componentRepository,
             experimentRepository = experimentRepository,
@@ -198,8 +207,14 @@ private class NubrickRuntime(
         this.container.appendExperimentHistory(experimentId)
     }
 
-    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String) -> Unit)?) {
-        this.trigger.updateOnTooltip(onTooltip)
+    fun updateCallbacks(
+        onEvent: ((event: Event) -> Unit)?,
+        onDispatch: ((event: NubrickEvent) -> Unit)?,
+        onTooltip: ((data: String, experimentId: String) -> Unit)?
+    ) {
+        if (onEvent != null) this.onEvent = onEvent
+        if (onDispatch != null) this.onDispatch = onDispatch
+        if (onTooltip != null) this.trigger.updateOnTooltip(onTooltip)
     }
 
     fun setUserId(id: String) {
@@ -298,10 +313,8 @@ object NubrickSDK {
         config: Config,
         onTooltip: ((data: String, experimentId: String) -> Unit)?
     ) {
-        val currentRuntime = runtime
-        if (currentRuntime != null) {
+        if (runtime != null) {
             warn("NubrickSDK.initialize(...) called more than once. Subsequent calls are ignored.")
-            currentRuntime.updateOnTooltip(onTooltip)
             return
         }
         runtime = NubrickRuntime(
@@ -338,6 +351,16 @@ object NubrickSDK {
     fun dispatch(event: NubrickEvent) {
         val current = runtimeOrNull(throwInDebug = true) ?: return
         current.dispatch(event)
+    }
+
+    @FlutterBridgeApi
+    fun updateCallbacks(
+        onEvent: ((event: Event) -> Unit)? = null,
+        onDispatch: ((event: NubrickEvent) -> Unit)? = null,
+        onTooltip: ((data: String, experimentId: String) -> Unit)? = null
+    ) {
+        val current = runtimeOrNull(throwInDebug = false) ?: return
+        current.updateCallbacks(onEvent, onDispatch, onTooltip)
     }
 
     @FlutterBridgeApi
