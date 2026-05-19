@@ -24,8 +24,8 @@ import app.nubrick.nubrick.component.Trigger
 import app.nubrick.nubrick.component.TriggerStateHolder
 import app.nubrick.nubrick.component.NubrickTheme
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
-import android.net.http.HttpResponseCache
 import app.nubrick.nubrick.data.CacheStore
+import app.nubrick.nubrick.data.CONNECT_TIMEOUT
 import app.nubrick.nubrick.data.ComponentRepositoryImpl
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.ContainerImpl
@@ -33,11 +33,13 @@ import app.nubrick.nubrick.data.ExperimentRepositoryImpl
 import app.nubrick.nubrick.data.FormRepositoryImpl
 import app.nubrick.nubrick.data.HttpRequestRepositoryImpl
 import app.nubrick.nubrick.data.NetworkRepository
+import app.nubrick.nubrick.data.READ_TIMEOUT
 import app.nubrick.nubrick.data.TrackCrashEvent
 import app.nubrick.nubrick.data.TrackRepositoryImpl
 import app.nubrick.nubrick.data.database.DatabaseRepositoryImpl
 import app.nubrick.nubrick.data.database.NubrickDbHelper
 import java.io.File
+import java.util.concurrent.TimeUnit
 import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
 import app.nubrick.nubrick.schema.UIBlock
@@ -50,6 +52,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.json.Json
+import okhttp3.Cache
+import okhttp3.OkHttpClient
 
 @RequiresOptIn(
     message = "This API is internal to the Flutter bridge and should not be used directly.",
@@ -108,6 +112,8 @@ private class NubrickRuntime(
     private val user: NubrickUser
     private val db: SQLiteDatabase
     private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val uncachedHttpClient: OkHttpClient
+    private val cachedHttpClient: OkHttpClient
     private val defaultExceptionHandler: Thread.UncaughtExceptionHandler?
     private val installedExceptionHandler: Thread.UncaughtExceptionHandler?
     private val trigger: TriggerStateHolder
@@ -116,22 +122,23 @@ private class NubrickRuntime(
     init {
         val appContext = context.applicationContext
 
-        // Install HTTP disk cache if not already installed
-        if (HttpResponseCache.getInstalled() == null) {
-            val cacheDir = File(appContext.cacheDir, "http")
-            HttpResponseCache.install(cacheDir, 10L * 1024 * 1024) // 10MB
-        }
-
         this.user = NubrickUser(appContext)
         this.db = NubrickDbHelper(appContext).writableDatabase
 
         // Create all repositories at SDK level
         val cache = CacheStore()
-        val networkRepository = NetworkRepository(this.sdkScope, cache)
+        this.uncachedHttpClient = OkHttpClient.Builder()
+            .connectTimeout(CONNECT_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(READ_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
+            .build()
+        this.cachedHttpClient = this.uncachedHttpClient.newBuilder()
+            .cache(Cache(File(appContext.cacheDir, "nubrick/http"), 10L * 1024 * 1024))
+            .build()
+        val networkRepository = NetworkRepository(this.sdkScope, cache, this.cachedHttpClient)
         val componentRepository = ComponentRepositoryImpl(config, networkRepository)
         val experimentRepository = ExperimentRepositoryImpl(config, networkRepository)
-        val trackRepository = TrackRepositoryImpl(config, this.user, this.sdkScope)
-        val httpRequestRepository = HttpRequestRepositoryImpl()
+        val trackRepository = TrackRepositoryImpl(config, this.user, this.sdkScope, this.uncachedHttpClient)
+        val httpRequestRepository = HttpRequestRepositoryImpl(this.uncachedHttpClient)
         val databaseRepository = DatabaseRepositoryImpl(this.db)
 
         this.onEvent = config.onEvent
@@ -182,6 +189,9 @@ private class NubrickRuntime(
         if (!this.sdkScope.isActive) return
         this.container.close()
         this.sdkScope.cancel()
+        this.cachedHttpClient.dispatcher.cancelAll()
+        this.uncachedHttpClient.dispatcher.cancelAll()
+        runCatching { this.cachedHttpClient.cache?.close() }
         if (this.installedExceptionHandler != null &&
             Thread.getDefaultUncaughtExceptionHandler() === this.installedExceptionHandler
         ) {

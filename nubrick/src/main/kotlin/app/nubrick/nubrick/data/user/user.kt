@@ -6,7 +6,6 @@ import android.os.Build
 import app.nubrick.nubrick.VERSION
 import app.nubrick.nubrick.schema.BuiltinUserProperty
 import app.nubrick.nubrick.schema.UserPropertyType
-import java.net.HttpURLConnection
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.ZoneId
@@ -41,15 +40,12 @@ internal fun getCurrentDate(): ZonedDateTime {
     )
 }
 
-internal fun syncDateFromHttpResponse(t0: Long, connection: HttpURLConnection) {
-    val t1 = System.currentTimeMillis()
-
-    val serverDateStr = connection.getHeaderField("Date") ?: return
-
+internal fun syncDateFromHttpDateHeader(t0: Long, t1: Long, serverDateHeader: String?) {
+    if (serverDateHeader == null) return
     val serverTime = try {
         val formatter = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
         formatter.timeZone = TimeZone.getTimeZone("GMT")
-        formatter.parse(serverDateStr)?.time ?: return
+        formatter.parse(serverDateHeader)?.time ?: return
     } catch (e: Exception) {
         return
     }
