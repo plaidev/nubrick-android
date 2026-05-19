@@ -11,7 +11,6 @@ import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-import java.net.HttpURLConnection
 import java.text.SimpleDateFormat
 import java.time.ZonedDateTime
 import java.util.Date
@@ -21,7 +20,7 @@ import kotlin.math.abs
 
 class UtilsUnitTest {
     @Test
-    fun testSyncDateFromHttpResponse_shouldWork() {
+    fun testSyncDateFromHttpDateHeader_shouldWork() {
         DATETIME_OFFSET = 0
         val now = System.currentTimeMillis()
         val tomorrow = Date(now + (24 * 60 * 60 * 1000))
@@ -29,11 +28,8 @@ class UtilsUnitTest {
             timeZone = TimeZone.getTimeZone("GMT")
         }
         val formattedDate = formatter.format(tomorrow)
-        val connection = mock(HttpURLConnection::class.java)
-            `when`(connection.responseCode).thenReturn(400)
-            `when`(connection.getHeaderField("Date")).thenReturn(formattedDate)
 
-        syncDateFromHttpResponse(now, connection)
+        syncDateFromHttpDateHeader(now, now, formattedDate)
         val offset = DATETIME_OFFSET
         val diff = abs(offset - 24 * 60 * 60 * 1000)
 

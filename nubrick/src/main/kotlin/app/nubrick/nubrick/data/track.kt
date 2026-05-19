@@ -15,6 +15,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.OkHttpClient
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -174,6 +175,7 @@ internal class TrackRepositoryImpl(
     private val config: Config,
     private val user: NubrickUser,
     private val scope: CoroutineScope,
+    private val client: OkHttpClient,
 ) : TrackRepository {
     private val eventChannel = Channel<TrackEvent>(capacity = 300)
     private val maxBatchSize = 50
@@ -239,7 +241,7 @@ internal class TrackRepositoryImpl(
             meta = meta,
         )
         val body = Json.encodeToString(request.encode())
-        postRequest(SdkConstants.endpoint.track, body).onFailure {
+        postRequest(SdkConstants.endpoint.track, body, client).onFailure {
             var dropped = 0
             events.forEach { event ->
                 if (eventChannel.trySend(event).isFailure) dropped++
