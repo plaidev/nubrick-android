@@ -1,21 +1,21 @@
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("kotlinx-serialization")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
 
     id("maven-publish")
     id("signing")
 }
 
 group = "app.nubrick"
-version = "0.13.2"
+version = libs.versions.nubrick.get()
 
 android {
     namespace = "app.nubrick.nubrick"
-    compileSdk = 36
+    compileSdk = libs.versions.androidCompileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 26
+        minSdk = libs.versions.androidMinSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
@@ -23,7 +23,7 @@ android {
         buildConfigField("String", "VERSION_NAME", "\"${project.version}\"")
 
         aarMetadata {
-            minCompileSdk = 26
+            minCompileSdk = libs.versions.androidMinSdk.get().toInt()
         }
     }
 
@@ -42,15 +42,15 @@ android {
         buildConfig = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.2"
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.toVersion(libs.versions.jvmTarget.get())
+        targetCompatibility = JavaVersion.toVersion(libs.versions.jvmTarget.get())
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = libs.versions.jvmTarget.get()
     }
     publishing {
         singleVariant("release") {
@@ -67,24 +67,24 @@ kotlin {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-    implementation("androidx.compose.ui:ui-tooling:1.6.4")
-    implementation("androidx.compose.ui:ui:1.6.4")
-    implementation("androidx.compose.foundation:foundation:1.6.4")
-    implementation("androidx.compose.runtime:runtime:1.6.4")
-    implementation("io.coil-kt:coil:2.5.0")
-    implementation("io.coil-kt:coil-compose:2.5.0")
-    implementation("androidx.compose.material3:material3:1.2.1")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation("androidx.browser:browser:1.8.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.compose.ui.tooling)
+    api(libs.compose.ui)
+    implementation(libs.compose.foundation)
+    api(libs.compose.runtime)
+    implementation(libs.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.compose.material3)
+    implementation(libs.navigation.compose)
+    implementation(libs.androidx.browser)
+    implementation(libs.okhttp)
 
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito:mockito-core:5.14.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    androidTestImplementation(libs.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
 }
 
 tasks.register<Jar>("javadocEmptyJar") {
