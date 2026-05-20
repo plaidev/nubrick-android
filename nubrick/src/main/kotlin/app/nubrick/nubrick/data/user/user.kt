@@ -8,10 +8,15 @@ import app.nubrick.nubrick.schema.BuiltinUserProperty
 import app.nubrick.nubrick.schema.UserPropertyType
 import java.text.SimpleDateFormat
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
@@ -63,6 +68,19 @@ internal fun getToday(): ZonedDateTime {
 
 internal fun formatISO8601(time: ZonedDateTime): String {
     return time.format(DateTimeFormatter.ISO_INSTANT)
+}
+
+private fun formatUserPropertyValue(value: Any): String {
+    return when (value) {
+        is ZonedDateTime -> value.format(DateTimeFormatter.ISO_INSTANT)
+        is OffsetDateTime -> value.toInstant().toString()
+        is Instant -> value.toString()
+        is LocalDateTime -> value.atZone(ZoneId.systemDefault()).toInstant().toString()
+        is LocalDate -> value.atStartOfDay(ZoneId.systemDefault()).toInstant().toString()
+        is Date -> value.toInstant().toString()
+        is Calendar -> value.toInstant().toString()
+        else -> value.toString()
+    }
 }
 
 internal data class UserProperty(
@@ -157,7 +175,7 @@ class NubrickUser {
             this.setUserId(value.toString())
             return
         }
-        val strValue = value.toString()
+        val strValue = formatUserPropertyValue(value)
         this.customProperties[key] = strValue
         this.preferences?.edit()?.putString(USER_CUSTOM_PROPERTY_KEY_PREFIX + key, strValue)?.apply()
     }

@@ -3,6 +3,12 @@ package app.nubrick.nubrick.data.extraction
 import app.nubrick.nubrick.data.user.UserProperty
 import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.UserPropertyType
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Locale
 import java.util.regex.Pattern
@@ -13,9 +19,13 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
     val propType = asType ?: prop.type
     return when (propType) {
         UserPropertyType.INTEGER -> {
-            val propValue = prop.value.trim().toIntOrNull() ?: 0
-            val conditionValues = values.map { it.trim().toIntOrNull() ?: 0 }
-            compareInteger(a = propValue, b = conditionValues, op = op)
+            val propValue = prop.value.trim().toLongOrNull()
+            val conditionValues = values.mapNotNull { it.trim().toLongOrNull() }
+            if (propValue != null && conditionValues.size == values.size) {
+                compareInteger(a = propValue, b = conditionValues, op = op)
+            } else {
+                false
+            }
         }
         UserPropertyType.DOUBLE -> {
             val propValue: Double = prop.value.trim().toDoubleOrNull() ?: 0.toDouble()
@@ -31,12 +41,12 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
             compareSemver(a = prop.value, b = strings, op = op)
         }
         UserPropertyType.TIMESTAMPZ -> {
-            try {
-                val propValue =  ZonedDateTime.parse(prop.value.trim()).toInstant().toEpochMilli().div(1000)
-                val conditionValues = values.map { ZonedDateTime.parse(it.trim()).toInstant().toEpochMilli().div(1000) }
+            val propValue = parseTimestampSeconds(prop.value)
+            val conditionValues = values.mapNotNull { parseTimestampSeconds(it) }
+            if (propValue != null && conditionValues.size == values.size) {
                 compareLong(a = propValue, b = conditionValues, op = op)
-            } catch (e: Exception) {
-                compareLong(a = 0, b = emptyList(), op = op)
+            } else {
+                false
             }
         }
         UserPropertyType.BOOLEAN -> {
@@ -50,7 +60,36 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
     }
 }
 
+private fun parseTimestampSeconds(value: String): Long? {
+    val trimmed = value.trim()
+    return trimmed.toLongOrNull()
+        ?: parseTimestampSecondsOrNull { ZonedDateTime.parse(trimmed).toInstant() }
+        ?: parseTimestampSecondsOrNull { OffsetDateTime.parse(trimmed).toInstant() }
+        ?: parseTimestampSecondsOrNull { Instant.parse(trimmed) }
+        ?: parseTimestampSecondsOrNull { LocalDateTime.parse(trimmed).atZone(ZoneId.systemDefault()).toInstant() }
+        ?: parseTimestampSecondsOrNull { LocalDate.parse(trimmed).atStartOfDay(ZoneId.systemDefault()).toInstant() }
+        ?: parseTimestampSecondsOrNull {
+            SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy", Locale.US).parse(trimmed)?.toInstant()
+        }
+}
+
+private fun parseTimestampSecondsOrNull(parse: () -> Instant?): Long? {
+    return try {
+        parse()?.toEpochMilli()?.div(1000)
+    } catch (e: Exception) {
+        null
+    }
+}
+
 internal fun compareInteger(a: Int, b: List<Int>, op: ConditionOperator): Boolean {
+    return compareInteger(
+        a = a.toLong(),
+        b = b.map { it.toLong() },
+        op = op
+    )
+}
+
+internal fun compareInteger(a: Long, b: List<Long>, op: ConditionOperator): Boolean {
     return when (op) {
         ConditionOperator.Equal -> {
             if (b.isEmpty()) {
