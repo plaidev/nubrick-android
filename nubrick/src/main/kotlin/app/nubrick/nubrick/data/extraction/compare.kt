@@ -3,7 +3,6 @@ package app.nubrick.nubrick.data.extraction
 import app.nubrick.nubrick.data.user.UserProperty
 import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.UserPropertyType
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -68,9 +67,6 @@ private fun parseTimestampSeconds(value: String): Long? {
         ?: parseTimestampSecondsOrNull { Instant.parse(trimmed) }
         ?: parseTimestampSecondsOrNull { LocalDateTime.parse(trimmed).atZone(ZoneId.systemDefault()).toInstant() }
         ?: parseTimestampSecondsOrNull { LocalDate.parse(trimmed).atStartOfDay(ZoneId.systemDefault()).toInstant() }
-        ?: parseTimestampSecondsOrNull {
-            SimpleDateFormat("EEE MMM dd HH:mm:ss zzz yyyy", Locale.US).parse(trimmed)?.toInstant()
-        }
 }
 
 private fun parseTimestampSecondsOrNull(parse: () -> Instant?): Long? {
