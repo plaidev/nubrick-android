@@ -41,7 +41,11 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
         }
         UserPropertyType.SEMVER -> {
             val strings = values.map { it.trim() }
-            compareSemver(a = prop.value, b = strings, op = op)
+            if (strings.all { it.isNotEmpty() }) {
+                compareSemver(a = prop.value, b = strings, op = op)
+            } else {
+                false
+            }
         }
         UserPropertyType.TIMESTAMPZ -> {
             val propValue = parseTimestampSeconds(prop.value)
@@ -54,10 +58,15 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
         }
         UserPropertyType.BOOLEAN -> {
             val propValue = parseStringToBoolean(prop.value)
-            val conditionValues = values.map {
-                parseStringToBoolean(it)
+            val strings = values.map { it.trim() }
+            if (strings.all { it.isNotEmpty() }) {
+                val conditionValues = strings.map {
+                    parseStringToBoolean(it)
+                }
+                compareBoolean(propValue, conditionValues, op)
+            } else {
+                false
             }
-            compareBoolean(propValue, conditionValues, op)
         }
         else -> false
     }
@@ -95,7 +104,7 @@ internal fun compareInteger(a: Long, b: List<Long>, op: ConditionOperator): Bool
 
 
 internal fun compareLong(a: Long, b: List<Long>, op: ConditionOperator): Boolean {
-    return when (op) {
+    when (op) {
         ConditionOperator.Equal -> {
             if (b.isEmpty()) {
                 return false
@@ -154,7 +163,7 @@ internal fun compareLong(a: Long, b: List<Long>, op: ConditionOperator): Boolean
 }
 
 internal fun compareDouble(a: Double, b: List<Double>, op: ConditionOperator): Boolean {
-    return when (op) {
+    when (op) {
         ConditionOperator.Equal -> {
             if (b.isEmpty()) {
                 return false
@@ -214,7 +223,7 @@ internal fun compareDouble(a: Double, b: List<Double>, op: ConditionOperator): B
 
 
 internal fun compareString(a: String, b: List<String>, op: ConditionOperator): Boolean {
-    return when (op) {
+    when (op) {
         ConditionOperator.Regex -> {
             if (b.isEmpty()) {
                 return false
@@ -279,7 +288,7 @@ internal fun compareString(a: String, b: List<String>, op: ConditionOperator): B
 }
 
 internal fun compareBoolean(a: Boolean, b: List<Boolean>, op: ConditionOperator): Boolean {
-    return when (op) {
+    when (op) {
         ConditionOperator.Equal -> {
             if (b.isEmpty()) {
                 return false
@@ -309,7 +318,7 @@ internal fun compareBoolean(a: Boolean, b: List<Boolean>, op: ConditionOperator)
 
 
 internal fun compareSemver(a: String, b: List<String>, op: ConditionOperator): Boolean {
-    return when (op) {
+    when (op) {
         ConditionOperator.Equal -> {
             if (b.isEmpty()) {
                 return false

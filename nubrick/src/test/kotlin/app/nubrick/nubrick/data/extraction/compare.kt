@@ -93,6 +93,13 @@ class ComparisonUnitTest {
     }
 
     @Test
+    fun shouldRejectEmptySemverConditionValues() {
+        assertEquals(false, comparePropWithConditionValue(this.semverProp, null, "1,", ConditionOperator.In))
+        assertEquals(false, comparePropWithConditionValue(this.semverProp, null, "1,,2", ConditionOperator.In))
+        assertEquals(false, comparePropWithConditionValue(this.semverProp, null, "", ConditionOperator.Equal))
+    }
+
+    @Test
     fun shouldCompareTimestamp() {
         assertEquals(true, comparePropWithConditionValue(this.timeProp, null, "2011-10-05T14:48:00.000Z", ConditionOperator.Equal))
         assertEquals(false, comparePropWithConditionValue(this.timeProp, null, "2011-10-05T14:49:00.000Z", ConditionOperator.Equal))
@@ -126,6 +133,15 @@ class ComparisonUnitTest {
     fun shouldCompareBoolean() {
         assertEquals(true, comparePropWithConditionValue(this.boolProp, null, "false", ConditionOperator.Equal))
         assertEquals(true, comparePropWithConditionValue(this.boolProp, null, "true", ConditionOperator.NotEqual))
+    }
+
+    @Test
+    fun shouldRejectEmptyBooleanConditionValues() {
+        val trueProp = UserProperty(name = "bool", value = "true", type = UserPropertyType.BOOLEAN)
+
+        assertEquals(false, comparePropWithConditionValue(trueProp, null, "true,", ConditionOperator.In))
+        assertEquals(false, comparePropWithConditionValue(this.boolProp, null, "true,,false", ConditionOperator.In))
+        assertEquals(false, comparePropWithConditionValue(this.boolProp, null, "", ConditionOperator.Equal))
     }
 
     @Test
