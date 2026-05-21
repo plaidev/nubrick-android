@@ -39,6 +39,24 @@ class ComparisonUnitTest {
     }
 
     @Test
+    fun shouldCompareIntegerOutsideIntRange() {
+        val longProp = UserProperty(name = "long", value = "3000000000", type = UserPropertyType.INTEGER)
+
+        assertEquals(true, comparePropWithConditionValue(longProp, null, "3000000000", ConditionOperator.Equal))
+        assertEquals(false, comparePropWithConditionValue(longProp, null, "3000000001", ConditionOperator.Equal))
+        assertEquals(true, comparePropWithConditionValue(longProp, null, "2999999999", ConditionOperator.GreaterThan))
+        assertEquals(true, comparePropWithConditionValue(longProp, null, "3000000000,3000000001", ConditionOperator.Between))
+    }
+
+    @Test
+    fun shouldNotTreatInvalidIntegerValuesAsZero() {
+        val invalidIntegerProp = UserProperty(name = "invalid", value = "invalid", type = UserPropertyType.INTEGER)
+
+        assertEquals(false, comparePropWithConditionValue(invalidIntegerProp, null, "invalid", ConditionOperator.Equal))
+        assertEquals(false, comparePropWithConditionValue(this.intProp, null, "invalid", ConditionOperator.NotIn))
+    }
+
+    @Test
     fun shouldCompareDouble() {
         assertEquals(true, comparePropWithConditionValue(this.doubleProp, null, "12.3 ", ConditionOperator.Equal))
         assertEquals(false, comparePropWithConditionValue(this.doubleProp, null, "12.3", ConditionOperator.NotEqual))
@@ -80,6 +98,28 @@ class ComparisonUnitTest {
         assertEquals(false, comparePropWithConditionValue(this.timeProp, null, "2011-10-05T14:49:00.000Z", ConditionOperator.Equal))
         assertEquals(true, comparePropWithConditionValue(this.timeProp, null, "2011-10-05T14:47:00.000Z", ConditionOperator.GreaterThanOrEqual))
         assertEquals(true, comparePropWithConditionValue(this.timeProp, null, "2011-10-05T14:49:00.000Z", ConditionOperator.LessThanOrEqual))
+    }
+
+    @Test
+    fun shouldCompareTimestampWithUnixSeconds() {
+        assertEquals(true, comparePropWithConditionValue(this.timeProp, null, "1317826080", ConditionOperator.Equal))
+        assertEquals(false, comparePropWithConditionValue(this.timeProp, null, "1317826140", ConditionOperator.Equal))
+        assertEquals(true, comparePropWithConditionValue(this.timeProp, null, "1317826020", ConditionOperator.GreaterThanOrEqual))
+        assertEquals(true, comparePropWithConditionValue(this.timeProp, null, "1317826140", ConditionOperator.LessThanOrEqual))
+    }
+
+    @Test
+    fun shouldCompareTimestampWithLocalDateTimeString() {
+        val localDateTimeProp = UserProperty(name = "time", value = "2011-10-05T14:48:00", type = UserPropertyType.TIMESTAMPZ)
+
+        assertEquals(true, comparePropWithConditionValue(localDateTimeProp, null, "2011-10-05T14:48:00", ConditionOperator.Equal))
+    }
+
+    @Test
+    fun shouldCompareTimestampWithDateString() {
+        val dateProp = UserProperty(name = "time", value = "2011-10-05", type = UserPropertyType.TIMESTAMPZ)
+
+        assertEquals(true, comparePropWithConditionValue(dateProp, null, "2011-10-05", ConditionOperator.Equal))
     }
 
     @Test

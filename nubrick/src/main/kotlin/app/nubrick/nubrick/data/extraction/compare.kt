@@ -3,6 +3,11 @@ package app.nubrick.nubrick.data.extraction
 import app.nubrick.nubrick.data.user.UserProperty
 import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.UserPropertyType
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Locale
 import java.util.regex.Pattern
@@ -13,14 +18,22 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
     val propType = asType ?: prop.type
     return when (propType) {
         UserPropertyType.INTEGER -> {
-            val propValue = prop.value.trim().toIntOrNull() ?: 0
-            val conditionValues = values.map { it.trim().toIntOrNull() ?: 0 }
-            compareInteger(a = propValue, b = conditionValues, op = op)
+            val propValue = prop.value.trim().toLongOrNull()
+            val conditionValues = values.mapNotNull { it.trim().toLongOrNull() }
+            if (propValue != null && conditionValues.size == values.size) {
+                compareInteger(a = propValue, b = conditionValues, op = op)
+            } else {
+                false
+            }
         }
         UserPropertyType.DOUBLE -> {
-            val propValue: Double = prop.value.trim().toDoubleOrNull() ?: 0.toDouble()
-            val conditionValues = values.map { it.trim().toDoubleOrNull() ?: 0.toDouble() }
-            compareDouble(a = propValue, b = conditionValues, op = op)
+            val propValue = prop.value.trim().toDoubleOrNull()
+            val conditionValues = values.mapNotNull { it.trim().toDoubleOrNull() }
+            if (propValue != null && conditionValues.size == values.size) {
+                compareDouble(a = propValue, b = conditionValues, op = op)
+            } else {
+                false
+            }
         }
         UserPropertyType.STRING -> {
             val strings = values.map { it }
@@ -31,12 +44,12 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
             compareSemver(a = prop.value, b = strings, op = op)
         }
         UserPropertyType.TIMESTAMPZ -> {
-            try {
-                val propValue =  ZonedDateTime.parse(prop.value.trim()).toInstant().toEpochMilli().div(1000)
-                val conditionValues = values.map { ZonedDateTime.parse(it.trim()).toInstant().toEpochMilli().div(1000) }
+            val propValue = parseTimestampSeconds(prop.value)
+            val conditionValues = values.mapNotNull { parseTimestampSeconds(it) }
+            if (propValue != null && conditionValues.size == values.size) {
                 compareLong(a = propValue, b = conditionValues, op = op)
-            } catch (e: Exception) {
-                compareLong(a = 0, b = emptyList(), op = op)
+            } else {
+                false
             }
         }
         UserPropertyType.BOOLEAN -> {
@@ -50,63 +63,34 @@ internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPrope
     }
 }
 
-internal fun compareInteger(a: Int, b: List<Int>, op: ConditionOperator): Boolean {
-    return when (op) {
-        ConditionOperator.Equal -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a == b[0]
-        }
-        ConditionOperator.NotEqual -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a != b[0]
-        }
-        ConditionOperator.GreaterThan -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a > b[0]
-        }
-        ConditionOperator.GreaterThanOrEqual -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a >= b[0]
-        }
-        ConditionOperator.LessThan -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a < b[0]
-        }
-        ConditionOperator.LessThanOrEqual -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a <= b[0]
-        }
-        ConditionOperator.In -> {
-            return b.contains(a)
-        }
-        ConditionOperator.NotIn -> {
-            return !b.contains(a)
-        }
-        ConditionOperator.Between -> {
-            if (b.count() != 2) {
-                return false
-            }
-            return b[0] <= a && a <= b[1]
-        }
-        else -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a == b[0]
-        }
+private fun parseTimestampSeconds(value: String): Long? {
+    val trimmed = value.trim()
+    return trimmed.toLongOrNull()
+        ?: parseTimestampSecondsOrNull { ZonedDateTime.parse(trimmed).toInstant() }
+        ?: parseTimestampSecondsOrNull { OffsetDateTime.parse(trimmed).toInstant() }
+        ?: parseTimestampSecondsOrNull { Instant.parse(trimmed) }
+        ?: parseTimestampSecondsOrNull { LocalDateTime.parse(trimmed).atZone(ZoneId.systemDefault()).toInstant() }
+        ?: parseTimestampSecondsOrNull { LocalDate.parse(trimmed).atStartOfDay(ZoneId.systemDefault()).toInstant() }
+}
+
+private fun parseTimestampSecondsOrNull(parse: () -> Instant?): Long? {
+    return try {
+        parse()?.toEpochMilli()?.div(1000)
+    } catch (e: Exception) {
+        null
     }
+}
+
+internal fun compareInteger(a: Int, b: List<Int>, op: ConditionOperator): Boolean {
+    return compareInteger(
+        a = a.toLong(),
+        b = b.map { it.toLong() },
+        op = op
+    )
+}
+
+internal fun compareInteger(a: Long, b: List<Long>, op: ConditionOperator): Boolean {
+    return compareLong(a, b, op)
 }
 
 

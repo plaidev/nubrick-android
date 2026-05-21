@@ -3,6 +3,7 @@ package app.nubrick.nubrick.data.user
 import android.content.Context
 import android.content.SharedPreferences
 import app.nubrick.nubrick.schema.BuiltinUserProperty
+import app.nubrick.nubrick.schema.UserPropertyType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,6 +13,10 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Date
 import java.util.Locale
@@ -79,7 +84,94 @@ class UtilsUnitTest {
         assertEquals(1, userIdProperties.size)
     }
 
-    private fun mockContext(): Context {
+    @Test
+    fun setProperty_shouldStoreDateAsIsoInstant() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+
+        user.setProperty("date", Date(1317826080000L))
+
+        assertEquals("2011-10-05T14:48:00Z", user.getProperty("date"))
+        assertEquals(
+            UserPropertyType.STRING,
+            user.toUserProperties().first { it.name == "date" }.type
+        )
+    }
+
+    @Test
+    fun setProperty_shouldStoreInstantAsIsoInstant() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+
+        user.setProperty("instant", Instant.ofEpochSecond(1317826080L))
+
+        assertEquals("2011-10-05T14:48:00Z", user.getProperty("instant"))
+        assertEquals(
+            UserPropertyType.STRING,
+            user.toUserProperties().first { it.name == "instant" }.type
+        )
+    }
+
+    @Test
+    fun setProperty_shouldStoreLocalDateTimeAsIsoInstant() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+        val localDateTime = LocalDateTime.of(2011, 10, 5, 14, 48)
+
+        user.setProperty("localDateTime", localDateTime)
+
+        assertEquals(
+            localDateTime.atZone(ZoneId.systemDefault()).toInstant().toString(),
+            user.getProperty("localDateTime")
+        )
+        assertEquals(
+            UserPropertyType.STRING,
+            user.toUserProperties().first { it.name == "localDateTime" }.type
+        )
+    }
+
+    @Test
+    fun setProperty_shouldStoreLocalDateAsIsoInstant() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+        val localDate = LocalDate.of(2011, 10, 5)
+
+        user.setProperty("localDate", localDate)
+
+        assertEquals(
+            localDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toString(),
+            user.getProperty("localDate")
+        )
+        assertEquals(
+            UserPropertyType.STRING,
+            user.toUserProperties().first { it.name == "localDate" }.type
+        )
+    }
+
+    @Test
+    fun setProperty_shouldKeepCustomPropertyTypesAsString() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+
+        user.setProperty("int", 123)
+        user.setProperty("double", 12.3)
+        user.setProperty("bool", true)
+        user.setProperty("string", "123")
+
+        val props = user.toUserProperties().associateBy { it.name }
+        assertEquals(UserPropertyType.STRING, props["int"]?.type)
+        assertEquals(UserPropertyType.STRING, props["double"]?.type)
+        assertEquals(UserPropertyType.STRING, props["bool"]?.type)
+        assertEquals(UserPropertyType.STRING, props["string"]?.type)
+    }
+
+    @Test
+    fun toUserProperties_shouldDefaultOldCustomPropertiesToString() {
+        val user = NubrickUser(
+            context = mockContext(mapOf("NATIVEBRIK_CUSTOM_date" to "2011-10-05T14:48:00Z")),
+            seed = 0
+        )
+
+        val date = user.toUserProperties().first { it.name == "date" }
+        assertEquals(UserPropertyType.STRING, date.type)
+    }
+
+    private fun mockContext(allPreferences: Map<String, Any> = emptyMap()): Context {
         val context = mock(Context::class.java)
         val preferences = mock(SharedPreferences::class.java)
         val editor = mock(SharedPreferences.Editor::class.java)
@@ -96,7 +188,7 @@ class UtilsUnitTest {
         `when`(preferences.getLong(anyString(), anyLong())).thenAnswer { invocation ->
             invocation.arguments[1] as Long
         }
-        `when`(preferences.all).thenReturn(emptyMap<String, Any>())
+        `when`(preferences.all).thenReturn(allPreferences)
         `when`(preferences.edit()).thenReturn(editor)
         `when`(editor.putString(anyString(), anyString())).thenReturn(editor)
         `when`(editor.putInt(anyString(), anyInt())).thenReturn(editor)
