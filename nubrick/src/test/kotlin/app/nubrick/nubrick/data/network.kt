@@ -34,7 +34,7 @@ class NetworkTest {
             response(502),
             response(200, "ok")
         ) { endpoint ->
-            getRequest(endpoint, client = client)
+            runBlocking { getRequest(endpoint, client = client) }
         }
 
         assertTrue(result.isSuccess)
@@ -45,7 +45,7 @@ class NetworkTest {
     @Test
     fun `get request does not retry not found`() {
         val (result, requestCount) = withLocalServer(response(404)) { endpoint ->
-            getRequest(endpoint, client = client)
+            runBlocking { getRequest(endpoint, client = client) }
         }
 
         assertTrue(result.isFailure)
@@ -56,7 +56,7 @@ class NetworkTest {
     @Test
     fun `get request does not retry client errors`() {
         val (result, requestCount) = withLocalServer(response(400, "bad request")) { endpoint ->
-            getRequest(endpoint, client = client)
+            runBlocking { getRequest(endpoint, client = client) }
         }
 
         val error = result.exceptionOrNull()
@@ -81,7 +81,7 @@ class NetworkTest {
     fun `oversized successful response returns failure`() {
         val oversizedBody = "x".repeat(5 * 1024 * 1024 + 1)
         val (result, requestCount) = withLocalServer(response(200, oversizedBody)) { endpoint ->
-            getRequest(endpoint, client = client)
+            runBlocking { getRequest(endpoint, client = client) }
         }
 
         assertTrue(result.isFailure)
@@ -91,7 +91,7 @@ class NetworkTest {
 
     @Test
     fun `get request rejects unsupported schemes`() {
-        val result = getRequest("file:///tmp/test.json", client = client)
+        val result = runBlocking { getRequest("file:///tmp/test.json", client = client) }
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalArgumentException)
