@@ -130,11 +130,13 @@ class NetworkTest {
 
         try {
             val (result, requestCount) = withLocalServer(cacheableResponse(200, "ok")) { endpoint ->
-                val first = NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
-                assertTrue(first.isSuccess)
-                assertEquals("ok", first.getOrNull())
+                runBlocking {
+                    val first = NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
+                    assertTrue(first.isSuccess)
+                    assertEquals("ok", first.getOrNull())
 
-                NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
+                    NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
+                }
             }
 
             assertTrue(result.isSuccess)
@@ -158,15 +160,17 @@ class NetworkTest {
             val (result, requestCount) = withLocalServer(
                 cacheableResponse(200, "ok", dateHeader = "Tue, 19 May 2099 00:00:00 GMT")
             ) { endpoint ->
-                val first = NetworkRepository(scope, CacheStore(), client)
-                    .getWithCache(endpoint, syncDateTime = true)
-                assertTrue(first.isSuccess)
-                assertTrue(DATETIME_OFFSET > 1000L)
+                runBlocking {
+                    val first = NetworkRepository(scope, CacheStore(), client)
+                        .getWithCache(endpoint, syncDateTime = true)
+                    assertTrue(first.isSuccess)
+                    assertTrue(DATETIME_OFFSET > 1000L)
 
-                DATETIME_OFFSET = 0
+                    DATETIME_OFFSET = 0
 
-                NetworkRepository(scope, CacheStore(), client)
-                    .getWithCache(endpoint, syncDateTime = true)
+                    NetworkRepository(scope, CacheStore(), client)
+                        .getWithCache(endpoint, syncDateTime = true)
+                }
             }
 
             assertTrue(result.isSuccess)
