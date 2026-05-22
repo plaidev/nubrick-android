@@ -5,6 +5,7 @@ import app.nubrick.nubrick.schema.ApiHttpRequest
 import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -34,7 +35,7 @@ internal class NetworkRepository(
     private val cache: CacheStore,
     private val client: OkHttpClient,
 ) {
-    fun getWithCache(endpoint: String, syncDateTime: Boolean = false): Result<String> {
+    suspend fun getWithCache(endpoint: String, syncDateTime: Boolean = false): Result<String> {
         val cached = cache.get(endpoint).getOrElse {
             val result = getRequest(endpoint, syncDateTime, client).getOrElse { error ->
                 return Result.failure(error)
@@ -81,7 +82,7 @@ private fun isRetryable(e: Throwable): Boolean {
     return e is SocketTimeoutException || (e is HttpException && e.statusCode >= 500)
 }
 
-internal fun getRequest(
+internal suspend fun getRequest(
     endpoint: String,
     syncDateTime: Boolean = false,
     client: OkHttpClient
@@ -98,12 +99,12 @@ internal fun getRequest(
     }
 }
 
-private fun getRequestWithRetry(
+private suspend fun getRequestWithRetry(
     request: () -> Result<String>
 ): Result<String> {
     var lastResult: Result<String> = Result.failure(IOException("No attempts made"))
     for (attempt in 0..MAX_RETRIES) {
-        if (attempt > 0) Thread.sleep(RETRY_DELAYS[attempt - 1])
+        if (attempt > 0) delay(RETRY_DELAYS[attempt - 1])
         lastResult = request()
         if (lastResult.isSuccess) return lastResult
         val error = lastResult.exceptionOrNull() ?: break
