@@ -86,7 +86,7 @@ internal suspend fun getRequest(
     endpoint: String,
     syncDateTime: Boolean = false,
     client: OkHttpClient
-): Result<String> = getRequestWithRetry {
+): Result<String> = requestWithRetry {
     try {
         val t0 = System.currentTimeMillis()
         val request = Request.Builder()
@@ -99,7 +99,7 @@ internal suspend fun getRequest(
     }
 }
 
-private suspend fun getRequestWithRetry(
+private suspend fun requestWithRetry(
     request: () -> Result<String>
 ): Result<String> {
     var lastResult: Result<String> = Result.failure(IOException("No attempts made"))
@@ -113,7 +113,7 @@ private suspend fun getRequestWithRetry(
     return lastResult
 }
 
-internal fun postRequest(endpoint: String, data: String, client: OkHttpClient): Result<String> {
+internal suspend fun postRequest(endpoint: String, data: String, client: OkHttpClient): Result<String> {
     val request = try {
         Request.Builder()
             .url(endpoint)
@@ -122,7 +122,7 @@ internal fun postRequest(endpoint: String, data: String, client: OkHttpClient): 
     } catch (e: IllegalArgumentException) {
         return Result.failure(e)
     }
-    return executeRequest(client, request)
+    return requestWithRetry { executeRequest(client, request) }
 }
 
 internal fun sendHttpRequest(req: ApiHttpRequest, client: OkHttpClient): Result<String> {

@@ -67,14 +67,18 @@ class NetworkTest {
     }
 
     @Test
-    fun `post request does not retry server errors`() {
-        val (result, requestCount) = withLocalServer(response(500)) { endpoint ->
-            postRequest(endpoint, "{}", client)
+    fun `post request retries server errors and returns success`() {
+        val (result, requestCount) = withLocalServer(
+            response(500),
+            response(502),
+            response(200, "ok")
+        ) { endpoint ->
+            runBlocking { postRequest(endpoint, "{}", client) }
         }
 
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is HttpException)
-        assertEquals(1, requestCount)
+        assertTrue(result.isSuccess)
+        assertEquals("ok", result.getOrNull())
+        assertEquals(3, requestCount)
     }
 
     @Test
