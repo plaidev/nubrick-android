@@ -226,7 +226,7 @@ internal class TrackRepositoryImpl(
         }
     }
 
-    private fun sendBatch(events: List<TrackEvent>) {
+    private suspend fun sendBatch(events: List<TrackEvent>) {
         val meta = TrackEventMeta(
             appId = user.packageName,
             appVersion = user.appVersion,
@@ -242,13 +242,7 @@ internal class TrackRepositoryImpl(
         )
         val body = Json.encodeToString(request.encode())
         postRequest(SdkConstants.endpoint.track, body, client).onFailure {
-            var dropped = 0
-            events.forEach { event ->
-                if (eventChannel.trySend(event).isFailure) dropped++
-            }
-            if (dropped > 0) {
-                Log.w("NubrickSDK", "Failed to re-enqueue $dropped events after send failure")
-            }
+            Log.w("NubrickSDK", "Dropped ${events.size} events after send failure")
         }
     }
 
