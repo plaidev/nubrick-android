@@ -8,13 +8,13 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import app.nubrick.nubrick.component.provider.container.ContainerContext
 import app.nubrick.nubrick.component.provider.pageblock.PageBlockContext
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.schema.ApiHttpRequest
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 private val LocalData = compositionLocalOf<DataState> {
     error("LocalData is not found")
@@ -41,47 +41,49 @@ internal fun rememberPageState(
     request: ApiHttpRequest?,
 ): DataState {
     val pageBlock = PageBlockContext.value
-    var state: DataState by remember {
-        mutableStateOf(DataState(
-            loading = true,
-            container.createVariableForTemplate(
-                properties = pageBlock.toProperties()
-            )
-        ))
+    val templateVariable = container.createVariableForTemplate(
+        data = null,
+        pageProperties = pageBlock.toProperties(),
+    )
+    val compiledRequest = remember(container, templateVariable, request) {
+        request?.let { container.compileHttpRequest(it, templateVariable) }
     }
-    LaunchedEffect("key") {
-        if (request == null) {
-            state = state.copy(loading = false)
+    var loading by remember {
+        mutableStateOf(compiledRequest != null)
+    }
+    var responseData: JsonElement? by remember {
+        mutableStateOf(null)
+    }
+    LaunchedEffect(compiledRequest) {
+        if (compiledRequest == null) {
+            responseData = null
+            loading = false
             return@LaunchedEffect
         }
-        state = state.copy(loading = true)
-        container.sendHttpRequest(
-            request, container.createVariableForTemplate(properties = pageBlock.toProperties())
-        ).onSuccess {
-            state = state.copy(
-                loading = false,
-                data = container.createVariableForTemplate(it, properties = pageBlock.toProperties())
-            )
+        container.sendCompiledHttpRequest(compiledRequest).onSuccess {
+            responseData = it
+            loading = false
         }.onFailure {
-            state = state.copy(loading = false)
+            loading = false
         }
     }
-    return state
+    return DataState(
+        loading = loading,
+        data = responseData?.let {
+            JsonObject(templateVariable.jsonObject + ("data" to it))
+        } ?: templateVariable,
+    )
 }
 
 @Composable
 internal fun rememberNestedDataState(
     data: JsonElement,
 ): DataState {
-    val pageBlock = PageBlockContext.value
-    val container = ContainerContext.value
-    val parentData by rememberUpdatedState(newValue = DataContext.state)
-    return remember(parentData, data) {
-        DataState(
-            loading = parentData.loading,
-            data = container.createVariableForTemplate(data = data, properties = pageBlock.toProperties())
-        )
-    }
+    val parentData = DataContext.state
+    return DataState(
+        loading = parentData.loading,
+        data = JsonObject(parentData.data.jsonObject + ("data" to data)),
+    )
 }
 
 @Composable

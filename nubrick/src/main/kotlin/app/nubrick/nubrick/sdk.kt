@@ -271,9 +271,12 @@ private class NubrickRuntime(
         content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
         onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
     ) {
+        val embeddingContainer = remember(arguments) {
+            this.container.initWith(arguments)
+        }
         NubrickTheme {
             Embedding(
-                container = this.container.initWith(arguments),
+                container = embeddingContainer,
                 experimentId = id,
                 modifier = modifier,
                 onEvent = onEvent,

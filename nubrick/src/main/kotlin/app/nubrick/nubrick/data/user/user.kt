@@ -6,6 +6,10 @@ import android.os.Build
 import app.nubrick.nubrick.VERSION
 import app.nubrick.nubrick.schema.BuiltinUserProperty
 import app.nubrick.nubrick.schema.UserPropertyType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -20,7 +24,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 
@@ -91,9 +94,20 @@ internal data class UserProperty(
 
 private const val USER_CUSTOM_PROPERTY_KEY_PREFIX = "NATIVEBRIK_CUSTOM_"
 
+internal data class NubrickUserState(
+    val properties: Map<String, String> = emptyMap(),
+    val customProperties: Map<String, String> = emptyMap(),
+) {
+    val id: String
+        get() = properties[BuiltinUserProperty.userId.toString()] ?: ""
+
+    val templateProperties: Map<String, String>
+        get() = customProperties + (BuiltinUserProperty.userId.toString() to id)
+}
+
 class NubrickUser {
-    private val properties: MutableMap<String, String> = ConcurrentHashMap()
-    private val customProperties: MutableMap<String, String> = ConcurrentHashMap()
+    private val _state = MutableStateFlow(NubrickUserState())
+    internal val state: StateFlow<NubrickUserState> = _state.asStateFlow()
     internal val preferences: SharedPreferences?
     @Volatile
     private var lastBootTime: ZonedDateTime = getCurrentDate()
@@ -102,12 +116,12 @@ class NubrickUser {
 
     val id: String
         get() {
-            return this.properties[BuiltinUserProperty.userId.toString()] ?: ""
+            return this.state.value.id
         }
 
     val retention: Int
         get() {
-            return (this.properties[BuiltinUserProperty.retentionPeriod.toString()] ?: "0").toInt()
+            return (this.state.value.properties[BuiltinUserProperty.retentionPeriod.toString()] ?: "0").toInt()
         }
 
     internal constructor(context: Context, seed: Int? = null) {
@@ -117,47 +131,47 @@ class NubrickUser {
         val userIdKey = BuiltinUserProperty.userId.toString()
         val userId: String = this.preferences?.getString(userIdKey, null) ?: UUID.randomUUID().toString()
         this.preferences?.edit()?.putString(userIdKey, userId)?.apply()
-        this.properties[userIdKey] = userId
+        this.setBaseProperty(userIdKey, userId)
 
         // USER_SEED_KEY := n in [0,USER_SEED_MAX)
         val rand = if (seed != null) Random(seed) else Random
         val userSeed: Int = this.preferences?.getInt(USER_SEED_KEY, rand.nextInt(0, USER_SEED_MAX)) ?: rand.nextInt(0, USER_SEED_MAX)
         this.preferences?.edit()?.putInt(USER_SEED_KEY, userSeed)?.apply()
-        this.properties[USER_SEED_KEY] = userSeed.toString()
+        this.setBaseProperty(USER_SEED_KEY, userSeed.toString())
 
         val languageCode = Locale.getDefault().language
-        this.properties[BuiltinUserProperty.languageCode.toString()] = languageCode
+        this.setBaseProperty(BuiltinUserProperty.languageCode.toString(), languageCode)
 
         val regionCode = Locale.getDefault().country.toString()
-        this.properties[BuiltinUserProperty.regionCode.toString()] = regionCode
+        this.setBaseProperty(BuiltinUserProperty.regionCode.toString(), regionCode)
 
         val firstBootTimeKey = BuiltinUserProperty.firstBootTime.toString()
         val firstBootTime: String = this.preferences?.getString(firstBootTimeKey, null) ?: formatISO8601(
             getCurrentDate()
         )
         this.preferences?.edit()?.putString(firstBootTimeKey, firstBootTime)?.apply()
-        this.properties[firstBootTimeKey] = firstBootTime
+        this.setBaseProperty(firstBootTimeKey, firstBootTime)
 
-        this.properties[BuiltinUserProperty.sdkVersion.toString()] = VERSION
+        this.setBaseProperty(BuiltinUserProperty.sdkVersion.toString(), VERSION)
 
-        this.properties[BuiltinUserProperty.osName.toString()] = "Android"
-        this.properties[BuiltinUserProperty.osVersion.toString()] = Build.VERSION.SDK_INT.toString()
+        this.setBaseProperty(BuiltinUserProperty.osName.toString(), "Android")
+        this.setBaseProperty(BuiltinUserProperty.osVersion.toString(), Build.VERSION.SDK_INT.toString())
 
         try {
             val packageName = context.packageName
             this.packageName = packageName
-            this.properties[BuiltinUserProperty.appId.toString()] = packageName
+            this.setBaseProperty(BuiltinUserProperty.appId.toString(), packageName)
             val appVersion = context.packageManager.getPackageInfo(packageName, 0).versionName
-            this.properties[BuiltinUserProperty.appVersion.toString()] = appVersion ?: "0.0.0"
+            this.setBaseProperty(BuiltinUserProperty.appVersion.toString(), appVersion ?: "0.0.0")
             this.appVersion = appVersion
         } catch (_: Exception) {
-            this.properties[BuiltinUserProperty.appVersion.toString()] = "0.0.0"
+            this.setBaseProperty(BuiltinUserProperty.appVersion.toString(), "0.0.0")
         }
 
         this.preferences?.all?.forEach { (key, value) ->
             if (key.startsWith(USER_CUSTOM_PROPERTY_KEY_PREFIX)) {
                 val propKey = key.removePrefix(USER_CUSTOM_PROPERTY_KEY_PREFIX)
-                this.customProperties[propKey] = value.toString()
+                this.setCustomProperty(propKey, value.toString())
             }
         }
 
@@ -166,7 +180,7 @@ class NubrickUser {
 
     fun setUserId(id: String) {
         val userIdKey = BuiltinUserProperty.userId.toString()
-        this.properties[userIdKey] = id
+        this.setBaseProperty(userIdKey, id)
         this.preferences?.edit()?.putString(userIdKey, id)?.apply()
     }
 
@@ -176,7 +190,7 @@ class NubrickUser {
             return
         }
         val strValue = formatUserPropertyValue(value)
-        this.customProperties[key] = strValue
+        this.setCustomProperty(key, strValue)
         this.preferences?.edit()?.putString(USER_CUSTOM_PROPERTY_KEY_PREFIX + key, strValue)?.apply()
     }
 
@@ -184,32 +198,45 @@ class NubrickUser {
         if (key == BuiltinUserProperty.userId.toString()) {
             return this.id.ifEmpty { null }
         }
-        return this.customProperties[key]
+        return this.state.value.customProperties[key]
     }
 
     fun setProperties(props: Map<String, Any>) {
-        props.forEach { (key, value) ->
-            this.setProperty(key, value)
+        val userIdKey = BuiltinUserProperty.userId.toString()
+        val userId = props[userIdKey]
+        if (userId != null) {
+            this.setUserId(userId.toString())
+        }
+
+        val customEntries = props.filterKeys { it != userIdKey }
+            .mapValues { (_, value) -> formatUserPropertyValue(value) }
+        if (customEntries.isNotEmpty()) {
+            this._state.update { state ->
+                state.copy(customProperties = state.customProperties + customEntries)
+            }
+            val editor = this.preferences?.edit()
+            customEntries.forEach { (key, value) ->
+                editor?.putString(USER_CUSTOM_PROPERTY_KEY_PREFIX + key, value)
+            }
+            editor?.apply()
         }
     }
 
     fun getProperties(): Map<String, String> {
-        val props = this.customProperties.toMutableMap()
-        props[BuiltinUserProperty.userId.toString()] = this.id
-        return props
+        return this.state.value.templateProperties
     }
 
     fun comeBack() {
         val now = getCurrentDate()
         val lastBootTime = getCurrentDate()
-        this.properties[BuiltinUserProperty.lastBootTime.toString()] = formatISO8601(lastBootTime)
+        this.setBaseProperty(BuiltinUserProperty.lastBootTime.toString(), formatISO8601(lastBootTime))
         this.lastBootTime = lastBootTime
 
         val retentionPeriodKey = BuiltinUserProperty.retentionPeriod.toString()
         val retentionTimestamp = this.preferences?.getLong(retentionPeriodKey, now.toEpochSecond()) ?: now.toEpochSecond()
         val retentionPeriodCountKey = "retentionPeriodCount"
         val retentionCount = this.preferences?.getInt(retentionPeriodCountKey, 0) ?: 0
-        this.properties[retentionPeriodKey] = retentionCount.toString()
+        this.setBaseProperty(retentionPeriodKey, retentionCount.toString())
 
         // 1 day is equal to 86400 seconds
         val lastDaysSince0 = retentionTimestamp / (86400)
@@ -221,7 +248,7 @@ class NubrickUser {
                 ?.putLong(retentionPeriodKey, now.toEpochSecond())
                 ?.putInt(retentionPeriodCountKey, countedUp)
                 ?.apply()
-            this.properties[retentionPeriodKey] = countedUp.toString()
+            this.setBaseProperty(retentionPeriodKey, countedUp.toString())
         } else if (lastDaysSince0 == daysSince0) {
             // save the initial count
             this.preferences?.edit()
@@ -235,13 +262,13 @@ class NubrickUser {
                 ?.putLong(retentionPeriodKey, now.toEpochSecond())
                 ?.putInt(retentionPeriodCountKey, reset)
                 ?.apply()
-            this.properties[retentionPeriodKey] = reset.toString()
+            this.setBaseProperty(retentionPeriodKey, reset.toString())
         }
     }
 
     // n in [0,1)
     internal fun getNormalizedUserRnd(seed: Int?): Double {
-        val userSeedStr: String = this.properties[USER_SEED_KEY] ?: "0"
+        val userSeedStr: String = this.state.value.properties[USER_SEED_KEY] ?: "0"
         val userSeed: Int = userSeedStr.toIntOrNull() ?: 0
         return Random((seed ?: 0) + userSeed).nextDouble()
     }
@@ -302,7 +329,7 @@ class NubrickUser {
             )
         ))
 
-        this.properties.forEach { (key, value) ->
+        this.state.value.properties.forEach { (key, value) ->
             if (key == BuiltinUserProperty.userRnd.toString()) {
                 // not to use userRnd prop. use USER_SEED_KEY instead.
                 return@forEach
@@ -333,7 +360,7 @@ class NubrickUser {
             }
         }
 
-        this.customProperties.forEach { (key, value) ->
+        this.state.value.customProperties.forEach { (key, value) ->
             props.add(UserProperty(
                 name = key,
                 value = value,
@@ -342,5 +369,17 @@ class NubrickUser {
         }
 
         return props
+    }
+
+    private fun setBaseProperty(key: String, value: String) {
+        this._state.update { state ->
+            state.copy(properties = state.properties + (key to value))
+        }
+    }
+
+    private fun setCustomProperty(key: String, value: String) {
+        this._state.update { state ->
+            state.copy(customProperties = state.customProperties + (key to value))
+        }
     }
 }
