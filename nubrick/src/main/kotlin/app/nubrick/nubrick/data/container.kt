@@ -21,6 +21,8 @@ import app.nubrick.nubrick.schema.Property
 import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.template.compile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 
@@ -53,11 +55,10 @@ internal interface Container {
         pageProperties: List<Property>?,
     ): JsonElement
 
+    val formValuesFlow: StateFlow<Map<String, FormValue>>
     fun getFormValues(): Map<String, JsonElement>
     fun getFormValue(key: String): FormValue?
     fun setFormValue(key: String, value: FormValue)
-    fun addFormValueListener(listener: FormValueListener)
-    fun removeFormValueListener(listener: FormValueListener)
 
     fun compileHttpRequest(
         req: ApiHttpRequest,
@@ -118,8 +119,8 @@ internal class ContainerImpl(
     ): JsonElement {
         val userState by user.state.collectAsStateWithLifecycle()
         val userProperties = userState.templateProperties
-        val formValues = formRepository?.formValues?.collectAsStateWithLifecycle()
-        val formData = formValues?.value?.toFormData()
+        val formValues by formValuesFlow.collectAsStateWithLifecycle()
+        val formData = formValues.toFormData()
         return remember(this, data, pageProperties, userProperties, formData) {
             createVariableForTemplate(
                 data = data,
@@ -132,6 +133,9 @@ internal class ContainerImpl(
         }
     }
 
+    override val formValuesFlow: StateFlow<Map<String, FormValue>> =
+        formRepository?.formValues ?: MutableStateFlow(emptyMap())
+
     override fun getFormValues(): Map<String, JsonElement> {
         return this.formRepository?.getFormData() ?: emptyMap()
     }
@@ -142,14 +146,6 @@ internal class ContainerImpl(
 
     override fun setFormValue(key: String, value: FormValue) {
         this.formRepository?.setValue(key, value)
-    }
-
-    override fun addFormValueListener(listener: FormValueListener) {
-        this.formRepository?.addListener(listener)
-    }
-
-    override fun removeFormValueListener(listener: FormValueListener) {
-        this.formRepository?.removeListener(listener)
     }
 
     override suspend fun sendHttpRequest(

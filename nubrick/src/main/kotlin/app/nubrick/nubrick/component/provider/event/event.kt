@@ -10,13 +10,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.alpha
@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import app.nubrick.nubrick.component.provider.container.ContainerContext
 import app.nubrick.nubrick.component.provider.data.DataContext
-import app.nubrick.nubrick.data.FormValueListener
+import app.nubrick.nubrick.data.toFormData
 import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
@@ -85,19 +85,11 @@ internal fun Modifier.eventDispatcher(
     val interaction = remember { MutableInteractionSource() }
 
     if (event.requiredFields != null) {
-        val handleFormValueChange: FormValueListener = { values ->
-            disabled = event.requiredFields.any { key ->
-                val value = values[key]
-                value == null || (value is JsonPrimitive && value.isString && value.content.isEmpty())
-            }
-        }
-        DisposableEffect(Unit) {
-            handleFormValueChange(container.getFormValues())
-            container.addFormValueListener(handleFormValueChange)
-
-            onDispose {
-                container.removeFormValueListener(handleFormValueChange)
-            }
+        val formValues by container.formValuesFlow.collectAsStateWithLifecycle()
+        val values = formValues.toFormData()
+        disabled = event.requiredFields.any { key ->
+            val value = values[key]
+            value == null || (value is JsonPrimitive && value.isString && value.content.isEmpty())
         }
     }
 
