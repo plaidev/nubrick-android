@@ -8,8 +8,11 @@ import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.extraction.extractComponentId
 import app.nubrick.nubrick.data.extraction.extractExperimentConfig
 import app.nubrick.nubrick.data.extraction.extractExperimentVariant
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.nubrick.nubrick.data.user.NubrickUser
-import app.nubrick.nubrick.schema.ApiHttpHeader
 import app.nubrick.nubrick.schema.ApiHttpRequest
 import app.nubrick.nubrick.schema.ExperimentConfigs
 import app.nubrick.nubrick.schema.ExperimentKind
@@ -44,9 +47,10 @@ internal interface Container {
 
     fun handleEvent(it: Event) {}
 
+    @Composable
     fun createVariableForTemplate(
-        data: JsonElement? = null,
-        properties: List<Property>? = null
+        data: JsonElement?,
+        pageProperties: List<Property>?,
     ): JsonElement
 
     fun getFormValues(): Map<String, JsonElement>
@@ -55,9 +59,16 @@ internal interface Container {
     fun addFormValueListener(listener: FormValueListener)
     fun removeFormValueListener(listener: FormValueListener)
 
+    fun compileHttpRequest(
+        req: ApiHttpRequest,
+        variable: JsonElement,
+    ): CompiledHttpRequest
+
+    suspend fun sendCompiledHttpRequest(req: CompiledHttpRequest): Result<JsonElement>
+
     suspend fun sendHttpRequest(
         req: ApiHttpRequest,
-        variable: JsonElement? = null
+        variable: JsonElement,
     ): Result<JsonElement>
 
     suspend fun fetchEmbedding(experimentId: String, componentId: String? = null): Result<UIBlock>
@@ -81,7 +92,6 @@ internal class ContainerImpl(
     private val arguments: Any? = null,
     private val formRepository: FormRepository? = null,
 ) : Container {
-
     override fun initWith(arguments: Any?): Container {
         return ContainerImpl(
             config = this.config,
@@ -101,18 +111,25 @@ internal class ContainerImpl(
         this.config.onEvent?.let { it1 -> it1(it) }
     }
 
+    @Composable
     override fun createVariableForTemplate(
         data: JsonElement?,
-        properties: List<Property>?
+        pageProperties: List<Property>?,
     ): JsonElement {
-        return createVariableForTemplate(
-            user = this.user,
-            data = data,
-            properties = properties,
-            form = formRepository?.getFormData(),
-            arguments = arguments,
-            projectId = config.projectId,
-        )
+        val userState by user.state.collectAsStateWithLifecycle()
+        val userProperties = userState.templateProperties
+        val formValues = formRepository?.formValues?.collectAsStateWithLifecycle()
+        val formData = formValues?.value?.toFormData()
+        return remember(this, data, pageProperties, userProperties, formData) {
+            createVariableForTemplate(
+                data = data,
+                pageProperties = pageProperties,
+                formData = formData,
+                userProperties = userProperties,
+                arguments = arguments,
+                projectId = config.projectId,
+            )
+        }
     }
 
     override fun getFormValues(): Map<String, JsonElement> {
@@ -137,21 +154,30 @@ internal class ContainerImpl(
 
     override suspend fun sendHttpRequest(
         req: ApiHttpRequest,
-        variable: JsonElement?
-    ): Result<JsonElement> = withContext(Dispatchers.IO) {
-        val mergedVariable = mergeJsonElements(variable, createVariableForTemplate())
-        val compiledReq = ApiHttpRequest(
-            url = req.url?.let { compile(it, mergedVariable) },
+        variable: JsonElement,
+    ): Result<JsonElement> {
+        return sendCompiledHttpRequest(compileHttpRequest(req, variable))
+    }
+
+    override fun compileHttpRequest(
+        req: ApiHttpRequest,
+        variable: JsonElement,
+    ): CompiledHttpRequest {
+        return CompiledHttpRequest(
+            url = req.url?.let { compile(it, variable) },
             method = req.method,
             headers = req.headers?.map {
-                ApiHttpHeader(
-                    compile(it.name ?: "", mergedVariable),
-                    compile(it.value ?: "", mergedVariable)
+                CompiledHttpHeader(
+                    name = compile(it.name ?: "", variable),
+                    value = compile(it.value ?: "", variable),
                 )
-            },
-            body = req.body?.let { compile(it, mergedVariable) },
+            } ?: emptyList(),
+            body = req.body?.let { compile(it, variable) },
         )
-        httpRequestRepository.request(compiledReq)
+    }
+
+    override suspend fun sendCompiledHttpRequest(req: CompiledHttpRequest): Result<JsonElement> = withContext(Dispatchers.IO) {
+        httpRequestRepository.request(req)
     }
 
     override suspend fun fetchEmbedding(

@@ -1,6 +1,5 @@
 package app.nubrick.nubrick.data
 
-import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.schema.BuiltinUserProperty
 import app.nubrick.nubrick.schema.Property
 import kotlinx.serialization.json.JsonArray
@@ -40,22 +39,23 @@ internal fun mergeJsonElements(a: JsonElement?, b: JsonElement?): JsonElement {
 }
 
 internal fun createVariableForTemplate(
-    user: NubrickUser? = null,
     data: JsonElement? = null,
-    properties: List<Property>? = null,
-    form: Map<String, JsonElement>? = null,
+    pageProperties: List<Property>? = null,
+    formData: Map<String, JsonElement>? = null,
+    userProperties: Map<String, String> = emptyMap(),
     arguments: Any? = null,
     projectId: String? = null,
 ): JsonElement {
-    val userData = mutableMapOf("id" to JsonPrimitive(user?.id ?: ""))
-    user?.getProperties()?.forEach { (key, value) ->
+    val userIdKey = BuiltinUserProperty.userId.toString()
+    val userData = mutableMapOf("id" to JsonPrimitive(userProperties[userIdKey] ?: ""))
+    userProperties.forEach { (key, value) ->
         if (key == BuiltinUserProperty.userId.toString()) return@forEach
         userData[key] = JsonPrimitive(value)
     }
     val userJsonObject = JsonObject(userData.toMap())
 
-    val propertiesJsonObject = JsonObject(properties?.associate { (it.name ?: "") to JsonPrimitive(it.value) } ?: emptyMap())
-    val formJsonObject = JsonObject(form?.entries?.associate {
+    val propertiesJsonObject = JsonObject(pageProperties?.associate { (it.name ?: "") to JsonPrimitive(it.value) } ?: emptyMap())
+    val formJsonObject = JsonObject(formData?.entries?.associate {
         it.key to it.value
     } ?: emptyMap())
     return JsonObject(mapOf(

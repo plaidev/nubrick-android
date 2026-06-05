@@ -1,7 +1,6 @@
 package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.data.user.DATETIME_OFFSET
-import app.nubrick.nubrick.schema.ApiHttpRequest
 import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -105,7 +104,14 @@ class NetworkTest {
     fun `custom http request returns failure for invalid json response`() {
         val (result, requestCount) = withLocalServer(response(200, "{")) { endpoint ->
             runBlocking {
-                HttpRequestRepositoryImpl(client).request(ApiHttpRequest(url = endpoint))
+                HttpRequestRepositoryImpl(client).request(
+                    CompiledHttpRequest(
+                        url = endpoint,
+                        method = null,
+                        headers = emptyList(),
+                        body = null,
+                    )
+                )
             }
         }
 
@@ -116,7 +122,12 @@ class NetworkTest {
     @Test
     fun `custom http request rejects unknown method before sending`() {
         val result = sendHttpRequest(
-            ApiHttpRequest(url = "http://127.0.0.1/test", method = ApiHttpRequestMethod.UNKNOWN),
+            CompiledHttpRequest(
+                url = "http://127.0.0.1/test",
+                method = ApiHttpRequestMethod.UNKNOWN,
+                headers = emptyList(),
+                body = null,
+            ),
             client
         )
 

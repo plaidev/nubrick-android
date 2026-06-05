@@ -1,7 +1,6 @@
 package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.data.user.syncDateFromHttpDateHeader
-import app.nubrick.nubrick.schema.ApiHttpRequest
 import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -125,7 +124,7 @@ internal suspend fun postRequest(endpoint: String, data: String, client: OkHttpC
     return requestWithRetry { executeRequest(client, request) }
 }
 
-internal fun sendHttpRequest(req: ApiHttpRequest, client: OkHttpClient): Result<String> {
+internal fun sendHttpRequest(req: CompiledHttpRequest, client: OkHttpClient): Result<String> {
     val url = req.url ?: return Result.failure(SkipHttpRequestException())
     val method = req.method ?: ApiHttpRequestMethod.GET
     if (method == ApiHttpRequestMethod.UNKNOWN) {
@@ -134,9 +133,8 @@ internal fun sendHttpRequest(req: ApiHttpRequest, client: OkHttpClient): Result<
     val request = try {
         val builder = Request.Builder().url(url)
 
-        req.headers?.forEach { header ->
-            val name = header.name ?: return@forEach
-            builder.header(name, header.value ?: "")
+        req.headers.forEach { header ->
+            builder.header(header.name, header.value)
         }
 
         val body = if (method != ApiHttpRequestMethod.GET &&
