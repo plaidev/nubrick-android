@@ -150,11 +150,7 @@ internal fun Trigger(trigger: TriggerStateHolder) {
     if (trigger.modalStacks.isNotEmpty()) {
         for (stack in trigger.modalStacks) {
             key(stack.id) {
-                val modalContainer = remember {
-                    trigger.container.makeContainer()
-                }
                 Root(
-                    container = modalContainer,
                     root = stack,
                     embeddingVisibility = false,
                     onDismiss = {
