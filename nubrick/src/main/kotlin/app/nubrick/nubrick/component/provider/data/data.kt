@@ -38,12 +38,14 @@ internal object DataContext {
 @Composable
 internal fun rememberPageState(
     container: Container,
+    arguments: Any?,
     request: ApiHttpRequest?,
 ): DataState {
     val pageBlock = PageBlockContext.value
     val templateVariable = container.createVariableForTemplate(
         data = null,
         pageProperties = pageBlock.toProperties(),
+        arguments = arguments,
     )
     val compiledRequest = remember(container, templateVariable, request) {
         request?.let { container.compileHttpRequest(it, templateVariable) }
@@ -102,10 +104,11 @@ internal fun NestedDataProvider(
 @Composable
 internal fun PageDataProvider(
     container: Container,
+    arguments: Any? = null,
     request: ApiHttpRequest?,
     content: @Composable() () -> Unit
 ) {
-    val state = rememberPageState(container, request)
+    val state = rememberPageState(container, arguments, request)
     CompositionLocalProvider(
         LocalData provides state
     ) {

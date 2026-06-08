@@ -2,6 +2,7 @@ package app.nubrick.nubrick.component
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -148,14 +149,19 @@ internal fun Trigger(trigger: TriggerStateHolder) {
 
     if (trigger.modalStacks.isNotEmpty()) {
         for (stack in trigger.modalStacks) {
-            Root(
-                container = trigger.container,
-                root = stack,
-                embeddingVisibility = false,
-                onDismiss = {
-                    trigger.handleDismiss(it)
+            key(stack.id) {
+                val modalContainer = remember {
+                    trigger.container.makeContainer()
                 }
-            )
+                Root(
+                    container = modalContainer,
+                    root = stack,
+                    embeddingVisibility = false,
+                    onDismiss = {
+                        trigger.handleDismiss(it)
+                    }
+                )
+            }
         }
     }
 }

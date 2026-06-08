@@ -35,12 +35,14 @@ sealed class EmbeddingLoadingState {
 @Composable
 internal fun rememberEmbeddingState(
     container: Container,
+    arguments: Any?,
     experimentId: String,
     componentId: String?,
     onEvent: ((event: Event) -> Unit)?,
     onSizeChange: (width: NubrickSize, height: NubrickSize) -> Unit
 ): EmbeddingLoadingState {
     val currentContainer = rememberUpdatedState(container)
+    val currentArguments = rememberUpdatedState(arguments)
     val currentOnEvent = rememberUpdatedState(onEvent)
     val currentOnSizeChange = rememberUpdatedState(onSizeChange)
     var loadingState: EmbeddingLoadingState by remember(experimentId, componentId) {
@@ -53,6 +55,7 @@ internal fun rememberEmbeddingState(
                     EmbeddingLoadingState.Completed {
                         Root(
                             container = currentContainer.value,
+                            arguments = currentArguments.value,
                             root = it.data,
                             modifier = Modifier
                                 .fillMaxSize(),
@@ -84,6 +87,7 @@ internal fun rememberEmbeddingState(
 @Composable
 internal fun Embedding(
     container: Container,
+    arguments: Any? = null,
     experimentId: String,
     componentId: String? = null,
     modifier: Modifier = Modifier,
@@ -95,6 +99,7 @@ internal fun Embedding(
     var height: NubrickSize by remember(experimentId, componentId) { mutableStateOf(NubrickSize.Fill) }
     val state = rememberEmbeddingState(
         container,
+        arguments,
         experimentId,
         componentId,
         onEvent,

@@ -21,7 +21,6 @@ import app.nubrick.nubrick.schema.Property
 import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.template.compile
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
@@ -44,7 +43,7 @@ internal class FailedToDecodeException : Exception("Failed to decode")
 internal class SkipHttpRequestException : Exception("Skip http request")
 
 internal interface Container {
-    fun initWith(arguments: Any?): Container
+    fun makeContainer(): Container
     fun close() {}
 
     fun handleEvent(it: Event) {}
@@ -53,6 +52,7 @@ internal interface Container {
     fun createVariableForTemplate(
         data: JsonElement?,
         pageProperties: List<Property>?,
+        arguments: Any?,
     ): JsonElement
 
     val formValuesFlow: StateFlow<Map<String, FormValue>>
@@ -90,10 +90,9 @@ internal class ContainerImpl(
     private val trackRepository: TrackRepository,
     private val httpRequestRepository: HttpRequestRepository,
     private val databaseRepository: DatabaseRepository,
-    private val arguments: Any? = null,
-    private val formRepository: FormRepository? = null,
+    private val formRepository: FormRepository = FormRepositoryImpl(),
 ) : Container {
-    override fun initWith(arguments: Any?): Container {
+    override fun makeContainer(): Container {
         return ContainerImpl(
             config = this.config,
             user = this.user,
@@ -102,11 +101,8 @@ internal class ContainerImpl(
             trackRepository = this.trackRepository,
             httpRequestRepository = this.httpRequestRepository,
             databaseRepository = this.databaseRepository,
-            arguments = arguments,
-            formRepository = FormRepositoryImpl(),
         )
     }
-
 
     override fun handleEvent(it: Event) {
         this.config.onEvent?.let { it1 -> it1(it) }
@@ -116,12 +112,13 @@ internal class ContainerImpl(
     override fun createVariableForTemplate(
         data: JsonElement?,
         pageProperties: List<Property>?,
+        arguments: Any?,
     ): JsonElement {
         val userState by user.state.collectAsStateWithLifecycle()
         val userProperties = userState.templateProperties
         val formValues by formValuesFlow.collectAsStateWithLifecycle()
         val formData = formValues.toFormData()
-        return remember(this, data, pageProperties, userProperties, formData) {
+        return remember(this, data, pageProperties, userProperties, formData, arguments) {
             createVariableForTemplate(
                 data = data,
                 pageProperties = pageProperties,
@@ -134,18 +131,18 @@ internal class ContainerImpl(
     }
 
     override val formValuesFlow: StateFlow<Map<String, FormValue>> =
-        formRepository?.formValues ?: MutableStateFlow(emptyMap())
+        formRepository.formValues
 
     override fun getFormValues(): Map<String, JsonElement> {
-        return this.formRepository?.getFormData() ?: emptyMap()
+        return this.formRepository.getFormData()
     }
 
     override fun getFormValue(key: String): FormValue? {
-        return this.formRepository?.getValue(key)
+        return this.formRepository.getValue(key)
     }
 
     override fun setFormValue(key: String, value: FormValue) {
-        this.formRepository?.setValue(key, value)
+        this.formRepository.setValue(key, value)
     }
 
     override suspend fun sendHttpRequest(

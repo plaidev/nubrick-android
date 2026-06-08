@@ -271,12 +271,13 @@ private class NubrickRuntime(
         content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
         onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
     ) {
-        val embeddingContainer = remember(arguments) {
-            this.container.initWith(arguments)
+        val embeddingContainer = remember(id) {
+            this.container.makeContainer()
         }
         NubrickTheme {
             Embedding(
                 container = embeddingContainer,
+                arguments = arguments,
                 experimentId = id,
                 modifier = modifier,
                 onEvent = onEvent,
@@ -555,8 +556,8 @@ object FlutterBridge {
         } ?: return
         var width: NubrickSize by remember(data) { mutableStateOf(NubrickSize.Fill) }
         var height: NubrickSize by remember(data) { mutableStateOf(NubrickSize.Fill) }
-        val container = remember(arguments, runtime) {
-            runtime.initWith(arguments)
+        val renderContainer = remember(data, runtime) {
+            runtime.makeContainer()
         }
         val widthModifier = when (width) {
             is NubrickSize.Fixed -> Modifier.width((width as NubrickSize.Fixed).value.dp)
@@ -574,7 +575,8 @@ object FlutterBridge {
             ) {
                 Root(
                     modifier = widthModifier.then(heightModifier),
-                    container = container,
+                    container = renderContainer,
+                    arguments = arguments,
                     root = it,
                     onEvent = onEvent,
                     onNextTooltip = onNextTooltip,
