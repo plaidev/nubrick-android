@@ -9,8 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import app.nubrick.nubrick.component.provider.container.ContainerContext
 import app.nubrick.nubrick.component.provider.pageblock.PageBlockContext
-import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.schema.ApiHttpRequest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -37,10 +37,10 @@ internal object DataContext {
 
 @Composable
 internal fun rememberPageState(
-    container: Container,
     arguments: Any?,
     request: ApiHttpRequest?,
 ): DataState {
+    val container = ContainerContext.value
     val pageBlock = PageBlockContext.value
     val templateVariable = container.createVariableForTemplate(
         data = null,
@@ -103,12 +103,11 @@ internal fun NestedDataProvider(
 
 @Composable
 internal fun PageDataProvider(
-    container: Container,
     arguments: Any? = null,
     request: ApiHttpRequest?,
     content: @Composable() () -> Unit
 ) {
-    val state = rememberPageState(container, arguments, request)
+    val state = rememberPageState(arguments, request)
     CompositionLocalProvider(
         LocalData provides state
     ) {

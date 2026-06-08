@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -271,12 +272,8 @@ private class NubrickRuntime(
         content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
         onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
     ) {
-        val embeddingContainer = remember(id) {
-            this.container.makeContainer()
-        }
         NubrickTheme {
             Embedding(
-                container = embeddingContainer,
                 arguments = arguments,
                 experimentId = id,
                 modifier = modifier,
@@ -293,7 +290,6 @@ private class NubrickRuntime(
         content: @Composable (RemoteConfigLoadingState) -> Unit
     ) {
         return app.nubrick.nubrick.remoteconfig.RemoteConfigView(
-            container = this.container,
             experimentId = id,
             content = content
         )
@@ -301,7 +297,6 @@ private class NubrickRuntime(
 
     fun remoteConfig(id: String): app.nubrick.nubrick.remoteconfig.RemoteConfig {
         return app.nubrick.nubrick.remoteconfig.RemoteConfig(
-            container = this.container,
             experimentId = id,
         )
     }
@@ -551,14 +546,8 @@ object FlutterBridge {
         onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
         eventBridge: UIBlockActionBridge? = null,
     ) {
-        val runtime = NubrickSDK.run {
-            containerOrNull()
-        } ?: return
         var width: NubrickSize by remember(data) { mutableStateOf(NubrickSize.Fill) }
         var height: NubrickSize by remember(data) { mutableStateOf(NubrickSize.Fill) }
-        val renderContainer = remember(data, runtime) {
-            runtime.makeContainer()
-        }
         val widthModifier = when (width) {
             is NubrickSize.Fixed -> Modifier.width((width as NubrickSize.Fixed).value.dp)
             NubrickSize.Fill -> Modifier.fillMaxWidth()
@@ -573,21 +562,22 @@ object FlutterBridge {
                 modifier = modifier,
                 contentAlignment = Alignment.Center
             ) {
-                Root(
-                    modifier = widthModifier.then(heightModifier),
-                    container = renderContainer,
-                    arguments = arguments,
-                    root = it,
-                    onEvent = onEvent,
-                    onNextTooltip = onNextTooltip,
-                    onDismiss = { onDismiss() },
-                    eventBridge = eventBridge,
-                    onSizeChange = { newWidth, newHeight ->
-                        width = newWidth
-                        height = newHeight
-                        onSizeChange?.invoke(newWidth, newHeight)
-                    },
-                )
+                key(it.id) {
+                    Root(
+                        modifier = widthModifier.then(heightModifier),
+                        arguments = arguments,
+                        root = it,
+                        onEvent = onEvent,
+                        onNextTooltip = onNextTooltip,
+                        onDismiss = { onDismiss() },
+                        eventBridge = eventBridge,
+                        onSizeChange = { newWidth, newHeight ->
+                            width = newWidth
+                            height = newHeight
+                            onSizeChange?.invoke(newWidth, newHeight)
+                        },
+                    )
+                }
             }
         }
     }

@@ -20,8 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.nubrick.nubrick.Event
+import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.NubrickSize
-import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.NotFoundException
 import app.nubrick.nubrick.schema.UIBlock
 
@@ -34,14 +34,13 @@ sealed class EmbeddingLoadingState {
 
 @Composable
 internal fun rememberEmbeddingState(
-    container: Container,
     arguments: Any?,
     experimentId: String,
     componentId: String?,
     onEvent: ((event: Event) -> Unit)?,
     onSizeChange: (width: NubrickSize, height: NubrickSize) -> Unit
 ): EmbeddingLoadingState {
-    val currentContainer = rememberUpdatedState(container)
+    val container = NubrickSDK.containerOrNull() ?: return EmbeddingLoadingState.NotFound()
     val currentArguments = rememberUpdatedState(arguments)
     val currentOnEvent = rememberUpdatedState(onEvent)
     val currentOnSizeChange = rememberUpdatedState(onSizeChange)
@@ -54,7 +53,6 @@ internal fun rememberEmbeddingState(
                 is UIBlock.UnionUIRootBlock -> {
                     EmbeddingLoadingState.Completed {
                         Root(
-                            container = currentContainer.value,
                             arguments = currentArguments.value,
                             root = it.data,
                             modifier = Modifier
@@ -86,7 +84,6 @@ internal fun rememberEmbeddingState(
 
 @Composable
 internal fun Embedding(
-    container: Container,
     arguments: Any? = null,
     experimentId: String,
     componentId: String? = null,
@@ -98,7 +95,6 @@ internal fun Embedding(
     var width: NubrickSize by remember(experimentId, componentId) { mutableStateOf(NubrickSize.Fill) }
     var height: NubrickSize by remember(experimentId, componentId) { mutableStateOf(NubrickSize.Fill) }
     val state = rememberEmbeddingState(
-        container,
         arguments,
         experimentId,
         componentId,

@@ -42,6 +42,7 @@ import app.nubrick.nubrick.EventPropertyType
 import app.nubrick.nubrick.NubrickSize
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
+import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.component.provider.container.ContainerProvider
 import app.nubrick.nubrick.component.provider.data.PageDataProvider
 import app.nubrick.nubrick.component.provider.event.EventListenerProvider
@@ -50,7 +51,6 @@ import app.nubrick.nubrick.component.provider.pageblock.PageBlockProvider
 import app.nubrick.nubrick.component.renderer.ModalBottomSheetBackHandler
 import app.nubrick.nubrick.component.renderer.NavigationHeader
 import app.nubrick.nubrick.component.renderer.Page
-import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.schema.ModalPresentationStyle
 import app.nubrick.nubrick.schema.ModalScreenSize
 import app.nubrick.nubrick.schema.PageKind
@@ -212,7 +212,6 @@ internal class RootStateHolder(
 
 @Composable
 internal fun ModalPage(
-    container: Container,
     arguments: Any?,
     blockData: PageBlockData,
     eventBridge: UIBlockActionBridge?,
@@ -236,7 +235,7 @@ internal fun ModalPage(
     PageBlockProvider(
         blockData,
     ) {
-        PageDataProvider(container = container, arguments = arguments, request = blockData.block.data?.httpRequest) {
+        PageDataProvider(arguments = arguments, request = blockData.block.data?.httpRequest) {
             UIBlockActionBridgeCollector(
                 events = eventBridge?.events,
                 isCurrentPage = blockData.block.id == currentPageBlock?.id
@@ -250,7 +249,6 @@ internal fun ModalPage(
 @Composable
 internal fun Root(
     modifier: Modifier = Modifier.fillMaxSize(),
-    container: Container,
     arguments: Any? = null,
     root: UIRootBlock,
     embeddingVisibility: Boolean = true,
@@ -263,7 +261,8 @@ internal fun Root(
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    val currentContainer = rememberUpdatedState(container)
+    val sdkContainer = NubrickSDK.containerOrNull() ?: return
+    val rootContainer = remember { sdkContainer.makeContainer() }
     val currentOnEvent = rememberUpdatedState(onEvent)
     val currentOnNextTooltip = rememberUpdatedState(onNextTooltip)
     val currentOnDismiss = rememberUpdatedState(onDismiss)
@@ -290,7 +289,7 @@ internal fun Root(
             onTrigger = { trigger ->
                 val e = parseUIEventToEvent(trigger)
                 currentOnEvent.value(e)
-                currentContainer.value.handleEvent(e)
+                rootContainer.handleEvent(e)
             },
             onSizeChange = { width, height ->
                 currentOnSizeChange.value?.invoke(width, height)
@@ -309,7 +308,7 @@ internal fun Root(
 
             val e = parseUIEventToEvent(event)
             currentOnEvent.value(e)
-            currentContainer.value.handleEvent(e)
+            rootContainer.handleEvent(e)
         }
     }
     LaunchedEffect(modalStateHolder, listener) {
@@ -322,7 +321,7 @@ internal fun Root(
     val displayedPageBlock = rootStateHolder.displayedPageBlock.value
     val modalState = modalStateHolder.modalState
 
-    ContainerProvider(container = container) {
+    ContainerProvider(container = rootContainer) {
         EventListenerProvider(listener = listener) {
             Box(modifier) {
                 if (embeddingVisibility && displayedPageBlock != null) {
@@ -336,7 +335,6 @@ internal fun Root(
                     ) {
                         PageBlockProvider(it) {
                             PageDataProvider(
-                                container = container,
                                 arguments = arguments,
                                 request = it.block.data?.httpRequest
                             ) {
@@ -409,7 +407,6 @@ internal fun Root(
                                     isFullscreen,
                                 )
                                 ModalPage(
-                                    container = container,
                                     arguments = arguments,
                                     blockData = stack,
                                     eventBridge = eventBridge,
