@@ -112,11 +112,12 @@ class RemoteConfigVariant internal constructor(
         content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null
     ) {
         val componentId = this.get(key) ?: return
-        val embeddingContainer = remember(arguments) {
-            this.container.initWith(arguments)
+        val embeddingContainer = remember(componentId) {
+            this.container.makeContainer()
         }
         return Embedding(
             container = embeddingContainer,
+            arguments = arguments,
             experimentId = this.experimentId,
             componentId = componentId,
             onEvent = onEvent,

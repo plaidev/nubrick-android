@@ -213,6 +213,7 @@ internal class RootStateHolder(
 @Composable
 internal fun ModalPage(
     container: Container,
+    arguments: Any?,
     blockData: PageBlockData,
     eventBridge: UIBlockActionBridge?,
     currentPageBlock: UIPageBlock?,
@@ -235,7 +236,7 @@ internal fun ModalPage(
     PageBlockProvider(
         blockData,
     ) {
-        PageDataProvider(container = container, request = blockData.block.data?.httpRequest) {
+        PageDataProvider(container = container, arguments = arguments, request = blockData.block.data?.httpRequest) {
             UIBlockActionBridgeCollector(
                 events = eventBridge?.events,
                 isCurrentPage = blockData.block.id == currentPageBlock?.id
@@ -250,6 +251,7 @@ internal fun ModalPage(
 internal fun Root(
     modifier: Modifier = Modifier.fillMaxSize(),
     container: Container,
+    arguments: Any? = null,
     root: UIRootBlock,
     embeddingVisibility: Boolean = true,
     onEvent: (event: Event) -> Unit = {},
@@ -335,6 +337,7 @@ internal fun Root(
                         PageBlockProvider(it) {
                             PageDataProvider(
                                 container = container,
+                                arguments = arguments,
                                 request = it.block.data?.httpRequest
                             ) {
                                 UIBlockActionBridgeCollector(
@@ -407,6 +410,7 @@ internal fun Root(
                                 )
                                 ModalPage(
                                     container = container,
+                                    arguments = arguments,
                                     blockData = stack,
                                     eventBridge = eventBridge,
                                     currentPageBlock = currentPageBlock,
