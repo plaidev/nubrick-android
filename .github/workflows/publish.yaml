@@ -77,13 +77,13 @@ jobs:
 
           git checkout -b "$BRANCH_NAME"
 
-      - name: Update version in build.gradle.kts
+      - name: Update version in libs.versions.toml
         run: |
           VERSION_NUMBER="${TAG#v}"
-          sed -i "s|^version = \".*\"|version = \"${VERSION_NUMBER}\"|" nubrick/build.gradle.kts
+          sed -i "s|^nubrick = \".*\"|nubrick = \"${VERSION_NUMBER}\"|" gradle/libs.versions.toml
           echo "Updated version to $VERSION_NUMBER"
 
-          git add nubrick/build.gradle.kts
+          git add gradle/libs.versions.toml
           git commit -m "[bot] Release ${TAG}: update version"
 
       - name: Push release branch and create PR
