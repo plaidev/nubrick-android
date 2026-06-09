@@ -192,19 +192,19 @@ internal class TrackRepositoryImpl(
             var lastFlushTime = System.currentTimeMillis()
 
             while (isActive) {
-                val event = withTimeoutOrNull(flushIntervalMs) {
-                    eventChannel.receiveCatching().getOrNull()
+                val result = withTimeoutOrNull(flushIntervalMs) {
+                    eventChannel.receiveCatching()
                 }
 
-                if (event != null) {
-                    buffer.add(event)
-                }
-
-                if (eventChannel.isClosedForReceive) {
-                    if (buffer.isNotEmpty()) {
-                        sendBatch(buffer.toList())
+                when {
+                    result == null -> Unit
+                    result.isSuccess -> result.getOrNull()?.let { buffer.add(it) }
+                    result.isClosed -> {
+                        if (buffer.isNotEmpty()) {
+                            sendBatch(buffer.toList())
+                        }
+                        break
                     }
-                    break
                 }
 
                 val shouldFlush = buffer.size >= maxBatchSize ||
@@ -257,10 +257,10 @@ internal class TrackRepositoryImpl(
     private fun sendCrashToBackend(crashEvent: TrackCrashEvent) {
         val causedByNubrick = crashEvent.exceptions.any { exception ->
             exception.callStacks.orEmpty().any { frame ->
-                val className = frame.className ?: return@any false
+                val className = frame.className.orEmpty()
                 className.contains("app.nubrick.nubrick") ||
-                className.contains("app.nubrick.flutter.nubrick_flutter") ||
-                className.contains("package:nubrick_flutter")
+                    className.contains("app.nubrick.flutter.nubrick_flutter") ||
+                    className.contains("package:nubrick_flutter")
             }
         }
 
@@ -292,7 +292,7 @@ internal class TrackRepositoryImpl(
             return
         }
 
-        sendCrashToBackend(TrackCrashEvent(exceptions = exceptionsList))
+        sendCrashToBackend(TrackCrashEvent(exceptions = exceptionsList, platform = "android"))
     }
 
     override fun storeNativeCrash(throwable: Throwable) {
