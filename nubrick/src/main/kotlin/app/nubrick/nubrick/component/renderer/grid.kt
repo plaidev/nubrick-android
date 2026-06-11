@@ -41,6 +41,8 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
         if (data is JsonArray && children.isNotEmpty()) {
             arrayData = data.jsonArray
             children = arrayData.map { children[0] }
+        } else {
+            children = emptyList()
         }
     }
 
