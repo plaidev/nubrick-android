@@ -42,7 +42,7 @@ internal fun rememberPageState(
 ): DataState {
     val container = ContainerContext.value
     val pageBlock = PageBlockContext.value
-    val templateVariable = container.createVariableForTemplate(
+    val templateVariable = container.rememberVariableForTemplate(
         data = null,
         pageProperties = pageBlock.toProperties(),
         arguments = arguments,
@@ -62,6 +62,7 @@ internal fun rememberPageState(
             loading = false
             return@LaunchedEffect
         }
+        loading = true
         container.sendCompiledHttpRequest(compiledRequest).onSuccess {
             responseData = it
             loading = false

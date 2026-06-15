@@ -9,7 +9,13 @@ class ExampleApp : Application() {
         super.onCreate()
         NubrickSDK.initialize(
             context = this,
-            config = Config(projectId = "cgv3p3223akg00fod19g")
+            config = Config(projectId = "p_d357ola9io6g00f6evag")
         )
+        NubrickSDK.setUserId("user-42")
+        NubrickSDK.setUserProperties(mapOf(
+            "name" to "Victor",
+            "plan" to "pro",
+            "locale" to "en",
+        ))
     }
 }

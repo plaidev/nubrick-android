@@ -18,7 +18,7 @@ internal fun TextInput(block: UITextInputBlock, modifier: Modifier = Modifier) {
     val container = ContainerContext.value
     var value by remember {
         var value = block.data?.value ?: ""
-        val key = block?.data?.key
+        val key = block.data?.key
         if (key != null) {
             when (val v = container.getFormValue(key)) {
                 is FormValue.Str -> {
@@ -47,7 +47,7 @@ internal fun TextInput(block: UITextInputBlock, modifier: Modifier = Modifier) {
         onValueChange = {
             value = it
 
-            val key = block?.data?.key
+            val key = block.data?.key
             if (key != null) {
                 container.setFormValue(key, FormValue.Str(it))
             }

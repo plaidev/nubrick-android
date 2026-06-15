@@ -23,6 +23,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +45,7 @@ import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.component.provider.container.ContainerProvider
+import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.data.PageDataProvider
 import app.nubrick.nubrick.component.provider.event.EventListenerProvider
 import app.nubrick.nubrick.component.provider.pageblock.PageBlockData
@@ -63,11 +65,11 @@ import app.nubrick.nubrick.template.compile
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
-private fun parseUIEventToEvent(event: UIBlockAction): Event {
+private fun parseActionToEvent(action: UIBlockAction): Event {
     return Event(
-        name = event.eventName,
-        deepLink = event.deepLink,
-        payload = event.payload?.map { p ->
+        name = action.eventName,
+        deepLink = action.deepLink,
+        payload = action.payload?.map { p ->
             EventProperty(
                 name = p.name ?: "",
                 value = p.value ?: "",
@@ -82,6 +84,25 @@ private fun parseUIEventToEvent(event: UIBlockAction): Event {
     )
 }
 
+private fun compileUIBlockAction(action: UIBlockAction, data: JsonElement): UIBlockAction {
+    return UIBlockAction(
+        eventName = action.eventName?.let { compile(it, data) },
+        name = action.name?.let { compile(it, data) },
+        destinationPageId = action.destinationPageId,
+        deepLink = action.deepLink?.let { compile(it, data) },
+        payload = action.payload?.map { prop ->
+            Property(
+                name = prop.name ?: "",
+                value = prop.value?.let { compile(it, data) } ?: "",
+                ptype = prop.ptype ?: PropertyType.STRING
+            )
+        },
+        requiredFields = action.requiredFields,
+        httpRequest = action.httpRequest,
+        httpResponseAssertion = action.httpResponseAssertion,
+    )
+}
+
 internal data class WebviewData(
     val url: String,
     val trigger: UIBlockAction?,
@@ -93,7 +114,7 @@ internal class RootStateHolder(
     private val onNextTooltip: ((pageId: String) -> Unit) = {},
     private val onDismiss: ((root: UIRootBlock) -> Unit) = {},
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
-    private val onTrigger: ((trigger: UIBlockAction) -> Unit) = {},
+    private val onTrigger: ((trigger: UIBlockAction, data: JsonElement) -> Unit) = { _, _ -> },
     private val onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
 ) {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
@@ -104,7 +125,7 @@ internal class RootStateHolder(
     val currentPageBlock = mutableStateOf<UIPageBlock?>(null)
     var currentTooltipAnchorId = mutableStateOf("")
 
-    fun initialize() {
+    fun initialize(data: JsonElement) {
         val trigger = pages.firstOrNull {
             it.data?.kind == PageKind.TRIGGER
         } ?: run {
@@ -117,29 +138,29 @@ internal class RootStateHolder(
           onDismiss(root)
           return
         }
-        onTrigger(onTrigger)
+        onTrigger(onTrigger, data)
 
         val destId = onTrigger.destinationPageId ?: ""
         if (destId.isNotEmpty()) {
-            this.render(destId)
+            this.render(destId, rootData = data)
         } else {
           this.dismiss()
         }
     }
 
-    fun handleNavigate(event: UIBlockAction, data: JsonElement) {
-        val deepLink = event.deepLink?.let { compile(it, data) } ?: ""
+    fun handleNavigate(action: UIBlockAction, rootData: JsonElement) {
+        val deepLink = action.deepLink ?: ""
         if (deepLink.isNotEmpty()) {
             onOpenDeepLink(deepLink)
         }
 
-        val destId = event.destinationPageId ?: ""
+        val destId = action.destinationPageId ?: ""
         if (destId.isNotEmpty()) {
-            this.render(destId)
+            this.render(destId, rootData = rootData)
         }
     }
 
-    private fun render(destId: String, properties: List<Property>? = null) {
+    private fun render(destId: String, properties: List<Property>? = null, rootData: JsonElement = JsonNull) {
         val destBlock = this.pages.firstOrNull {
             it.id == destId
         }
@@ -156,8 +177,8 @@ internal class RootStateHolder(
 
         if (destBlock.data?.kind == PageKind.WEBVIEW_MODAL) {
             this.webviewData.value = WebviewData(
-                url = destBlock.data.webviewUrl ?: "",
-                trigger = destBlock.data.triggerSetting?.onTrigger
+                url = destBlock.data.webviewUrl?.let { compile(it, rootData) } ?: "",
+                trigger = destBlock.data.triggerSetting?.onTrigger,
             )
             return
         }
@@ -216,6 +237,7 @@ internal fun ModalPage(
     blockData: PageBlockData,
     eventBridge: UIBlockActionBridge?,
     currentPageBlock: UIPageBlock?,
+    onDataChange: (JsonElement) -> Unit = {},
     modifier: Modifier = Modifier,
     isFullscreen: Boolean,
 ) {
@@ -236,6 +258,10 @@ internal fun ModalPage(
         blockData,
     ) {
         PageDataProvider(arguments = arguments, request = blockData.block.data?.httpRequest) {
+            val dataState = DataContext.state
+            LaunchedEffect(dataState.data) {
+                onDataChange(dataState.data)
+            }
             UIBlockActionBridgeCollector(
                 events = eventBridge?.events,
                 isCurrentPage = blockData.block.id == currentPageBlock?.id
@@ -286,8 +312,9 @@ internal fun Root(
                 } catch (_: Throwable) {
                 }
             },
-            onTrigger = { trigger ->
-                val e = parseUIEventToEvent(trigger)
+            onTrigger = { trigger, data ->
+                val compiledTrigger = compileUIBlockAction(trigger, data)
+                val e = parseActionToEvent(compiledTrigger)
                 currentOnEvent.value(e)
                 rootContainer.handleEvent(e)
             },
@@ -296,17 +323,24 @@ internal fun Root(
             },
         )
     }
+    val rootData = rootContainer.rememberVariableForTemplate(
+        data = null,
+        pageProperties = null,
+        arguments = arguments,
+    )
+    val latestRootData = rememberUpdatedState(rootData)
     LaunchedEffect(rootStateHolder) {
-        rootStateHolder.initialize()
+        rootStateHolder.initialize(rootData)
     }
     val bottomSheetProps = remember {
         ModalBottomSheetDefaults.properties(shouldDismissOnBackPress = false)
     }
     val listener = remember(rootStateHolder) {
-        { event: UIBlockAction, data: JsonElement ->
-            rootStateHolder.handleNavigate(event, data)
+        { action: UIBlockAction, data: JsonElement ->
+            val compiledAction = compileUIBlockAction(action, data)
+            rootStateHolder.handleNavigate(compiledAction, latestRootData.value)
 
-            val e = parseUIEventToEvent(event)
+            val e = parseActionToEvent(compiledAction)
             currentOnEvent.value(e)
             rootContainer.handleEvent(e)
         }
@@ -320,6 +354,17 @@ internal fun Root(
     val currentPageBlock = rootStateHolder.currentPageBlock.value
     val displayedPageBlock = rootStateHolder.displayedPageBlock.value
     val modalState = modalStateHolder.modalState
+    val modalDataByIndex = remember(root) { mutableStateMapOf<Int, JsonElement>() }
+    fun currentModalData(): JsonElement {
+        return modalDataByIndex[modalStateHolder.modalState.displayedModalIndex] ?: JsonNull
+    }
+    LaunchedEffect(modalState.modalStack.size) {
+        if (modalState.modalStack.isEmpty()) {
+            modalDataByIndex.clear()
+        } else {
+            modalDataByIndex.keys.removeAll { it >= modalState.modalStack.size }
+        }
+    }
 
     ContainerProvider(container = rootContainer) {
         EventListenerProvider(listener = listener) {
@@ -350,7 +395,7 @@ internal fun Root(
 
                 if (modalState.modalVisibility) {
                     BackHandler(true) {
-                        modalStateHolder.back(JsonNull)
+                        modalStateHolder.back(currentModalData())
                     }
                     val isLarge =
                         modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
@@ -370,7 +415,7 @@ internal fun Root(
                         tonalElevation = 0.dp, // to have the right background color as set in theme
                     ) {
                         ModalBottomSheetBackHandler {
-                            modalStateHolder.back(JsonNull)
+                            modalStateHolder.back(currentModalData())
                         }
                         Column(
                             modifier = if (modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN) {
@@ -403,7 +448,7 @@ internal fun Root(
                                     it,
                                     stack.block,
                                     onClose = { modalStateHolder.close() },
-                                    onBack = { modalStateHolder.back(JsonNull) },
+                                    onBack = { modalStateHolder.back(currentModalData()) },
                                     isFullscreen,
                                 )
                                 ModalPage(
@@ -411,6 +456,7 @@ internal fun Root(
                                     blockData = stack,
                                     eventBridge = eventBridge,
                                     currentPageBlock = currentPageBlock,
+                                    onDataChange = { data -> modalDataByIndex[it] = data },
                                     isFullscreen = isFullscreen,
                                 )
                             }
@@ -430,7 +476,7 @@ internal fun Root(
                         } catch (_: Throwable) {
                             // No browser available — fire trigger immediately
                             webviewData.trigger?.let { trigger ->
-                                listener(trigger, JsonNull)
+                                listener(trigger, latestRootData.value)
                             }
                             rootStateHolder.handleWebviewDismiss()
                         }
@@ -443,7 +489,7 @@ internal fun Root(
                         val observer = LifecycleEventObserver { _, event ->
                             if (event == Lifecycle.Event.ON_RESUME) {
                                 webviewData?.trigger?.let { trigger ->
-                                    listener(trigger, JsonNull)
+                                    listener(trigger, latestRootData.value)
                                 }
                                 rootStateHolder.handleWebviewDismiss()
                                 pendingWebviewReturn.value = false

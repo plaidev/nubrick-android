@@ -21,6 +21,7 @@ import app.nubrick.nubrick.schema.FontWeight
 import app.nubrick.nubrick.schema.TextAlign
 import app.nubrick.nubrick.schema.UITextBlock
 import app.nubrick.nubrick.template.compile
+import app.nubrick.nubrick.template.hasDataPlaceholder
 import app.nubrick.nubrick.template.hasPlaceholder
 import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
 import androidx.compose.material3.MaterialTheme
@@ -79,11 +80,11 @@ internal fun parseTextAlign(alignment: TextAlign?): PrimitiveTextAlign {
 internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
     val data = DataContext.state
     val loading = data.loading
-    var value = block.data?.value ?: ""
-    var skeleton = false
-    if (hasPlaceholder(block.data?.value ?: "")) {
-        skeleton = loading
-        value = if (loading) block.data?.value ?: "" else compile(block.data?.value ?: "", data.data)
+    val rawValue = block.data?.value ?: ""
+    val skeleton = hasDataPlaceholder(rawValue) && loading
+    var value = rawValue
+    if (hasPlaceholder(rawValue) && !skeleton) {
+        value = compile(rawValue, data.data)
     }
     val containerModifier = modifier
         .eventDispatcher(block.data?.onClick)

@@ -49,11 +49,8 @@ internal data class EventListenerState(
 internal fun rememberEventListenerState(
     listener: (event: UIBlockAction, data: JsonElement) -> Unit
 ): EventListenerState {
-    val state: EventListenerState by remember {
-        mutableStateOf(EventListenerState(listener))
-    }
-    return remember(state) {
-        state
+    return remember(listener) {
+        EventListenerState(listener)
     }
 }
 

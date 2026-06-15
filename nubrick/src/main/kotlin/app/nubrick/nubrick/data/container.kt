@@ -49,7 +49,7 @@ internal interface Container {
     fun handleEvent(it: Event) {}
 
     @Composable
-    fun createVariableForTemplate(
+    fun rememberVariableForTemplate(
         data: JsonElement?,
         pageProperties: List<Property>?,
         arguments: Any?,
@@ -109,7 +109,7 @@ internal class ContainerImpl(
     }
 
     @Composable
-    override fun createVariableForTemplate(
+    override fun rememberVariableForTemplate(
         data: JsonElement?,
         pageProperties: List<Property>?,
         arguments: Any?,
