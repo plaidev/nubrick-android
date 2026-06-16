@@ -14,6 +14,7 @@ import app.nubrick.nubrick.component.provider.event.skeleton
 import app.nubrick.nubrick.schema.ImageContentMode
 import app.nubrick.nubrick.schema.UIImageBlock
 import app.nubrick.nubrick.template.compile
+import app.nubrick.nubrick.template.hasDataPlaceholder
 import app.nubrick.nubrick.template.hasPlaceholder
 import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
 
@@ -48,11 +49,11 @@ internal fun parseContentModeToContentScale(contentMode: ImageContentMode?): Con
 internal fun Image(block: UIImageBlock, modifier: Modifier = Modifier) {
     val data = DataContext.state
     val loading = data.loading
-    var src = block.data?.src ?: ""
-    var skeleton = false
-    if (hasPlaceholder(block.data?.src ?: "")) {
-        skeleton = loading
-        src = if (loading) block.data?.src ?: "" else compile(block.data?.src ?: "", data.data)
+    val rawSrc = block.data?.src ?: ""
+    val skeleton = hasDataPlaceholder(rawSrc) && loading
+    var src = rawSrc
+    if (hasPlaceholder(rawSrc) && !skeleton) {
+        src = compile(rawSrc, data.data)
     }
 
     val modifier = modifier

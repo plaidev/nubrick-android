@@ -39,6 +39,14 @@ class CompilerTest {
     }
 
     @Test
+    fun shouldHasDataPlaceholderWork() {
+        assertEquals(true, hasDataPlaceholder("hello {{data.id}}"))
+        assertEquals(true, hasDataPlaceholder("hello {{ data.id | json }}"))
+        assertEquals(false, hasDataPlaceholder("hello {{user.data.id}}"))
+        assertEquals(false, hasDataPlaceholder("hello {{metadata.id}}"))
+    }
+
+    @Test
     fun shouldGetVariableByPath() {
         assertEquals(JsonPrimitive(this.userId), variableByPath("user.id", this.variable))
         assertEquals(null, variableByPath("user.xxx.yyy", this.variable))

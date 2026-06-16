@@ -33,6 +33,16 @@ internal fun hasPlaceholder(value: String): Boolean {
     return placeholderRegex.containsMatchIn(value)
 }
 
+internal fun hasDataPlaceholder(value: String): Boolean {
+    return placeholderRegex.findAll(value).any { match ->
+        val path = match.value
+            .removeSurrounding("{{", "}}")
+            .split("|")[0]
+            .trim()
+        path == "data" || path.startsWith("data.")
+    }
+}
+
 internal fun variableByPath(path: String, variable: JsonElement?): JsonElement? {
     val keys = path.split(".")
     if (keys.isEmpty()) return null
