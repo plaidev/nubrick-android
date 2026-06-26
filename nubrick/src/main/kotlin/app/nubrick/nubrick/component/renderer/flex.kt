@@ -45,7 +45,7 @@ import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.schema.UIFlexContainerBlock
 import app.nubrick.nubrick.template.compile
 import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
-import app.nubrick.nubrick.schema.Color as SchemaColor
+import app.nubrick.nubrick.schema.ColorValue
 import androidx.core.math.MathUtils
 
 private fun calcWeight(frameData: FrameData?, flexDirection: FlexDirection): Float? {
@@ -305,18 +305,32 @@ internal fun Modifier.flexOverflow(direction: FlexDirection, overflow: Overflow?
     }
 }
 
-internal fun parseColor(color: SchemaColor?): Color {
+private fun extractRgba(value: ColorValue): Array<Float?> = when (value) {
+    is ColorValue.UnionColor -> arrayOf(value.data.red, value.data.green, value.data.blue, value.data.alpha)
+    is ColorValue.UnionLinearGradient -> arrayOf(value.data.red, value.data.green, value.data.blue, value.data.alpha)
+    else -> arrayOf(null, null, null, null)
+}
+
+internal fun parseColor(color: ColorValue?): Color {
+    val (r, g, b, a) = color?.let { extractRgba(it) } ?: arrayOf<Float?>(null, null, null, null)
     return Color(
-        red = MathUtils.clamp(color?.red ?: 0f, 0f, 1f),
-        green = MathUtils.clamp(color?.green ?: 0f, 0f, 1f),
-        blue = MathUtils.clamp(color?.blue ?: 0f, 0f, 1f),
-        alpha = MathUtils.clamp(color?.alpha ?: 0f, 0f, 1f),
+        red = MathUtils.clamp(r ?: 0f, 0f, 1f),
+        green = MathUtils.clamp(g ?: 0f, 0f, 1f),
+        blue = MathUtils.clamp(b ?: 0f, 0f, 1f),
+        alpha = MathUtils.clamp(a ?: 0f, 0f, 1f),
     )
 }
 
-internal fun parseColorForText(color: SchemaColor?): Color? {
-    if (color?.red == null) return null
-    return parseColor(color)
+internal fun parseColorForText(color: ColorValue?): Color? {
+    if (color == null) return null
+    val (r, g, b, a) = extractRgba(color)
+    if (r == null) return null
+    return Color(
+        red = MathUtils.clamp(r, 0f, 1f),
+        green = MathUtils.clamp(g ?: 0f, 0f, 1f),
+        blue = MathUtils.clamp(b ?: 0f, 0f, 1f),
+        alpha = MathUtils.clamp(a ?: 0f, 0f, 1f),
+    )
 }
 
 internal fun parseHorizontalAlignItems(alignItems: AlignItems?): Alignment.Horizontal {
