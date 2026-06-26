@@ -460,7 +460,7 @@ internal class ApiHttpResponseAssertion (
 }
 
 internal class BoxShadow (
-	val color: Color? = null,
+	val color: ColorValue? = null,
 	val offsetX: Int? = null,
 	val offsetY: Int? = null,
 	val radius: Int? = null,
@@ -475,7 +475,7 @@ internal class BoxShadow (
 			}
 
 			return BoxShadow(
-				color = Color.decode(element.jsonObject["color"]),
+				color = ColorValue.decode(element.jsonObject["color"]),
 				offsetX = IntDecoder.decode(element.jsonObject["offsetX"]),
 				offsetY = IntDecoder.decode(element.jsonObject["offsetY"]),
 				radius = IntDecoder.decode(element.jsonObject["radius"]),
@@ -490,7 +490,7 @@ internal class BoxShadow (
 			val map = mutableMapOf<String, JsonElement>()
 			map["__typename"] = JsonPrimitive("BoxShadow")
 			data.color?.let { value ->
-				Color.encode(value)?.let { map["color"] = it }
+				ColorValue.encode(value)?.let { map["color"] = it }
 			}
 			data.offsetX?.let { value ->
 				IntEncoder.encode(value)?.let { map["offsetX"] = it }
@@ -515,8 +515,8 @@ internal enum class BuiltinUserProperty {
 	currentTime,
 	firstBootTime,
 	lastBootTime,
-	retentionPeriod,
 	bootingTime,
+	retentionPeriod,
 	sdkVersion,
 	osVersion,
 	osName,
@@ -554,8 +554,8 @@ internal enum class BuiltinUserProperty {
 				"currentTime" -> currentTime
 				"firstBootTime" -> firstBootTime
 				"lastBootTime" -> lastBootTime
-				"retentionPeriod" -> retentionPeriod
 				"bootingTime" -> bootingTime
+				"retentionPeriod" -> retentionPeriod
 				"sdkVersion" -> sdkVersion
 				"osVersion" -> osVersion
 				"osName" -> osName
@@ -585,8 +585,8 @@ internal enum class BuiltinUserProperty {
 				currentTime -> JsonPrimitive("currentTime")
 				firstBootTime -> JsonPrimitive("firstBootTime")
 				lastBootTime -> JsonPrimitive("lastBootTime")
-				retentionPeriod -> JsonPrimitive("retentionPeriod")
 				bootingTime -> JsonPrimitive("bootingTime")
+				retentionPeriod -> JsonPrimitive("retentionPeriod")
 				sdkVersion -> JsonPrimitive("sdkVersion")
 				osVersion -> JsonPrimitive("osVersion")
 				osName -> JsonPrimitive("osName")
@@ -697,6 +697,67 @@ internal class Color (
 		}
 	}
 }
+
+internal sealed class ColorValue {
+	class UnionColor(var data: Color): ColorValue()
+	class UnionLinearGradient(var data: LinearGradient): ColorValue()
+
+	companion object {
+		fun decode(element: JsonElement?): ColorValue? {
+			if (element == null) {
+				return null
+			}
+			if (element is JsonNull) {
+				return null
+			}
+			if (element !is JsonObject) {
+				return null
+			}
+			val typename = element.jsonObject["__typename"] ?: return null
+			if (typename !is JsonPrimitive) {
+				return null
+			}
+			if (element is JsonNull) {
+				return null
+			}
+
+			return when (typename.jsonPrimitive.content) {
+				"Color" -> Color.decode(element)?.let { UnionColor(it) }
+				"LinearGradient" -> LinearGradient.decode(element)?.let { UnionLinearGradient(it) }
+				else -> null
+			}
+		}
+
+		fun encode(data: ColorValue?): JsonElement? {
+			if (data == null) {
+				return JsonNull
+			}
+
+			val map = mutableMapOf<String, JsonElement>()
+
+			when (data) {
+				is UnionColor -> {
+					Color.encode(data.data)?.let {
+						if (it is JsonObject) {
+							map.putAll(it.jsonObject)
+						}
+					}
+				}
+				is UnionLinearGradient -> {
+					LinearGradient.encode(data.data)?.let {
+						if (it is JsonObject) {
+							map.putAll(it.jsonObject)
+						}
+					}
+				}
+				else -> return JsonNull
+			}
+
+			return JsonObject(map)
+		}
+	}
+}
+
 
 internal enum class ConditionOperator {
 	Regex,
@@ -1233,8 +1294,8 @@ internal class FrameData (
 	val borderBottomRightRadius: Int? = null,
 	val borderBottomLeftRadius: Int? = null,
 	val borderWidth: Int? = null,
-	val borderColor: Color? = null,
-	val background: Color? = null,
+	val borderColor: ColorValue? = null,
+	val background: ColorValue? = null,
 	val backgroundSrc: String? = null,
 	val shadow: BoxShadow? = null,
 ) {
@@ -1260,8 +1321,8 @@ internal class FrameData (
 				borderBottomRightRadius = IntDecoder.decode(element.jsonObject["borderBottomRightRadius"]),
 				borderBottomLeftRadius = IntDecoder.decode(element.jsonObject["borderBottomLeftRadius"]),
 				borderWidth = IntDecoder.decode(element.jsonObject["borderWidth"]),
-				borderColor = Color.decode(element.jsonObject["borderColor"]),
-				background = Color.decode(element.jsonObject["background"]),
+				borderColor = ColorValue.decode(element.jsonObject["borderColor"]),
+				background = ColorValue.decode(element.jsonObject["background"]),
 				backgroundSrc = StringDecoder.decode(element.jsonObject["backgroundSrc"]),
 				shadow = BoxShadow.decode(element.jsonObject["shadow"]),
 			)
@@ -1311,10 +1372,10 @@ internal class FrameData (
 				IntEncoder.encode(value)?.let { map["borderWidth"] = it }
 			}
 			data.borderColor?.let { value ->
-				Color.encode(value)?.let { map["borderColor"] = it }
+				ColorValue.encode(value)?.let { map["borderColor"] = it }
 			}
 			data.background?.let { value ->
-				Color.encode(value)?.let { map["background"] = it }
+				ColorValue.encode(value)?.let { map["background"] = it }
 			}
 			data.backgroundSrc?.let { value ->
 				StringEncoder.encode(value)?.let { map["backgroundSrc"] = it }
@@ -1376,6 +1437,44 @@ internal enum class FrequencyUnit {
 	}
 }
 
+
+internal class GradientStop (
+	val color: Color? = null,
+	val position: Float? = null,
+) {
+	companion object {
+		fun decode(element: JsonElement?): GradientStop? {
+			if (element == null) {
+				return null
+			}
+			if (element !is JsonObject) {
+				return null
+			}
+
+			return GradientStop(
+				color = Color.decode(element.jsonObject["color"]),
+				position = FloatDecoder.decode(element.jsonObject["position"]),
+			)
+		}
+
+		fun encode(data: GradientStop?): JsonElement? {
+			if (data == null) {
+				return JsonNull
+			}
+
+			val map = mutableMapOf<String, JsonElement>()
+			map["__typename"] = JsonPrimitive("GradientStop")
+			data.color?.let { value ->
+				Color.encode(value)?.let { map["color"] = it }
+			}
+			data.position?.let { value ->
+				FloatEncoder.encode(value)?.let { map["position"] = it }
+			}
+
+			return JsonObject(map)
+		}
+	}
+}
 
 internal enum class ImageContentMode {
 	FIT,
@@ -1463,6 +1562,68 @@ internal enum class JustifyContent {
 }
 
 
+internal class LinearGradient (
+	val red: Float? = null,
+	val green: Float? = null,
+	val blue: Float? = null,
+	val alpha: Float? = null,
+	val angle: Float? = null,
+	val stops: List<GradientStop>? = null,
+) {
+	companion object {
+		fun decode(element: JsonElement?): LinearGradient? {
+			if (element == null) {
+				return null
+			}
+			if (element !is JsonObject) {
+				return null
+			}
+
+			return LinearGradient(
+				red = FloatDecoder.decode(element.jsonObject["red"]),
+				green = FloatDecoder.decode(element.jsonObject["green"]),
+				blue = FloatDecoder.decode(element.jsonObject["blue"]),
+				alpha = FloatDecoder.decode(element.jsonObject["alpha"]),
+				angle = FloatDecoder.decode(element.jsonObject["angle"]),
+				stops = ListDecoder.decode(element.jsonObject["stops"]) { element: JsonElement? ->
+				GradientStop.decode(element)
+			},
+			)
+		}
+
+		fun encode(data: LinearGradient?): JsonElement? {
+			if (data == null) {
+				return JsonNull
+			}
+
+			val map = mutableMapOf<String, JsonElement>()
+			map["__typename"] = JsonPrimitive("LinearGradient")
+			data.red?.let { value ->
+				FloatEncoder.encode(value)?.let { map["red"] = it }
+			}
+			data.green?.let { value ->
+				FloatEncoder.encode(value)?.let { map["green"] = it }
+			}
+			data.blue?.let { value ->
+				FloatEncoder.encode(value)?.let { map["blue"] = it }
+			}
+			data.alpha?.let { value ->
+				FloatEncoder.encode(value)?.let { map["alpha"] = it }
+			}
+			data.angle?.let { value ->
+				FloatEncoder.encode(value)?.let { map["angle"] = it }
+			}
+			data.stops?.let { value ->
+				ListEncoder.encode(value) { item ->
+					GradientStop.encode(item)
+				}?.let { map["stops"] = it }
+			}
+
+			return JsonObject(map)
+		}
+	}
+}
+
 internal enum class ModalPresentationStyle {
 	DEPENDS_ON_CONTEXT_OR_FULL_SCREEN,
 	DEPENDS_ON_CONTEXT_OR_PAGE_SHEET,
@@ -1548,7 +1709,7 @@ internal enum class ModalScreenSize {
 
 internal class NavigationBackButton (
 	val title: String? = null,
-	val color: Color? = null,
+	val color: ColorValue? = null,
 	val visible: Boolean? = null,
 ) {
 	companion object {
@@ -1562,7 +1723,7 @@ internal class NavigationBackButton (
 
 			return NavigationBackButton(
 				title = StringDecoder.decode(element.jsonObject["title"]),
-				color = Color.decode(element.jsonObject["color"]),
+				color = ColorValue.decode(element.jsonObject["color"]),
 				visible = BooleanDecoder.decode(element.jsonObject["visible"]),
 			)
 		}
@@ -1578,7 +1739,7 @@ internal class NavigationBackButton (
 				StringEncoder.encode(value)?.let { map["title"] = it }
 			}
 			data.color?.let { value ->
-				Color.encode(value)?.let { map["color"] = it }
+				ColorValue.encode(value)?.let { map["color"] = it }
 			}
 			data.visible?.let { value ->
 				BooleanEncoder.encode(value)?.let { map["visible"] = it }
@@ -2646,7 +2807,7 @@ internal class UIMultiSelectInputBlockData (
 	val value: List<String>? = null,
 	val placeholder: String? = null,
 	val size: Int? = null,
-	val color: Color? = null,
+	val color: ColorValue? = null,
 	val design: FontDesign? = null,
 	val weight: FontWeight? = null,
 	val textAlign: TextAlign? = null,
@@ -2671,7 +2832,7 @@ internal class UIMultiSelectInputBlockData (
 			},
 				placeholder = StringDecoder.decode(element.jsonObject["placeholder"]),
 				size = IntDecoder.decode(element.jsonObject["size"]),
-				color = Color.decode(element.jsonObject["color"]),
+				color = ColorValue.decode(element.jsonObject["color"]),
 				design = FontDesign.decode(element.jsonObject["design"]),
 				weight = FontWeight.decode(element.jsonObject["weight"]),
 				textAlign = TextAlign.decode(element.jsonObject["textAlign"]),
@@ -2706,7 +2867,7 @@ internal class UIMultiSelectInputBlockData (
 				IntEncoder.encode(value)?.let { map["size"] = it }
 			}
 			data.color?.let { value ->
-				Color.encode(value)?.let { map["color"] = it }
+				ColorValue.encode(value)?.let { map["color"] = it }
 			}
 			data.design?.let { value ->
 				FontDesign.encode(value)?.let { map["design"] = it }
@@ -3053,7 +3214,7 @@ internal class UISelectInputBlockData (
 	val value: String? = null,
 	val placeholder: String? = null,
 	val size: Int? = null,
-	val color: Color? = null,
+	val color: ColorValue? = null,
 	val design: FontDesign? = null,
 	val weight: FontWeight? = null,
 	val textAlign: TextAlign? = null,
@@ -3076,7 +3237,7 @@ internal class UISelectInputBlockData (
 				value = StringDecoder.decode(element.jsonObject["value"]),
 				placeholder = StringDecoder.decode(element.jsonObject["placeholder"]),
 				size = IntDecoder.decode(element.jsonObject["size"]),
-				color = Color.decode(element.jsonObject["color"]),
+				color = ColorValue.decode(element.jsonObject["color"]),
 				design = FontDesign.decode(element.jsonObject["design"]),
 				weight = FontWeight.decode(element.jsonObject["weight"]),
 				textAlign = TextAlign.decode(element.jsonObject["textAlign"]),
@@ -3109,7 +3270,7 @@ internal class UISelectInputBlockData (
 				IntEncoder.encode(value)?.let { map["size"] = it }
 			}
 			data.color?.let { value ->
-				Color.encode(value)?.let { map["color"] = it }
+				ColorValue.encode(value)?.let { map["color"] = it }
 			}
 			data.design?.let { value ->
 				FontDesign.encode(value)?.let { map["design"] = it }
@@ -3208,7 +3369,7 @@ internal class UISwitchInputBlock (
 internal class UISwitchInputBlockData (
 	val key: String? = null,
 	val value: Boolean? = null,
-	val checkedColor: Color? = null,
+	val checkedColor: ColorValue? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UISwitchInputBlockData? {
@@ -3222,7 +3383,7 @@ internal class UISwitchInputBlockData (
 			return UISwitchInputBlockData(
 				key = StringDecoder.decode(element.jsonObject["key"]),
 				value = BooleanDecoder.decode(element.jsonObject["value"]),
-				checkedColor = Color.decode(element.jsonObject["checkedColor"]),
+				checkedColor = ColorValue.decode(element.jsonObject["checkedColor"]),
 			)
 		}
 
@@ -3240,7 +3401,7 @@ internal class UISwitchInputBlockData (
 				BooleanEncoder.encode(value)?.let { map["value"] = it }
 			}
 			data.checkedColor?.let { value ->
-				Color.encode(value)?.let { map["checkedColor"] = it }
+				ColorValue.encode(value)?.let { map["checkedColor"] = it }
 			}
 
 			return JsonObject(map)
@@ -3289,7 +3450,7 @@ internal class UITextBlock (
 internal class UITextBlockData (
 	val value: String? = null,
 	val size: Int? = null,
-	val color: Color? = null,
+	val color: ColorValue? = null,
 	val design: FontDesign? = null,
 	val weight: FontWeight? = null,
 	val maxLines: Int? = null,
@@ -3308,7 +3469,7 @@ internal class UITextBlockData (
 			return UITextBlockData(
 				value = StringDecoder.decode(element.jsonObject["value"]),
 				size = IntDecoder.decode(element.jsonObject["size"]),
-				color = Color.decode(element.jsonObject["color"]),
+				color = ColorValue.decode(element.jsonObject["color"]),
 				design = FontDesign.decode(element.jsonObject["design"]),
 				weight = FontWeight.decode(element.jsonObject["weight"]),
 				maxLines = IntDecoder.decode(element.jsonObject["maxLines"]),
@@ -3331,7 +3492,7 @@ internal class UITextBlockData (
 				IntEncoder.encode(value)?.let { map["size"] = it }
 			}
 			data.color?.let { value ->
-				Color.encode(value)?.let { map["color"] = it }
+				ColorValue.encode(value)?.let { map["color"] = it }
 			}
 			data.design?.let { value ->
 				FontDesign.encode(value)?.let { map["design"] = it }
@@ -3402,7 +3563,7 @@ internal class UITextInputBlockData (
 	val secure: Boolean? = null,
 	val autocorrect: Boolean? = null,
 	val size: Int? = null,
-	val color: Color? = null,
+	val color: ColorValue? = null,
 	val design: FontDesign? = null,
 	val weight: FontWeight? = null,
 	val textAlign: TextAlign? = null,
@@ -3427,7 +3588,7 @@ internal class UITextInputBlockData (
 				secure = BooleanDecoder.decode(element.jsonObject["secure"]),
 				autocorrect = BooleanDecoder.decode(element.jsonObject["autocorrect"]),
 				size = IntDecoder.decode(element.jsonObject["size"]),
-				color = Color.decode(element.jsonObject["color"]),
+				color = ColorValue.decode(element.jsonObject["color"]),
 				design = FontDesign.decode(element.jsonObject["design"]),
 				weight = FontWeight.decode(element.jsonObject["weight"]),
 				textAlign = TextAlign.decode(element.jsonObject["textAlign"]),
@@ -3470,7 +3631,7 @@ internal class UITextInputBlockData (
 				IntEncoder.encode(value)?.let { map["size"] = it }
 			}
 			data.color?.let { value ->
-				Color.encode(value)?.let { map["color"] = it }
+				ColorValue.encode(value)?.let { map["color"] = it }
 			}
 			data.design?.let { value ->
 				FontDesign.encode(value)?.let { map["design"] = it }
@@ -3981,3 +4142,4 @@ internal enum class Weekdays {
 		}
 	}
 }
+

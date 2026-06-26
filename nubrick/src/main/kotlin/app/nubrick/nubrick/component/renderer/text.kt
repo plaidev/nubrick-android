@@ -15,7 +15,7 @@ import coil.request.ImageRequest
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.event.eventDispatcher
 import app.nubrick.nubrick.component.provider.event.skeleton
-import app.nubrick.nubrick.schema.Color
+import app.nubrick.nubrick.schema.ColorValue
 import app.nubrick.nubrick.schema.FontDesign
 import app.nubrick.nubrick.schema.FontWeight
 import app.nubrick.nubrick.schema.TextAlign
@@ -56,7 +56,7 @@ internal fun parseFontWeight(fontWeight: FontWeight?): PrimitiveFontWeight {
 }
 
 @Composable
-internal fun parseFontStyle(size: Int? = null, color: Color? = null, fontWeight: FontWeight? = null, fontDesign: FontDesign? = null, alignment: TextAlign? = null, transparent: Boolean = false): TextStyle {
+internal fun parseFontStyle(size: Int? = null, color: ColorValue? = null, fontWeight: FontWeight? = null, fontDesign: FontDesign? = null, alignment: TextAlign? = null, transparent: Boolean = false): TextStyle {
     val textColor = parseColorForText(color) ?: MaterialTheme.colorScheme.onSurface
     return TextStyle.Default.copy(
         color = if (transparent) PrimitiveColor.Transparent else textColor,
