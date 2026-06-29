@@ -1,6 +1,7 @@
 package app.nubrick.nubrick.component.renderer
 
 import android.os.Build
+import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -13,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -23,18 +25,27 @@ import app.nubrick.nubrick.schema.UIPageBlock
 
 @Composable
 internal fun ModalBottomSheetBackHandler(handler: () -> Unit) {
-    val view = rememberUpdatedState(LocalView.current)
-    DisposableEffect(handler) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            view.value.findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(
-                OnBackInvokedDispatcher.PRIORITY_OVERLAY,
-                handler
-            )
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        return
+    }
+
+    val currentHandler = rememberUpdatedState(handler)
+    val view = LocalView.current
+    val callback = remember {
+        OnBackInvokedCallback {
+            currentHandler.value()
         }
+    }
+
+    DisposableEffect(view, callback) {
+        val dispatcher = view.findOnBackInvokedDispatcher()
+        dispatcher?.registerOnBackInvokedCallback(
+            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+            callback
+        )
+
         onDispose {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                view.value.findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(handler)
-            }
+            dispatcher?.unregisterOnBackInvokedCallback(callback)
         }
     }
 }
