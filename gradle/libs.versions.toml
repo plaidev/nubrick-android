@@ -23,7 +23,7 @@ lifecycleRuntimeKtx = "2.7.0"
 material3 = "1.2.1"
 mockitoCore = "5.14.2"
 navigationCompose = "2.7.7"
-nubrick = "0.13.4"
+nubrick = "0.13.5"
 okhttp = "4.12.0"
 testExtJunit = "1.1.5"
 
