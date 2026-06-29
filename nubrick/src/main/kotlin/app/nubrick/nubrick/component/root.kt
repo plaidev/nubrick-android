@@ -441,7 +441,7 @@ internal fun Root(
                                 },
                                 label = "Bottom Sheet"
                             ) {
-                                val stack = modalState.modalStack[it]
+                                val stack = modalState.modalStack.getOrNull(it) ?: return@AnimatedContent
                                 val isFullscreen =
                                     modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
                                 NavigationHeader(

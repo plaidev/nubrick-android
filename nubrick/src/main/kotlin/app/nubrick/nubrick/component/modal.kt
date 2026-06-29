@@ -20,7 +20,10 @@ internal data class ModalState(
     val modalVisibility: Boolean = false,
     val modalPresentationStyle: ModalPresentationStyle = ModalPresentationStyle.UNKNOWN,
     val modalScreenSize: ModalScreenSize = ModalScreenSize.UNKNOWN,
-)
+) {
+    val currentPageBlock: PageBlockData?
+        get() = modalStack.getOrNull(displayedModalIndex)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 internal class ModalStateHolder(
@@ -56,7 +59,11 @@ internal class ModalStateHolder(
     }
 
     fun back(data: JsonElement) {
-        val currentPageBlock = modalState.modalStack[modalState.displayedModalIndex]
+        val currentPageBlock = modalState.currentPageBlock
+        if (currentPageBlock == null) {
+            close(forceReset = true, emitDispatch = false)
+            return
+        }
         if (currentPageBlock.block.data?.triggerSetting?.onTrigger != null) {
             currentPageBlock.block.data.triggerSetting.onTrigger.let { onTrigger(it, data) }
             return
