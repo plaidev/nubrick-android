@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 
     id("maven-publish")
@@ -41,9 +42,6 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
-    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.toVersion(libs.versions.jvmTarget.get())
@@ -68,12 +66,14 @@ kotlin {
 
 dependencies {
     implementation(libs.kotlinx.serialization.json)
+    api(platform(libs.compose.bom))
     implementation(libs.compose.ui.tooling)
     api(libs.compose.ui)
     implementation(libs.compose.foundation)
     api(libs.compose.runtime)
     implementation(libs.coil)
     implementation(libs.coil.compose)
+    implementation(libs.compose.material.icons.extended)
     implementation(libs.compose.material3)
     implementation(libs.navigation.compose)
     implementation(libs.androidx.browser)
