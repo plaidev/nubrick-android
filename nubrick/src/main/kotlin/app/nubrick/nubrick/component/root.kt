@@ -410,7 +410,7 @@ internal fun Root(
                         },
                         properties = bottomSheetProps,
                         dragHandle = {},
-                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        contentWindowInsets = { WindowInsets(0)},
                         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
                         tonalElevation = 0.dp, // to have the right background color as set in theme
                     ) {

@@ -1,6 +1,5 @@
 package app.nubrick.nubrick.component.renderer
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,7 +37,6 @@ internal fun Modifier.horizontalCollectionItemSize(block: UICollectionBlock): Mo
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
     val dataState = DataContext.state

@@ -7,11 +7,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,6 @@ private fun resolveInitialValue(data: UISelectInputBlockData, container: Contain
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Select(block: UISelectInputBlock, modifier: Modifier = Modifier) {
     if (block.data == null) {
@@ -112,7 +113,7 @@ internal fun Select(block: UISelectInputBlock, modifier: Modifier = Modifier) {
                 style = fontStyle,
                 modifier = Modifier.weight(2f)
             )
-            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            NubrickSelectTrailingIcon(expanded = expanded)
         }
         DropdownMenu(
             expanded = expanded,
@@ -150,6 +151,18 @@ internal fun Select(block: UISelectInputBlock, modifier: Modifier = Modifier) {
     }
 }
 
+@Composable
+private fun NubrickSelectTrailingIcon(
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Icon(
+        imageVector = Icons.Filled.ArrowDropDown,
+        contentDescription = null,
+        modifier = modifier.rotate(if (expanded) 180f else 0f),
+    )
+}
+
 internal fun selectedOptionsToText(options: List<UISelectInputOption>): String? {
     return when (options.size) {
         0 -> null
@@ -162,7 +175,6 @@ internal fun selectedOptionsToText(options: List<UISelectInputOption>): String? 
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MultiSelect(block: UIMultiSelectInputBlock, modifier: Modifier = Modifier) {
     val localDensity = LocalDensity.current
@@ -231,7 +243,7 @@ internal fun MultiSelect(block: UIMultiSelectInputBlock, modifier: Modifier = Mo
                 style = fontStyle,
                 modifier = Modifier.weight(2f)
             )
-            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            NubrickSelectTrailingIcon(expanded = expanded)
         }
         DropdownMenu(
             expanded = expanded,
