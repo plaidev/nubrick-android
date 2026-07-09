@@ -717,9 +717,6 @@ internal sealed class ColorValue {
 			if (typename !is JsonPrimitive) {
 				return null
 			}
-			if (element is JsonNull) {
-				return null
-			}
 
 			return when (typename.jsonPrimitive.content) {
 				"Color" -> Color.decode(element)?.let { UnionColor(it) }
@@ -2144,9 +2141,6 @@ internal sealed class UIBlock {
 			}
 			val typename = element.jsonObject["__typename"] ?: return null
 			if (typename !is JsonPrimitive) {
-				return null
-			}
-			if (element is JsonNull) {
 				return null
 			}
 
@@ -4142,4 +4136,3 @@ internal enum class Weekdays {
 		}
 	}
 }
-

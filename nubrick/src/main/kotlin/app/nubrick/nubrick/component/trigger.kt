@@ -1,14 +1,16 @@
 package app.nubrick.nubrick.component
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.user.NubrickUser
@@ -151,6 +153,7 @@ internal fun Trigger(trigger: TriggerStateHolder) {
         for (stack in trigger.modalStacks) {
             key(stack.id) {
                 Root(
+                    modifier = Modifier.fillMaxSize(),
                     root = stack,
                     embeddingVisibility = false,
                     onDismiss = {

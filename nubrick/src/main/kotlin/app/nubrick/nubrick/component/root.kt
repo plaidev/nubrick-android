@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalBottomSheetDefaults
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,11 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.EventProperty
 import app.nubrick.nubrick.EventPropertyType
@@ -237,9 +237,9 @@ internal fun ModalPage(
     blockData: PageBlockData,
     eventBridge: UIBlockActionBridge?,
     currentPageBlock: UIPageBlock?,
-    onDataChange: (JsonElement) -> Unit = {},
-    modifier: Modifier = Modifier,
     isFullscreen: Boolean,
+    modifier: Modifier = Modifier,
+    onDataChange: (JsonElement) -> Unit = {},
 ) {
     val insetTop = if (blockData.block.data?.modalRespectSafeArea == true) {
         if (isFullscreen) {
@@ -274,7 +274,7 @@ internal fun ModalPage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Root(
-    modifier: Modifier = Modifier.fillMaxSize(),
+    modifier: Modifier = Modifier,
     arguments: Any? = null,
     root: UIRootBlock,
     embeddingVisibility: Boolean = true,
@@ -333,7 +333,7 @@ internal fun Root(
         rootStateHolder.initialize(rootData)
     }
     val bottomSheetProps = remember {
-        ModalBottomSheetDefaults.properties(shouldDismissOnBackPress = false)
+        ModalBottomSheetProperties(shouldDismissOnBackPress = false)
     }
     val listener = remember(rootStateHolder) {
         { action: UIBlockAction, data: JsonElement ->
@@ -456,8 +456,8 @@ internal fun Root(
                                     blockData = stack,
                                     eventBridge = eventBridge,
                                     currentPageBlock = currentPageBlock,
-                                    onDataChange = { data -> modalDataByIndex[it] = data },
                                     isFullscreen = isFullscreen,
+                                    onDataChange = { data -> modalDataByIndex[it] = data },
                                 )
                             }
                         }
