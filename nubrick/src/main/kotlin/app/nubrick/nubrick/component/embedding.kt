@@ -84,12 +84,12 @@ internal fun rememberEmbeddingState(
 
 @Composable
 internal fun Embedding(
-    arguments: Any? = null,
     experimentId: String,
-    componentId: String? = null,
     modifier: Modifier = Modifier,
+    arguments: Any? = null,
+    componentId: String? = null,
     onEvent: ((event: Event) -> Unit)? = null,
-    content: (@Composable() (state: EmbeddingLoadingState) -> Unit)?,
+    content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
     onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
 ) {
     var width: NubrickSize by remember(experimentId, componentId) { mutableStateOf(NubrickSize.Fill) }
