@@ -1,10 +1,13 @@
 package app.nubrick.nubrick.data
 
 import kotlinx.coroutines.channels.Channel
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
 
 class TrackEventChannelTest {
 
@@ -84,5 +87,34 @@ class TrackEventEncodingTest {
         assertFalse(CrashSeverity.WARNING.isErrorLevel)
         assertTrue(CrashSeverity.ERROR.isErrorLevel)
         assertTrue(CrashSeverity.FATAL.isErrorLevel)
+    }
+
+    @Test
+    fun `test survey response request encoding contains tracking context`() {
+        val request = SurveyResponseRequest(
+            projectId = "project-123",
+            experimentId = "exp-123",
+            variantId = "var-456",
+            userId = "user-789",
+            responseData = """{"name":"Ada","accepted":true}""",
+            meta = TrackEventMeta(
+                appId = "app.id",
+                appVersion = "1.2.3",
+                osName = "Android",
+                osVersion = "36",
+                sdkVersion = "0.14.0",
+            ),
+            timestamp = ZonedDateTime.of(2026, 7, 9, 1, 2, 3, 0, ZoneOffset.UTC),
+        )
+
+        val encoded = request.encode()
+        val meta = encoded["meta"] as kotlinx.serialization.json.JsonObject
+
+        assertEquals("project-123", encoded["projectId"]?.jsonPrimitive?.content)
+        assertEquals("exp-123", encoded["experimentId"]?.jsonPrimitive?.content)
+        assertEquals("var-456", encoded["variantId"]?.jsonPrimitive?.content)
+        assertEquals("user-789", encoded["userId"]?.jsonPrimitive?.content)
+        assertEquals("""{"name":"Ada","accepted":true}""", encoded["response_data"]?.jsonPrimitive?.content)
+        assertEquals("android", meta["platform"]?.jsonPrimitive?.content)
     }
 }

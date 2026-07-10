@@ -93,6 +93,10 @@ internal fun Modifier.eventDispatcher(
     this
         .alpha(if (disabled) 0.5f else if (isLoading) 0.8f else 1f)
         .clickable(enabled = !disabled && !isLoading, interactionSource = interaction, indication = null) {
+            if (event.submitSurveyResponse == true) {
+                container.sendSurveyResponse()
+            }
+
             val req = event.httpRequest
             if (req == null) {
                 eventListener.dispatch(event, data)

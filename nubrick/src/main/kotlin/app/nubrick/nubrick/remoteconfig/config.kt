@@ -7,9 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import app.nubrick.nubrick.Event
-import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.component.Embedding
 import app.nubrick.nubrick.component.EmbeddingLoadingState
+import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.NotFoundException
 import app.nubrick.nubrick.schema.ExperimentVariant
 
@@ -22,15 +22,16 @@ sealed class RemoteConfigLoadingState {
 
 @Composable
 internal fun rememberRemoteConfigState(
+    container: Container,
     experimentId: String
 ): RemoteConfigLoadingState {
-    val container = NubrickSDK.containerOrNull() ?: return RemoteConfigLoadingState.NotFound()
     var loadingState: RemoteConfigLoadingState by remember(experimentId) {
         mutableStateOf(RemoteConfigLoadingState.Loading())
     }
     LaunchedEffect(experimentId) {
         container.fetchRemoteConfig(experimentId).onSuccess {
             loadingState = RemoteConfigLoadingState.Completed(RemoteConfigVariant(
+                container = container,
                 experimentId = experimentId,
                 variant = it,
             ))
@@ -49,9 +50,15 @@ internal fun rememberRemoteConfigState(
 }
 
 class RemoteConfigVariant internal constructor(
+    container: Container,
     val experimentId: String,
     private val variant: ExperimentVariant
 ) {
+    private val container = container.makeContainer(
+        experimentId = experimentId,
+        variantId = variant.id,
+    )
+
     val id: String
         get() = this.variant.id ?: ""
 
@@ -111,6 +118,7 @@ class RemoteConfigVariant internal constructor(
     ) {
         val componentId = this.get(key) ?: return
         return Embedding(
+            container = this.container,
             arguments = arguments,
             experimentId = this.experimentId,
             componentId = componentId,
@@ -122,23 +130,24 @@ class RemoteConfigVariant internal constructor(
 
 @Composable
 internal fun RemoteConfigView(
+    container: Container,
     experimentId: String,
     content: @Composable() (state: RemoteConfigLoadingState) -> Unit
 ) {
-    val state = rememberRemoteConfigState(experimentId = experimentId)
+    val state = rememberRemoteConfigState(container = container, experimentId = experimentId)
     content(state)
 }
 
 class RemoteConfig internal constructor(
+    private val container: Container,
     private val experimentId: String
 ) {
     suspend fun fetch(): Result<RemoteConfigVariant> {
-        val container = NubrickSDK.containerOrNull()
-            ?: return Result.failure(IllegalStateException("NubrickSDK not initialized"))
         val variant = container.fetchRemoteConfig(experimentId).getOrElse {
             return Result.failure(it)
         }
         return Result.success(RemoteConfigVariant(
+            container = container,
             experimentId = this.experimentId,
             variant = variant,
         ))

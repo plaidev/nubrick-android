@@ -162,9 +162,32 @@ internal data class TrackRequest(
     }
 }
 
+internal data class SurveyResponseRequest(
+    val projectId: String,
+    val experimentId: String,
+    val variantId: String,
+    val userId: String,
+    val responseData: String,
+    val meta: TrackEventMeta,
+    val timestamp: ZonedDateTime = getCurrentDate(),
+) {
+    fun encode(): JsonObject {
+        return JsonObject(mapOf(
+            "timestamp" to JsonPrimitive(formatISO8601(timestamp)),
+            "projectId" to JsonPrimitive(projectId),
+            "experimentId" to JsonPrimitive(experimentId),
+            "variantId" to JsonPrimitive(variantId),
+            "userId" to JsonPrimitive(userId),
+            "response_data" to JsonPrimitive(responseData),
+            "meta" to meta.encode(),
+        ))
+    }
+}
+
 internal interface TrackRepository {
     fun trackExperimentEvent(event: TrackExperimentEvent)
     fun trackEvent(event: TrackUserEvent)
+    fun sendSurveyResponse(experimentId: String, variantId: String, responseData: String)
 
     fun storeNativeCrash(throwable: Throwable)
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
@@ -226,19 +249,22 @@ internal class TrackRepositoryImpl(
         }
     }
 
-    private suspend fun sendBatch(events: List<TrackEvent>) {
-        val meta = TrackEventMeta(
+    private fun currentMeta(): TrackEventMeta {
+        return TrackEventMeta(
             appId = user.packageName,
             appVersion = user.appVersion,
             osVersion = Build.VERSION.SDK_INT.toString(),
             osName = "Android",
             sdkVersion = VERSION
         )
+    }
+
+    private suspend fun sendBatch(events: List<TrackEvent>) {
         val request = TrackRequest(
             projectId = config.projectId,
             userId = user.id,
             events = events,
-            meta = meta,
+            meta = currentMeta(),
         )
         val body = Json.encodeToString(request.encode())
         postRequest(SdkConstants.endpoint.track, body, client).onFailure {
@@ -252,6 +278,26 @@ internal class TrackRepositoryImpl(
 
     override fun trackExperimentEvent(event: TrackExperimentEvent) {
         enqueue(TrackEvent.ExperimentEvent(event))
+    }
+
+    override fun sendSurveyResponse(experimentId: String, variantId: String, responseData: String) {
+        if (experimentId.isEmpty() || variantId.isEmpty()) {
+            return
+        }
+        scope.launch {
+            val request = SurveyResponseRequest(
+                projectId = config.projectId,
+                experimentId = experimentId,
+                variantId = variantId,
+                userId = user.id,
+                responseData = responseData,
+                meta = currentMeta(),
+            )
+            val body = Json.encodeToString(request.encode())
+            postRequest(SdkConstants.endpoint.surveyResponses, body, client).onFailure {
+                Log.w("NubrickSDK", "Dropped survey response after send failure")
+            }
+        }
     }
 
     private fun sendCrashToBackend(crashEvent: TrackCrashEvent) {

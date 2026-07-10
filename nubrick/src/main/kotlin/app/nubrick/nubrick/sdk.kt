@@ -274,6 +274,7 @@ private class NubrickRuntime(
     ) {
         NubrickTheme {
             Embedding(
+                container = this.container,
                 arguments = arguments,
                 experimentId = id,
                 modifier = modifier,
@@ -290,6 +291,7 @@ private class NubrickRuntime(
         content: @Composable (RemoteConfigLoadingState) -> Unit
     ) {
         return app.nubrick.nubrick.remoteconfig.RemoteConfigView(
+            container = this.container,
             experimentId = id,
             content = content
         )
@@ -297,6 +299,7 @@ private class NubrickRuntime(
 
     fun remoteConfig(id: String): app.nubrick.nubrick.remoteconfig.RemoteConfig {
         return app.nubrick.nubrick.remoteconfig.RemoteConfig(
+            container = this.container,
             experimentId = id,
         )
     }
@@ -505,7 +508,7 @@ object FlutterBridge {
 
     suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
         val container = NubrickSDK.containerOrNull() ?: return Result.failure(NubrickUninitializedException())
-        return container.fetchEmbedding(experimentId, componentId).map { it }
+        return container.fetchEmbedding(experimentId, componentId).map { it.root }
     }
 
     fun computeInitialSize(embedding: Any?): Pair<NubrickSize, NubrickSize> {
@@ -557,6 +560,7 @@ object FlutterBridge {
             NubrickSize.Fill -> Modifier.fillMaxHeight()
         }
         val rootBlock: UIRootBlock? = extractRootBlock(data)
+        val container = NubrickSDK.containerOrNull() ?: return
         rootBlock?.let {
             Box(
                 modifier = modifier,
@@ -564,6 +568,7 @@ object FlutterBridge {
             ) {
                 key(it.id) {
                     Root(
+                        container = container,
                         modifier = widthModifier.then(heightModifier),
                         arguments = arguments,
                         root = it,
