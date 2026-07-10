@@ -20,10 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.nubrick.nubrick.Event
-import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.NubrickSize
+import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.NotFoundException
-import app.nubrick.nubrick.schema.UIBlock
 
 sealed class EmbeddingLoadingState {
     class Loading(): EmbeddingLoadingState()
@@ -34,38 +33,36 @@ sealed class EmbeddingLoadingState {
 
 @Composable
 internal fun rememberEmbeddingState(
+    container: Container,
     arguments: Any?,
     experimentId: String,
     componentId: String?,
     onEvent: ((event: Event) -> Unit)?,
     onSizeChange: (width: NubrickSize, height: NubrickSize) -> Unit
 ): EmbeddingLoadingState {
-    val container = NubrickSDK.containerOrNull() ?: return EmbeddingLoadingState.NotFound()
     val currentArguments = rememberUpdatedState(arguments)
     val currentOnEvent = rememberUpdatedState(onEvent)
     val currentOnSizeChange = rememberUpdatedState(onSizeChange)
-    var loadingState: EmbeddingLoadingState by remember(experimentId, componentId) {
+    var loadingState: EmbeddingLoadingState by remember(experimentId, container.variantId, componentId) {
         mutableStateOf(EmbeddingLoadingState.Loading())
     }
-    LaunchedEffect(experimentId, componentId) {
-        container.fetchEmbedding(experimentId, componentId).onSuccess {
-            loadingState = when (it) {
-                is UIBlock.UnionUIRootBlock -> {
-                    EmbeddingLoadingState.Completed {
-                        Root(
-                            arguments = currentArguments.value,
-                            root = it.data,
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            onEvent = currentOnEvent.value ?: {},
-                            onSizeChange = currentOnSizeChange.value
-                        )
-                    }
-                }
-
-                else -> {
-                    EmbeddingLoadingState.NotFound()
-                }
+    LaunchedEffect(experimentId, container.variantId, componentId) {
+        container.fetchEmbedding(
+            experimentId = experimentId,
+            componentId = componentId,
+        ).onSuccess { content ->
+            loadingState = EmbeddingLoadingState.Completed {
+                Root(
+                    container = container,
+                    arguments = currentArguments.value,
+                    root = content.root,
+                    experimentId = content.experimentId,
+                    variantId = content.variantId,
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    onEvent = currentOnEvent.value ?: {},
+                    onSizeChange = currentOnSizeChange.value
+                )
             }
         }.onFailure {
             loadingState = when (it) {
@@ -84,6 +81,7 @@ internal fun rememberEmbeddingState(
 
 @Composable
 internal fun Embedding(
+    container: Container,
     experimentId: String,
     modifier: Modifier = Modifier,
     arguments: Any? = null,
@@ -92,9 +90,10 @@ internal fun Embedding(
     content: (@Composable() (state: EmbeddingLoadingState) -> Unit)? = null,
     onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null
 ) {
-    var width: NubrickSize by remember(experimentId, componentId) { mutableStateOf(NubrickSize.Fill) }
-    var height: NubrickSize by remember(experimentId, componentId) { mutableStateOf(NubrickSize.Fill) }
+    var width: NubrickSize by remember(experimentId, container.variantId, componentId) { mutableStateOf(NubrickSize.Fill) }
+    var height: NubrickSize by remember(experimentId, container.variantId, componentId) { mutableStateOf(NubrickSize.Fill) }
     val state = rememberEmbeddingState(
+        container,
         arguments,
         experimentId,
         componentId,

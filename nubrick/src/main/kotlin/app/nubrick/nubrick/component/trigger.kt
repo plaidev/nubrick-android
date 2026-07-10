@@ -13,11 +13,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.Container
+import app.nubrick.nubrick.data.ExperimentContent
 import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.data.user.getNubrickUserSharedPreferences
 import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.TriggerEventNameDefs
-import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.schema.UIRootBlock
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -37,7 +37,7 @@ internal class TriggerStateHolder(
     private var onTooltip: ((data: String, experimentId: String) -> Unit)? = onTooltip
 
     private val isFirstStart = AtomicBoolean(true)
-    internal val modalStacks = mutableStateListOf<UIRootBlock>()
+    internal val modalContents = mutableStateListOf<ExperimentContent>()
 
     fun updateOnTooltip(onTooltip: ((data: String, experimentId: String) -> Unit)?) {
         this.onTooltip = onTooltip
@@ -79,26 +79,20 @@ internal class TriggerStateHolder(
         // scope runs on Dispatchers.IO, provided by NubrickRuntime
         scope.launch {
             self.container.handleNubrickEvent(event)
-            val triggerContent = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
+            val (content, kind) = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
                 ?: return@launch
-            val kind = triggerContent.kind
-            val block = triggerContent.block
             if (kind == ExperimentKind.TOOLTIP) {
                 self.onTooltip?.let { callback ->
-                    val jsonString = Json.encodeToString(UIBlock.encode(block))
+                    val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
                     // Flutter MethodChannel requires calls on the main thread
                     withContext(Dispatchers.Main) {
-                        callback(jsonString, triggerContent.experimentId)
+                        callback(jsonString, content.experimentId)
                     }
                 }
             } else {
                 withContext(Dispatchers.Main) {
-                    if (block is UIBlock.UnionUIRootBlock) {
-                        if (self.modalStacks.indexOfFirst { stack ->
-                                stack.id == block.data.id
-                            } < 0) {
-                            self.modalStacks.add(block.data)
-                        }
+                    if (self.modalContents.indexOfFirst { it.root.id == content.root.id } < 0) {
+                        self.modalContents.add(content)
                     }
                 }
             }
@@ -106,8 +100,8 @@ internal class TriggerStateHolder(
     }
 
     fun handleDismiss(root: UIRootBlock) {
-        modalStacks.removeIf {
-            it.id == root.id
+        modalContents.removeIf {
+            it.root.id == root.id
         }
     }
 
@@ -149,12 +143,15 @@ internal fun Trigger(trigger: TriggerStateHolder) {
         }
     }
 
-    if (trigger.modalStacks.isNotEmpty()) {
-        for (stack in trigger.modalStacks) {
-            key(stack.id) {
+    if (trigger.modalContents.isNotEmpty()) {
+        for (content in trigger.modalContents) {
+            key(content.root.id) {
                 Root(
+                    container = trigger.container,
                     modifier = Modifier.fillMaxSize(),
-                    root = stack,
+                    root = content.root,
+                    experimentId = content.experimentId,
+                    variantId = content.variantId,
                     embeddingVisibility = false,
                     onDismiss = {
                         trigger.handleDismiss(it)

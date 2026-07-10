@@ -43,7 +43,6 @@ import app.nubrick.nubrick.EventPropertyType
 import app.nubrick.nubrick.NubrickSize
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
-import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.component.provider.container.ContainerProvider
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.data.PageDataProvider
@@ -53,6 +52,7 @@ import app.nubrick.nubrick.component.provider.pageblock.PageBlockProvider
 import app.nubrick.nubrick.component.renderer.ModalBottomSheetBackHandler
 import app.nubrick.nubrick.component.renderer.NavigationHeader
 import app.nubrick.nubrick.component.renderer.Page
+import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.schema.ModalPresentationStyle
 import app.nubrick.nubrick.schema.ModalScreenSize
 import app.nubrick.nubrick.schema.PageKind
@@ -100,6 +100,7 @@ private fun compileUIBlockAction(action: UIBlockAction, data: JsonElement): UIBl
         requiredFields = action.requiredFields,
         httpRequest = action.httpRequest,
         httpResponseAssertion = action.httpResponseAssertion,
+        submitSurveyResponse = action.submitSurveyResponse,
     )
 }
 
@@ -274,9 +275,12 @@ internal fun ModalPage(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun Root(
+    container: Container,
     modifier: Modifier = Modifier,
     arguments: Any? = null,
     root: UIRootBlock,
+    experimentId: String? = null,
+    variantId: String? = null,
     embeddingVisibility: Boolean = true,
     onEvent: (event: Event) -> Unit = {},
     onNextTooltip: (pageId: String) -> Unit = {},
@@ -287,8 +291,12 @@ internal fun Root(
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    val sdkContainer = NubrickSDK.containerOrNull() ?: return
-    val rootContainer = remember { sdkContainer.makeContainer() }
+    val rootContainer = remember(container, experimentId, variantId) {
+        container.makeContainer(
+            experimentId = experimentId ?: container.experimentId,
+            variantId = variantId ?: container.variantId,
+        )
+    }
     val currentOnEvent = rememberUpdatedState(onEvent)
     val currentOnNextTooltip = rememberUpdatedState(onNextTooltip)
     val currentOnDismiss = rememberUpdatedState(onDismiss)
@@ -297,7 +305,7 @@ internal fun Root(
         ModalStateHolder(sheetState, largeSheetState, scope, onDismiss = { currentOnDismiss.value(root) })
     }
     val context = LocalContext.current
-    val rootStateHolder = remember(root, modalStateHolder, context) {
+    val rootStateHolder = remember(root, rootContainer, modalStateHolder, context) {
         RootStateHolder(
             root,
             modalStateHolder,

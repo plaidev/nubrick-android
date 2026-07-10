@@ -2263,6 +2263,7 @@ internal class UIBlockAction (
 	val requiredFields: List<String>? = null,
 	val httpRequest: ApiHttpRequest? = null,
 	val httpResponseAssertion: ApiHttpResponseAssertion? = null,
+	val submitSurveyResponse: Boolean? = null,
 ) {
 	companion object {
 		fun decode(element: JsonElement?): UIBlockAction? {
@@ -2287,6 +2288,7 @@ internal class UIBlockAction (
 			},
 				httpRequest = ApiHttpRequest.decode(element.jsonObject["httpRequest"]),
 				httpResponseAssertion = ApiHttpResponseAssertion.decode(element.jsonObject["httpResponseAssertion"]),
+				submitSurveyResponse = BooleanDecoder.decode(element.jsonObject["submitSurveyResponse"]),
 			)
 		}
 
@@ -2324,6 +2326,9 @@ internal class UIBlockAction (
 			}
 			data.httpResponseAssertion?.let { value ->
 				ApiHttpResponseAssertion.encode(value)?.let { map["httpResponseAssertion"] = it }
+			}
+			data.submitSurveyResponse?.let { value ->
+				BooleanEncoder.encode(value)?.let { map["submitSurveyResponse"] = it }
 			}
 
 			return JsonObject(map)
@@ -4136,3 +4141,4 @@ internal enum class Weekdays {
 		}
 	}
 }
+

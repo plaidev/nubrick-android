@@ -19,11 +19,13 @@ import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
 import app.nubrick.nubrick.schema.Property
 import app.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 internal data class ExtractedVariant(
     val experimentId: String,
@@ -31,10 +33,10 @@ internal data class ExtractedVariant(
     val variant: ExperimentVariant,
 )
 
-internal data class TriggerContent(
+internal data class ExperimentContent(
     val experimentId: String,
-    val kind: ExperimentKind,
-    val block: UIBlock,
+    val variantId: String?,
+    val root: UIRootBlock,
 )
 
 @FlutterBridgeApi
@@ -43,7 +45,11 @@ internal class FailedToDecodeException : Exception("Failed to decode")
 internal class SkipHttpRequestException : Exception("Skip http request")
 
 internal interface Container {
+    val experimentId: String?
+    val variantId: String?
+
     fun makeContainer(): Container
+    fun makeContainer(experimentId: String?, variantId: String?): Container
     fun close() {}
 
     fun handleEvent(it: Event) {}
@@ -59,6 +65,7 @@ internal interface Container {
     fun getFormValues(): Map<String, JsonElement>
     fun getFormValue(key: String): FormValue?
     fun setFormValue(key: String, value: FormValue)
+    fun sendSurveyResponse()
 
     fun compileHttpRequest(
         req: ApiHttpRequest,
@@ -72,8 +79,14 @@ internal interface Container {
         variable: JsonElement,
     ): Result<JsonElement>
 
-    suspend fun fetchEmbedding(experimentId: String, componentId: String? = null): Result<UIBlock>
-    suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<TriggerContent>
+    suspend fun fetchEmbedding(
+        experimentId: String,
+        componentId: String? = null,
+    ): Result<ExperimentContent>
+    suspend fun fetchTriggerContent(
+        trigger: String,
+        kinds: List<ExperimentKind>,
+    ): Result<Pair<ExperimentContent, ExperimentKind>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
     fun appendExperimentHistory(experimentId: String)
 
@@ -91,8 +104,14 @@ internal class ContainerImpl(
     private val httpRequestRepository: HttpRequestRepository,
     private val databaseRepository: DatabaseRepository,
     private val formRepository: FormRepository = FormRepositoryImpl(),
+    override val experimentId: String? = null,
+    override val variantId: String? = null,
 ) : Container {
     override fun makeContainer(): Container {
+        return makeContainer(experimentId = this.experimentId, variantId = this.variantId)
+    }
+
+    override fun makeContainer(experimentId: String?, variantId: String?): Container {
         return ContainerImpl(
             config = this.config,
             user = this.user,
@@ -101,6 +120,8 @@ internal class ContainerImpl(
             trackRepository = this.trackRepository,
             httpRequestRepository = this.httpRequestRepository,
             databaseRepository = this.databaseRepository,
+            experimentId = experimentId,
+            variantId = variantId,
         )
     }
 
@@ -175,14 +196,18 @@ internal class ContainerImpl(
 
     override suspend fun fetchEmbedding(
         experimentId: String,
-        componentId: String?
-    ): Result<UIBlock> {
+        componentId: String?,
+    ): Result<ExperimentContent> {
         if (componentId != null) {
             val component =
                 this.componentRepository.fetchComponent(experimentId, componentId).getOrElse {
                     return Result.failure(it)
                 }
-            return Result.success(component)
+            return rootContent(
+                experimentId = experimentId,
+                variantId = this.variantId,
+                block = component,
+            )
         }
 
         val configs = this.experimentRepository.fetchExperimentConfigs(experimentId).getOrElse {
@@ -192,11 +217,11 @@ internal class ContainerImpl(
             .getOrElse {
                 return Result.failure(it)
             }
-        val variantId = extracted.variant.id ?: return Result.failure(NotFoundException())
+        val selectedVariantId = extracted.variant.id ?: return Result.failure(NotFoundException())
         this.trackRepository.trackExperimentEvent(
             TrackExperimentEvent(
                 experimentId = extracted.experimentId,
-                variantId = variantId
+                variantId = selectedVariantId
             )
         )
         // Tooltip is a Flutter-only flow. Persist tooltip history only after
@@ -209,10 +234,17 @@ internal class ContainerImpl(
             this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
                 return Result.failure(it)
             }
-        return Result.success(component)
+        return rootContent(
+            experimentId = extracted.experimentId,
+            variantId = selectedVariantId,
+            block = component,
+        )
     }
 
-    override suspend fun fetchTriggerContent(trigger: String, kinds: List<ExperimentKind>): Result<TriggerContent> {
+    override suspend fun fetchTriggerContent(
+        trigger: String,
+        kinds: List<ExperimentKind>,
+    ): Result<Pair<ExperimentContent, ExperimentKind>> {
         // send the user track event and save it to database
         this.trackRepository.trackEvent(TrackUserEvent(trigger))
         this.databaseRepository.appendUserEvent(trigger)
@@ -244,13 +276,13 @@ internal class ContainerImpl(
             this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
                 return Result.failure(it)
             }
-        return Result.success(
-            TriggerContent(
-                experimentId = extracted.experimentId,
-                kind = extracted.kind,
-                block = component,
-            )
-        )
+        return rootContent(
+            experimentId = extracted.experimentId,
+            variantId = variantId,
+            block = component,
+        ).map { content ->
+            content to extracted.kind
+        }
     }
 
     override suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant> {
@@ -274,6 +306,32 @@ internal class ContainerImpl(
 
     override fun appendExperimentHistory(experimentId: String) {
         this.databaseRepository.appendExperimentHistory(experimentId)
+    }
+
+    override fun sendSurveyResponse() {
+        val experimentId = this.experimentId ?: return
+        val variantId = this.variantId ?: return
+        val responseData = JsonObject(this.formRepository.getFormData()).toString()
+        this.trackRepository.sendSurveyResponse(
+            experimentId = experimentId,
+            variantId = variantId,
+            responseData = responseData,
+        )
+    }
+
+    private fun rootContent(
+        experimentId: String,
+        variantId: String?,
+        block: UIBlock,
+    ): Result<ExperimentContent> {
+        return when (block) {
+            is UIBlock.UnionUIRootBlock -> Result.success(ExperimentContent(
+                experimentId = experimentId,
+                variantId = variantId,
+                root = block.data,
+            ))
+            else -> Result.failure(NotFoundException())
+        }
     }
 
     private fun extractVariant(
