@@ -31,7 +31,6 @@ import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.coroutines.cancellation.CancellationException
 
 internal val LocalEventListener = compositionLocalOf<EventListenerState> {
     error("LocalEventListener is not found")
@@ -93,33 +92,19 @@ internal fun Modifier.eventDispatcher(
     this
         .alpha(if (disabled) 0.5f else if (isLoading) 0.8f else 1f)
         .clickable(enabled = !disabled && !isLoading, interactionSource = interaction, indication = null) {
-            if (event.submitSurveyResponse == true) {
-                container.sendSurveyResponse()
-            }
-
             val req = event.httpRequest
-            if (req == null) {
-                eventListener.dispatch(event, data)
-                return@clickable
-            }
-
-            isLoading = true
-            scope.launch {
-                try {
-                    container.sendHttpRequest(req, data).getOrThrow()
-                    // onSuccess
-                    eventListener.dispatch(event, data)
-                } catch (ce: CancellationException) {
-                    // propagate cancellation to parent
-                    throw ce
-                } catch (e: Exception) {
-                    // onError
-                    eventListener.dispatch(event, data)
-                } finally {
-                    // unlock ui
-                    isLoading = false
+            if (req != null) {
+                isLoading = true
+                scope.launch {
+                    try {
+                        container.sendHttpRequest(req, data)
+                    } finally {
+                        isLoading = false
+                    }
                 }
             }
+
+            eventListener.dispatch(event, data)
         }
 }
 

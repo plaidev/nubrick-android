@@ -2,6 +2,8 @@ package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.Event
+import app.nubrick.nubrick.EventProperty
+import app.nubrick.nubrick.EventPropertyType
 import app.nubrick.nubrick.FlutterBridgeApi
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.database.DatabaseRepository
@@ -18,7 +20,9 @@ import app.nubrick.nubrick.schema.ExperimentConfigs
 import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
 import app.nubrick.nubrick.schema.Property
+import app.nubrick.nubrick.schema.PropertyType
 import app.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.schema.UIBlockAction
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +57,7 @@ internal interface Container {
     fun close() {}
 
     fun handleEvent(it: Event) {}
+    fun handleAction(action: UIBlockAction, onEvent: ((Event) -> Unit)? = null) {}
 
     @Composable
     fun rememberVariableForTemplate(
@@ -127,6 +132,16 @@ internal class ContainerImpl(
 
     override fun handleEvent(it: Event) {
         this.config.onEvent?.let { it1 -> it1(it) }
+    }
+
+    override fun handleAction(action: UIBlockAction, onEvent: ((Event) -> Unit)?) {
+        if (action.submitSurveyResponse == true) {
+            sendSurveyResponse()
+        }
+
+        val event = action.toEvent()
+        onEvent?.invoke(event)
+        handleEvent(event)
     }
 
     @Composable
@@ -381,4 +396,23 @@ internal class ContainerImpl(
     override fun close() {
         trackRepository.close()
     }
+}
+
+private fun UIBlockAction.toEvent(): Event {
+    return Event(
+        name = eventName,
+        deepLink = deepLink,
+        payload = payload?.map { p ->
+            EventProperty(
+                name = p.name ?: "",
+                value = p.value ?: "",
+                type = when (p.ptype) {
+                    PropertyType.INTEGER -> EventPropertyType.INTEGER
+                    PropertyType.STRING -> EventPropertyType.STRING
+                    PropertyType.TIMESTAMPZ -> EventPropertyType.TIMESTAMPZ
+                    else -> EventPropertyType.UNKNOWN
+                }
+            )
+        }
+    )
 }

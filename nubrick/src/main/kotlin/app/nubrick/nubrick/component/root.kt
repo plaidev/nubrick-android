@@ -38,8 +38,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.nubrick.nubrick.Event
-import app.nubrick.nubrick.EventProperty
-import app.nubrick.nubrick.EventPropertyType
 import app.nubrick.nubrick.NubrickSize
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
@@ -64,25 +62,6 @@ import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-
-private fun parseActionToEvent(action: UIBlockAction): Event {
-    return Event(
-        name = action.eventName,
-        deepLink = action.deepLink,
-        payload = action.payload?.map { p ->
-            EventProperty(
-                name = p.name ?: "",
-                value = p.value ?: "",
-                type = when (p.ptype) {
-                    PropertyType.INTEGER -> EventPropertyType.INTEGER
-                    PropertyType.STRING -> EventPropertyType.STRING
-                    PropertyType.TIMESTAMPZ -> EventPropertyType.TIMESTAMPZ
-                    else -> EventPropertyType.UNKNOWN
-                }
-            )
-        }
-    )
-}
 
 private fun compileUIBlockAction(action: UIBlockAction, data: JsonElement): UIBlockAction {
     return UIBlockAction(
@@ -322,9 +301,9 @@ internal fun Root(
             },
             onTrigger = { trigger, data ->
                 val compiledTrigger = compileUIBlockAction(trigger, data)
-                val e = parseActionToEvent(compiledTrigger)
-                currentOnEvent.value(e)
-                rootContainer.handleEvent(e)
+                rootContainer.handleAction(compiledTrigger) { event ->
+                    currentOnEvent.value(event)
+                }
             },
             onSizeChange = { width, height ->
                 currentOnSizeChange.value?.invoke(width, height)
@@ -348,9 +327,9 @@ internal fun Root(
             val compiledAction = compileUIBlockAction(action, data)
             rootStateHolder.handleNavigate(compiledAction, latestRootData.value)
 
-            val e = parseActionToEvent(compiledAction)
-            currentOnEvent.value(e)
-            rootContainer.handleEvent(e)
+            rootContainer.handleAction(compiledAction) { event ->
+                currentOnEvent.value(event)
+            }
         }
     }
     LaunchedEffect(modalStateHolder, listener) {
