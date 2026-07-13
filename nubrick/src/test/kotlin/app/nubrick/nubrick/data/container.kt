@@ -9,6 +9,7 @@ import app.nubrick.nubrick.schema.ExperimentFrequency
 import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
 import app.nubrick.nubrick.schema.UIBlock
+import app.nubrick.nubrick.schema.UIBlockAction
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.schema.UITextBlock
 import app.nubrick.nubrick.schema.UserEventFrequencyCondition
@@ -56,6 +57,28 @@ class ContainerSurveyResponseTest {
         container.sendSurveyResponse()
 
         assertTrue(trackRepository.surveyResponses.isEmpty())
+    }
+
+    @Test
+    fun `handleAction sends survey response when requested`() {
+        val trackRepository = FakeTrackRepository()
+        val container = newContainer(
+            trackRepository = trackRepository,
+            experimentId = "exp-123",
+            variantId = "var-456",
+        )
+
+        container.setFormValue("name", FormValue.Str("Ada"))
+        container.handleAction(UIBlockAction(
+            eventName = "submit",
+            submitSurveyResponse = true,
+        ))
+
+        assertEquals(1, trackRepository.surveyResponses.size)
+        val sent = trackRepository.surveyResponses.single()
+        assertEquals("exp-123", sent.experimentId)
+        assertEquals("var-456", sent.variantId)
+        assertEquals("\"Ada\"", Json.decodeFromString<JsonObject>(sent.responseData)["name"].toString())
     }
 
     @Test

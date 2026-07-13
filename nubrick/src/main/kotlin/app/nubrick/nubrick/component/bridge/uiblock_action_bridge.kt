@@ -8,7 +8,7 @@ import app.nubrick.nubrick.component.provider.container.ContainerContext
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.event.LocalEventListener
 import app.nubrick.nubrick.schema.UIBlockAction
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.serialization.json.Json
@@ -46,8 +46,12 @@ internal fun UIBlockActionBridgeCollector(
         events.collect { event ->
             val data = latestData.value
             val req = event.httpRequest
-            req?.runCatching { latestContainer.value.sendHttpRequest(this, data) }
-                ?.onFailure { if (it is CancellationException) throw it }
+            if (req != null) {
+                launch {
+                    latestContainer.value.sendHttpRequest(req, data)
+                }
+            }
+
             latestEventListener.value.dispatch(event, data)
         }
     }
