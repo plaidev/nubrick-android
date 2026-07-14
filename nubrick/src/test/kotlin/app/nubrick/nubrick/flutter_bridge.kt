@@ -1,5 +1,6 @@
 package app.nubrick.nubrick
 
+import app.nubrick.nubrick.data.ExperimentContent
 import app.nubrick.nubrick.schema.PageKind
 import app.nubrick.nubrick.schema.TriggerSetting
 import app.nubrick.nubrick.schema.UIBlockAction
@@ -7,35 +8,61 @@ import app.nubrick.nubrick.schema.UIPageBlock
 import app.nubrick.nubrick.schema.UIPageBlockData
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.schema.UIRootBlockData
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FlutterBridgeUnitTest {
     @Test
+    fun buildExperimentContentPreservesContextAndDecodesRoot() {
+        val root = UIRootBlock(
+            id = "tooltip-root",
+            data = UIRootBlockData(currentPageId = "tooltip-page"),
+        )
+        val rootJson = Json.encodeToString(UIRootBlock.encode(root))
+
+        val content = FlutterBridge.buildExperimentContent(
+            experimentId = "experiment",
+            variantId = "variant",
+            rootJson = rootJson,
+        ).getOrThrow()
+
+        assertEquals("experiment", content.experimentId)
+        assertEquals("variant", content.variantId)
+        assertEquals("tooltip-root", content.root.id)
+        assertEquals("tooltip-page", content.root.data?.currentPageId)
+    }
+
+    @Test
     fun computeInitialSizeMapsZeroToFill() {
-        val embedding = UIRootBlock(
-            id = "root",
-            data = UIRootBlockData(
-                pages = listOf(
-                    UIPageBlock(
-                        id = "trigger",
-                        data = UIPageBlockData(
-                            kind = PageKind.TRIGGER,
-                            triggerSetting = TriggerSetting(
-                                onTrigger = UIBlockAction(destinationPageId = "component")
+        val embedding = ExperimentContent(
+            experimentId = "experiment",
+            variantId = "variant",
+            root = UIRootBlock(
+                id = "root",
+                data = UIRootBlockData(
+                    pages = listOf(
+                        UIPageBlock(
+                            id = "trigger",
+                            data = UIPageBlockData(
+                                kind = PageKind.TRIGGER,
+                                triggerSetting = TriggerSetting(
+                                    onTrigger = UIBlockAction(destinationPageId = "component")
+                                )
                             )
-                        )
-                    ),
-                    UIPageBlock(
-                        id = "component",
-                        data = UIPageBlockData(
-                            kind = PageKind.COMPONENT,
-                            frameWidth = 0,
-                            frameHeight = null
+                        ),
+                        UIPageBlock(
+                            id = "component",
+                            data = UIPageBlockData(
+                                kind = PageKind.COMPONENT,
+                                frameWidth = 0,
+                                frameHeight = null
+                            )
                         )
                     )
                 )
-            )
+            ),
         )
 
         val size = FlutterBridge.computeInitialSize(embedding)
@@ -45,29 +72,33 @@ class FlutterBridgeUnitTest {
 
     @Test
     fun computeInitialSizeMapsNonZeroToFixed() {
-        val embedding = UIRootBlock(
-            id = "root",
-            data = UIRootBlockData(
-                pages = listOf(
-                    UIPageBlock(
-                        id = "trigger",
-                        data = UIPageBlockData(
-                            kind = PageKind.TRIGGER,
-                            triggerSetting = TriggerSetting(
-                                onTrigger = UIBlockAction(destinationPageId = "component")
+        val embedding = ExperimentContent(
+            experimentId = "experiment",
+            variantId = "variant",
+            root = UIRootBlock(
+                id = "root",
+                data = UIRootBlockData(
+                    pages = listOf(
+                        UIPageBlock(
+                            id = "trigger",
+                            data = UIPageBlockData(
+                                kind = PageKind.TRIGGER,
+                                triggerSetting = TriggerSetting(
+                                    onTrigger = UIBlockAction(destinationPageId = "component")
+                                )
                             )
-                        )
-                    ),
-                    UIPageBlock(
-                        id = "component",
-                        data = UIPageBlockData(
-                            kind = PageKind.COMPONENT,
-                            frameWidth = 180,
-                            frameHeight = 96
+                        ),
+                        UIPageBlock(
+                            id = "component",
+                            data = UIPageBlockData(
+                                kind = PageKind.COMPONENT,
+                                frameWidth = 180,
+                                frameHeight = 96
+                            )
                         )
                     )
                 )
-            )
+            ),
         )
 
         val size = FlutterBridge.computeInitialSize(embedding)

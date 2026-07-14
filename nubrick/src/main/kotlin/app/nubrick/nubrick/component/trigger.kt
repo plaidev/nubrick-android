@@ -31,15 +31,15 @@ internal class TriggerStateHolder(
     internal val container: Container,
     internal val user: NubrickUser,
     private val scope: CoroutineScope,
-    onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
+    onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null,
 ) {
     @Volatile
-    private var onTooltip: ((data: String, experimentId: String) -> Unit)? = onTooltip
+    private var onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = onTooltip
 
     private val isFirstStart = AtomicBoolean(true)
     internal val modalContents = mutableStateListOf<ExperimentContent>()
 
-    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String) -> Unit)?) {
+    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?) {
         this.onTooltip = onTooltip
     }
 
@@ -86,7 +86,7 @@ internal class TriggerStateHolder(
                     val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
                     // Flutter MethodChannel requires calls on the main thread
                     withContext(Dispatchers.Main) {
-                        callback(jsonString, content.experimentId)
+                        callback(jsonString, content.experimentId, content.variantId)
                     }
                 }
             } else {
