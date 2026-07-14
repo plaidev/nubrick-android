@@ -29,7 +29,9 @@ import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.data.toFormData
 import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
 internal val LocalEventListener = compositionLocalOf<EventListenerState> {
@@ -66,45 +68,61 @@ internal fun EventListenerProvider(
     }
 }
 
+internal fun requiredFieldsAreInvalid(
+    requiredFields: List<String>?,
+    values: Map<String, JsonElement>,
+): Boolean = requiredFields?.any { key ->
+    when (val value = values[key]) {
+        null, JsonNull -> true
+        is JsonPrimitive -> value.isString && value.content.isEmpty()
+        is JsonArray -> value.isEmpty()
+        else -> false
+    }
+} ?: false
+
 @Composable
 internal fun Modifier.eventDispatcher(
-    eventDispatcher: UIBlockAction?
+    action: UIBlockAction?
 ): Modifier = composed {
     val container = ContainerContext.value
     val data = DataContext.state.data
     val eventListener = LocalEventListener.current
-    val event = eventDispatcher ?: return@composed this
+    val action = action ?: return@composed this
 
-    var disabled by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+    var isRequestPending by remember(action) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val interaction = remember { MutableInteractionSource() }
 
-    if (event.requiredFields != null) {
+    val formValues = if (action.requiredFields.isNullOrEmpty()) {
+        emptyMap()
+    } else {
         val formValues by container.formValuesFlow.collectAsStateWithLifecycle()
-        val values = formValues.toFormData()
-        disabled = event.requiredFields.any { key ->
-            val value = values[key]
-            value == null || (value is JsonPrimitive && value.isString && value.content.isEmpty())
-        }
+        formValues.toFormData()
+    }
+    val hasInvalidRequiredFields = requiredFieldsAreInvalid(action.requiredFields, formValues)
+    val enabled = !hasInvalidRequiredFields && !isRequestPending
+    val alpha = when {
+        hasInvalidRequiredFields -> 0.5f
+        isRequestPending -> 0.8f
+        else -> 1f
     }
 
     this
-        .alpha(if (disabled) 0.5f else if (isLoading) 0.8f else 1f)
-        .clickable(enabled = !disabled && !isLoading, interactionSource = interaction, indication = null) {
-            val req = event.httpRequest
+        .alpha(alpha)
+        .clickable(enabled = enabled, interactionSource = interaction, indication = null) {
+            val req = action.httpRequest
             if (req != null) {
-                isLoading = true
+                isRequestPending = true
                 scope.launch {
                     try {
                         container.sendHttpRequest(req, data)
                     } finally {
-                        isLoading = false
+                        isRequestPending = false
                     }
                 }
             }
 
-            eventListener.dispatch(event, data)
+            eventListener.dispatch(action, data)
         }
 }
 
