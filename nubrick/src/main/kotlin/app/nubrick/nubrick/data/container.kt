@@ -37,10 +37,11 @@ internal data class ExtractedVariant(
     val variant: ExperimentVariant,
 )
 
-internal data class ExperimentContent(
-    val experimentId: String,
-    val variantId: String?,
-    val root: UIRootBlock,
+@FlutterBridgeApi
+class ExperimentContent internal constructor(
+    internal val experimentId: String,
+    internal val variantId: String?,
+    internal val root: UIRootBlock,
 )
 
 @FlutterBridgeApi

@@ -30,7 +30,9 @@ import app.nubrick.nubrick.data.CONNECT_TIMEOUT
 import app.nubrick.nubrick.data.ComponentRepositoryImpl
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.ContainerImpl
+import app.nubrick.nubrick.data.ExperimentContent
 import app.nubrick.nubrick.data.ExperimentRepositoryImpl
+import app.nubrick.nubrick.data.FailedToDecodeException
 import app.nubrick.nubrick.data.FormRepositoryImpl
 import app.nubrick.nubrick.data.HttpRequestRepositoryImpl
 import app.nubrick.nubrick.data.NetworkRepository
@@ -43,7 +45,6 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
-import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.schema.UIPageBlock
 import app.nubrick.nubrick.schema.PageKind
@@ -106,7 +107,7 @@ private class NubrickUninitializedException : IllegalStateException(
 private class NubrickRuntime(
     config: Config,
     context: Context,
-    onTooltip: ((data: String, experimentId: String) -> Unit)? = null,
+    onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null,
 ) {
     @Volatile private var onEvent: ((event: Event) -> Unit)? = null
     @Volatile private var onDispatch: ((event: NubrickEvent) -> Unit)? = null
@@ -221,7 +222,7 @@ private class NubrickRuntime(
     fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)?,
         onDispatch: ((event: NubrickEvent) -> Unit)?,
-        onTooltip: ((data: String, experimentId: String) -> Unit)?
+        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
     ) {
         if (onEvent != null) this.onEvent = onEvent
         if (onDispatch != null) this.onDispatch = onDispatch
@@ -329,7 +330,7 @@ object NubrickSDK {
     private fun initializeInternal(
         context: Context,
         config: Config,
-        onTooltip: ((data: String, experimentId: String) -> Unit)?
+        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
     ) {
         if (runtime != null) {
             warn("NubrickSDK.initialize(...) called more than once. Subsequent calls are ignored.")
@@ -355,7 +356,7 @@ object NubrickSDK {
     fun initialize(
         context: Context,
         config: Config,
-        onTooltip: ((data: String, experimentId: String) -> Unit)?
+        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
     ) {
         initializeInternal(context = context, config = config, onTooltip = onTooltip)
     }
@@ -374,7 +375,7 @@ object NubrickSDK {
     internal fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)? = null,
         onDispatch: ((event: NubrickEvent) -> Unit)? = null,
-        onTooltip: ((data: String, experimentId: String) -> Unit)? = null
+        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null
     ) {
         val current = runtimeOrNull(throwInDebug = false) ?: return
         current.updateCallbacks(onEvent, onDispatch, onTooltip)
@@ -497,7 +498,7 @@ object FlutterBridge {
     fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)? = null,
         onDispatch: ((event: NubrickEvent) -> Unit)? = null,
-        onTooltip: ((data: String, experimentId: String) -> Unit)? = null
+        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null
     ) {
         NubrickSDK.updateCallbacks(onEvent, onDispatch, onTooltip)
     }
@@ -506,14 +507,37 @@ object FlutterBridge {
         NubrickSDK.clearCallbacks()
     }
 
-    suspend fun connectEmbedding(experimentId: String, componentId: String?): Result<Any?> {
+    suspend fun connectEmbedding(
+        experimentId: String,
+        componentId: String?,
+        variantId: String? = null,
+    ): Result<ExperimentContent> {
         val container = NubrickSDK.containerOrNull() ?: return Result.failure(NubrickUninitializedException())
-        return container.fetchEmbedding(experimentId, componentId).map { it.root }
+        val embeddingContainer = if (componentId != null && variantId != null) {
+            container.makeContainer(experimentId = experimentId, variantId = variantId)
+        } else {
+            container
+        }
+        return embeddingContainer.fetchEmbedding(experimentId, componentId)
     }
 
-    fun computeInitialSize(embedding: Any?): Pair<NubrickSize, NubrickSize> {
-        val root: UIRootBlock? = extractRootBlock(embedding)
-        val pages: List<UIPageBlock>? = root?.data?.pages
+    fun buildExperimentContent(
+        experimentId: String,
+        variantId: String?,
+        rootJson: String,
+    ): Result<ExperimentContent> {
+        val root = runCatching {
+            UIRootBlock.decode(Json.decodeFromString(rootJson))
+        }.getOrNull() ?: return Result.failure(FailedToDecodeException())
+        return Result.success(ExperimentContent(
+            experimentId = experimentId,
+            variantId = variantId,
+            root = root,
+        ))
+    }
+
+    fun computeInitialSize(embedding: ExperimentContent): Pair<NubrickSize, NubrickSize> {
+        val pages: List<UIPageBlock>? = embedding.root.data?.pages
         val triggerPage = pages?.firstOrNull {
             it.data?.kind == PageKind.TRIGGER
         }
@@ -529,20 +553,11 @@ object FlutterBridge {
         )
     }
 
-    private fun extractRootBlock(data: Any?): UIRootBlock? {
-        return when (data) {
-            is UIBlock.UnionUIRootBlock -> data.data
-            is UIRootBlock -> data
-            is String -> UIRootBlock.decode(Json.decodeFromString(data))
-            else -> null
-        }
-    }
-
     @Composable
     fun render(
         modifier: Modifier = Modifier,
         arguments: Any? = null,
-        data: Any?,
+        data: ExperimentContent,
         onEvent: ((event: Event) -> Unit),
         onNextTooltip: ((pageId: String) -> Unit) = {},
         onDismiss: (() -> Unit) = {},
@@ -559,30 +574,30 @@ object FlutterBridge {
             is NubrickSize.Fixed -> Modifier.height((height as NubrickSize.Fixed).value.dp)
             NubrickSize.Fill -> Modifier.fillMaxHeight()
         }
-        val rootBlock: UIRootBlock? = extractRootBlock(data)
+        val rootBlock = data.root
         val container = NubrickSDK.containerOrNull() ?: return
-        rootBlock?.let {
-            Box(
-                modifier = modifier,
-                contentAlignment = Alignment.Center
-            ) {
-                key(it.id) {
-                    Root(
-                        container = container,
-                        modifier = widthModifier.then(heightModifier),
-                        arguments = arguments,
-                        root = it,
-                        onEvent = onEvent,
-                        onNextTooltip = onNextTooltip,
-                        onDismiss = { onDismiss() },
-                        eventBridge = eventBridge,
-                        onSizeChange = { newWidth, newHeight ->
-                            width = newWidth
-                            height = newHeight
-                            onSizeChange?.invoke(newWidth, newHeight)
-                        },
-                    )
-                }
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            key(rootBlock.id) {
+                Root(
+                    container = container,
+                    modifier = widthModifier.then(heightModifier),
+                    arguments = arguments,
+                    root = rootBlock,
+                    experimentId = data.experimentId,
+                    variantId = data.variantId,
+                    onEvent = onEvent,
+                    onNextTooltip = onNextTooltip,
+                    onDismiss = { onDismiss() },
+                    eventBridge = eventBridge,
+                    onSizeChange = { newWidth, newHeight ->
+                        width = newWidth
+                        height = newHeight
+                        onSizeChange?.invoke(newWidth, newHeight)
+                    },
+                )
             }
         }
     }
