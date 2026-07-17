@@ -131,7 +131,11 @@ private fun createRoundedShape(frame: FrameData?): Shape {
             frame?.borderTopLeftRadius == frame?.borderBottomLeftRadius
 
     val roundedShape = if (isSingleRadius) {
-        RoundedCornerShape((frame?.borderRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
+        // Prefer borderRadius; if omitted, use the shared per-corner value
+        // (all four corners are equal when isSingleRadius is true).
+        RoundedCornerShape(
+            (frame?.borderRadius ?: frame?.borderTopLeftRadius)?.coerceAtLeast(0)?.dp ?: 0.dp
+        )
     } else {
         val topLeftRadiusPx = toPx((frame?.borderTopLeftRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
         val topRightRadiusPx = toPx((frame?.borderTopRightRadius?.coerceAtLeast(0))?.dp ?: 0.dp)
