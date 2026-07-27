@@ -17,3 +17,4 @@ rootProject.name = "Nubrick android"
 include(":app")
 include(":nubrick")
 include(":e2e")
+include(":example-java-xml")
