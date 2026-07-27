@@ -84,7 +84,7 @@ data class Event(
     val payload: List<EventProperty>?
 )
 
-data class Config(
+data class Config @JvmOverloads constructor(
     val projectId: String,
     val onEvent: ((event: Event) -> Unit)? = null,
     val onDispatch: ((event: NubrickEvent) -> Unit)? = null,
@@ -344,6 +344,7 @@ object NubrickSDK {
     }
 
     @Synchronized
+    @JvmStatic
     fun initialize(
         context: Context,
         config: Config
@@ -367,6 +368,7 @@ object NubrickSDK {
         runtime = null
     }
 
+    @JvmStatic
     fun dispatch(event: NubrickEvent) {
         val current = runtimeOrNull(throwInDebug = true) ?: return
         current.dispatch(event)
@@ -398,31 +400,37 @@ object NubrickSDK {
         current.appendTooltipExperimentHistory(experimentId)
     }
 
+    @JvmStatic
     fun setUserId(id: String) {
         val current = runtimeOrNull(throwInDebug = false) ?: return
         current.setUserId(id)
     }
 
+    @JvmStatic
     fun getUserId(): String? {
         val current = runtimeOrNull(throwInDebug = false) ?: return null
         return current.getUserId()
     }
 
+    @JvmStatic
     fun setUserProperty(key: String, value: Any) {
         val current = runtimeOrNull(throwInDebug = false) ?: return
         current.setUserProperty(key, value)
     }
 
+    @JvmStatic
     fun getUserProperty(key: String): String? {
         val current = runtimeOrNull(throwInDebug = false) ?: return null
         return current.getUserProperty(key)
     }
 
+    @JvmStatic
     fun setUserProperties(props: Map<String, Any>) {
         val current = runtimeOrNull(throwInDebug = false) ?: return
         current.setUserProperties(props)
     }
 
+    @JvmStatic
     fun getUserProperties(): Map<String, String> {
         val current = runtimeOrNull(throwInDebug = false) ?: return emptyMap()
         return current.getUserProperties()
