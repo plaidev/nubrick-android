@@ -1086,6 +1086,7 @@ internal enum class ExperimentKind {
 
 internal class ExperimentVariant (
 	val id: ID? = null,
+	val label: String? = null,
 	val configs: List<VariantConfig>? = null,
 	val weight: Int? = null,
 ) {
@@ -1100,6 +1101,7 @@ internal class ExperimentVariant (
 
 			return ExperimentVariant(
 				id = StringDecoder.decode(element.jsonObject["id"]),
+				label = StringDecoder.decode(element.jsonObject["label"]),
 				configs = ListDecoder.decode(element.jsonObject["configs"]) { element: JsonElement? ->
 				VariantConfig.decode(element)
 			},
@@ -1116,6 +1118,9 @@ internal class ExperimentVariant (
 			map["__typename"] = JsonPrimitive("ExperimentVariant")
 			data.id?.let { value ->
 				StringEncoder.encode(value)?.let { map["id"] = it }
+			}
+			data.label?.let { value ->
+				StringEncoder.encode(value)?.let { map["label"] = it }
 			}
 			data.configs?.let { value ->
 				ListEncoder.encode(value) { item ->
@@ -2022,6 +2027,7 @@ internal enum class TriggerEventNameDefs {
 	USER_ENTER_TO_FOREGROUND,
 	N_ERROR_RECORD,
 	N_ERROR_IN_SDK_RECORD,
+	NUBRICK_SURVEY_RESPONSE_SENT,
 	UNKNOWN,;
 
 	companion object {
@@ -2050,6 +2056,7 @@ internal enum class TriggerEventNameDefs {
 				"USER_ENTER_TO_FOREGROUND" -> USER_ENTER_TO_FOREGROUND
 				"N_ERROR_RECORD" -> N_ERROR_RECORD
 				"N_ERROR_IN_SDK_RECORD" -> N_ERROR_IN_SDK_RECORD
+				"NUBRICK_SURVEY_RESPONSE_SENT" -> NUBRICK_SURVEY_RESPONSE_SENT
 				else -> UNKNOWN
 			}
 		}
@@ -2070,6 +2077,7 @@ internal enum class TriggerEventNameDefs {
 				USER_ENTER_TO_FOREGROUND -> JsonPrimitive("USER_ENTER_TO_FOREGROUND")
 				N_ERROR_RECORD -> JsonPrimitive("N_ERROR_RECORD")
 				N_ERROR_IN_SDK_RECORD -> JsonPrimitive("N_ERROR_IN_SDK_RECORD")
+				NUBRICK_SURVEY_RESPONSE_SENT -> JsonPrimitive("NUBRICK_SURVEY_RESPONSE_SENT")
 				UNKNOWN -> JsonPrimitive("UNKNOWN")
 			}
 		}
