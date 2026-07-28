@@ -2,6 +2,7 @@ package app.nubrick.nubrick.view
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.ViewGroup
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,7 +13,9 @@ import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.NubrickSDK
+import app.nubrick.nubrick.NubrickSize
 import app.nubrick.nubrick.R
+import kotlin.math.roundToInt
 
 /**
  * Java-friendly callback for events emitted by a [NubrickEmbeddingView].
@@ -35,6 +38,8 @@ class NubrickEmbeddingView @JvmOverloads constructor(
     private var currentExperimentId by mutableStateOf("")
     private var currentArguments by mutableStateOf<Any?>(null)
     private var eventListener by mutableStateOf<NubrickEventListener?>(null)
+    private var hostWidth: Int? = null
+    private var hostHeight: Int? = null
 
     init {
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
@@ -66,6 +71,12 @@ class NubrickEmbeddingView @JvmOverloads constructor(
         eventListener = listener
     }
 
+    override fun setLayoutParams(params: ViewGroup.LayoutParams?) {
+        super.setLayoutParams(params)
+        hostWidth = params?.width
+        hostHeight = params?.height
+    }
+
     @Composable
     override fun Content() {
         if (currentExperimentId.isEmpty()) return
@@ -75,6 +86,39 @@ class NubrickEmbeddingView @JvmOverloads constructor(
             modifier = Modifier.fillMaxSize(),
             arguments = currentArguments,
             onEvent = { event -> eventListener?.onEvent(event) },
+            onSizeChange = ::applyEmbeddingSize,
         )
+    }
+
+    /** Applies backend dimensions only when the corresponding host dimension is `wrap_content`. */
+    private fun applyEmbeddingSize(width: NubrickSize, height: NubrickSize) {
+        val params = layoutParams ?: return
+        val originalWidth = hostWidth ?: params.width
+        val originalHeight = hostHeight ?: params.height
+        var changed = false
+        if (originalWidth == ViewGroup.LayoutParams.WRAP_CONTENT) {
+            val targetWidth = width.toBackendLayoutDimension()
+            if (params.width != targetWidth) {
+                params.width = targetWidth
+                changed = true
+            }
+        }
+        if (originalHeight == ViewGroup.LayoutParams.WRAP_CONTENT) {
+            val targetHeight = height.toBackendLayoutDimension()
+            if (params.height != targetHeight) {
+                params.height = targetHeight
+                changed = true
+            }
+        }
+        if (!changed) return
+
+        super.setLayoutParams(params)
+    }
+
+    private fun NubrickSize.toBackendLayoutDimension(): Int {
+        return when (this) {
+            is NubrickSize.Fixed -> (value * resources.displayMetrics.density).roundToInt()
+            NubrickSize.Fill -> ViewGroup.LayoutParams.WRAP_CONTENT
+        }
     }
 }

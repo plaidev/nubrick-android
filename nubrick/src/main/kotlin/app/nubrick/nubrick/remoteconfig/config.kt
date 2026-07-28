@@ -20,6 +20,24 @@ sealed class RemoteConfigLoadingState {
     class Failed(val e: Throwable): RemoteConfigLoadingState()
 }
 
+/**
+ * Result delivered to Java callers of [app.nubrick.nubrick.NubrickSDK.fetchRemoteConfig].
+ */
+class RemoteConfigResult internal constructor(
+    val value: RemoteConfigVariant? = null,
+    val error: Throwable? = null,
+) {
+    val isSuccess: Boolean
+        get() = value != null
+}
+
+/**
+ * Java-friendly callback for an asynchronous Remote Config fetch.
+ */
+fun interface RemoteConfigListener {
+    fun onResult(result: RemoteConfigResult)
+}
+
 @Composable
 internal fun rememberRemoteConfigState(
     container: Container,

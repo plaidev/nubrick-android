@@ -2,6 +2,8 @@ package app.nubrick.nubrick
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,15 +46,21 @@ import app.nubrick.nubrick.data.database.NubrickDbHelper
 import java.io.File
 import java.util.concurrent.TimeUnit
 import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.remoteconfig.RemoteConfigListener
 import app.nubrick.nubrick.remoteconfig.RemoteConfigLoadingState
+import app.nubrick.nubrick.remoteconfig.RemoteConfigResult
+import app.nubrick.nubrick.remoteconfig.RemoteConfigVariant
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.schema.UIPageBlock
 import app.nubrick.nubrick.schema.PageKind
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Cache
 import okhttp3.OkHttpClient
@@ -83,6 +91,20 @@ data class Event(
     val deepLink: String?,
     val payload: List<EventProperty>?
 )
+
+/**
+ * Java-friendly callback for events emitted anywhere in the SDK, including popup overlays.
+ */
+fun interface NubrickGlobalEventListener {
+    fun onEvent(event: Event)
+}
+
+/**
+ * Java-friendly callback for events dispatched through [NubrickSDK.dispatch].
+ */
+fun interface NubrickDispatchListener {
+    fun onDispatch(event: NubrickEvent)
+}
 
 data class Config @JvmOverloads constructor(
     val projectId: String,
@@ -219,6 +241,33 @@ private class NubrickRuntime(
         this.container.appendExperimentHistory(experimentId)
     }
 
+    fun fetchRemoteConfig(id: String, listener: RemoteConfigListener) {
+        this.sdkScope.launch {
+            val fetchResult = try {
+                this@NubrickRuntime.container.fetchRemoteConfig(id)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                Result.failure(error)
+            }
+            val result = fetchResult.fold(
+                onSuccess = { variant ->
+                    RemoteConfigResult(
+                        value = RemoteConfigVariant(
+                            container = this@NubrickRuntime.container,
+                            experimentId = id,
+                            variant = variant,
+                        ),
+                    )
+                },
+                onFailure = { error -> RemoteConfigResult(error = error) },
+            )
+            withContext(Dispatchers.Main) {
+                listener.onResult(result)
+            }
+        }
+    }
+
     fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)?,
         onDispatch: ((event: NubrickEvent) -> Unit)?,
@@ -352,6 +401,31 @@ object NubrickSDK {
         initializeInternal(context = context, config = config, onTooltip = null)
     }
 
+    /**
+     * Creates a [Config] without exposing Kotlin function types to Java callers.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun createConfig(
+        projectId: String,
+        onEventListener: NubrickGlobalEventListener? = null,
+        onDispatchListener: NubrickDispatchListener? = null,
+        trackCrashes: Boolean = true,
+    ): Config {
+        return Config(
+            projectId = projectId,
+            onEvent = onEventListener?.let { listener -> { event -> listener.onEvent(event) } },
+            onDispatch = onDispatchListener?.let { listener -> { event -> listener.onDispatch(event) } },
+            trackCrashes = trackCrashes,
+        )
+    }
+
+    /** Creates a Java-friendly [Config] when only crash tracking needs to be customized. */
+    @JvmStatic
+    fun createConfig(projectId: String, trackCrashes: Boolean): Config {
+        return Config(projectId = projectId, trackCrashes = trackCrashes)
+    }
+
     @Synchronized
     @FlutterBridgeApi
     fun initialize(
@@ -434,6 +508,18 @@ object NubrickSDK {
     fun getUserProperties(): Map<String, String> {
         val current = runtimeOrNull(throwInDebug = false) ?: return emptyMap()
         return current.getUserProperties()
+    }
+
+    /** Fetches remote config asynchronously and invokes [listener] on the main thread. */
+    @JvmStatic
+    fun fetchRemoteConfig(id: String, listener: RemoteConfigListener) {
+        val current = runtimeOrNull(throwInDebug = false)
+        if (current == null) {
+            val result = RemoteConfigResult(error = NubrickUninitializedException())
+            Handler(Looper.getMainLooper()).post { listener.onResult(result) }
+            return
+        }
+        current.fetchRemoteConfig(id, listener)
     }
 
     @Composable
