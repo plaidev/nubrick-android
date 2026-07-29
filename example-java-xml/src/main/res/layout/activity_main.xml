@@ -30,7 +30,7 @@
 
             <app.nubrick.nubrick.view.NubrickEmbeddingView
                 android:id="@+id/sdk_embedding"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="270dp"
                 android:layout_marginTop="20dp"
                 app:nubrickExperimentId="TOP_COMPONENT" />
