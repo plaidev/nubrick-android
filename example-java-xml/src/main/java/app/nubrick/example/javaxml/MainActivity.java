@@ -1,15 +1,12 @@
 package app.nubrick.example.javaxml;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-
-import app.nubrick.nubrick.view.NubrickEmbeddingView;
 
 public final class MainActivity extends AppCompatActivity {
     @Override
@@ -19,11 +16,6 @@ public final class MainActivity extends AppCompatActivity {
 
         View appRoot = findViewById(R.id.app_root);
         applySystemBarInsets(appRoot);
-
-        NubrickEmbeddingView embeddingView = findViewById(R.id.sdk_embedding);
-        embeddingView.setOnSizeChangeListener((width, height) ->
-                Log.d("NubrickExample", "width=" + width + ", height=" + height)
-        );
     }
 
     private static void applySystemBarInsets(View root) {
