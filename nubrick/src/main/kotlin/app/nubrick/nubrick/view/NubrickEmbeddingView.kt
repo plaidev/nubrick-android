@@ -25,6 +25,13 @@ fun interface NubrickEventListener {
 }
 
 /**
+ * Java-friendly callback for size changes emitted by a [NubrickEmbeddingView].
+ */
+fun interface NubrickSizeListener {
+    fun onSizeChange(width: NubrickSize, height: NubrickSize)
+}
+
+/**
  * Hosts a Nubrick embedding in a traditional Android View hierarchy.
  *
  * The experiment ID can be supplied with the `nubrickExperimentId` XML attribute or by calling
@@ -38,6 +45,7 @@ class NubrickEmbeddingView @JvmOverloads constructor(
     private var currentExperimentId by mutableStateOf("")
     private var currentArguments by mutableStateOf<Any?>(null)
     private var eventListener by mutableStateOf<NubrickEventListener?>(null)
+    private var sizeListener by mutableStateOf<NubrickSizeListener?>(null)
     private var hostWidth: Int? = null
     private var hostHeight: Int? = null
 
@@ -71,6 +79,10 @@ class NubrickEmbeddingView @JvmOverloads constructor(
         eventListener = listener
     }
 
+    fun setOnSizeChangeListener(listener: NubrickSizeListener?) {
+        sizeListener = listener
+    }
+
     override fun setLayoutParams(params: ViewGroup.LayoutParams?) {
         super.setLayoutParams(params)
         hostWidth = params?.width
@@ -86,7 +98,10 @@ class NubrickEmbeddingView @JvmOverloads constructor(
             modifier = Modifier.fillMaxSize(),
             arguments = currentArguments,
             onEvent = { event -> eventListener?.onEvent(event) },
-            onSizeChange = ::applyEmbeddingSize,
+            onSizeChange = { width, height ->
+                applyEmbeddingSize(width, height)
+                sizeListener?.onSizeChange(width, height)
+            },
         )
     }
 
