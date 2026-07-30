@@ -1,5 +1,8 @@
 package app.nubrick.nubrick.component
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
@@ -62,6 +65,18 @@ import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+
+private fun Context.findActivity(): Activity? {
+    var currentContext = this
+    while (currentContext is ContextWrapper) {
+        if (currentContext is Activity) return currentContext
+
+        val baseContext = currentContext.baseContext
+        if (baseContext === currentContext) return null
+        currentContext = baseContext
+    }
+    return currentContext as? Activity
+}
 
 private fun compileUIBlockAction(action: UIBlockAction, data: JsonElement): UIBlockAction {
     return UIBlockAction(
@@ -291,11 +306,15 @@ internal fun Root(
             onNextTooltip = { pageId -> currentOnNextTooltip.value(pageId) },
             onDismiss = { dismissedRoot -> currentOnDismiss.value(dismissedRoot) },
             onOpenDeepLink = { link ->
+                val activity = context.findActivity()
+                val launchContext = activity ?: context
                 val intent = Intent(Intent.ACTION_VIEW, link.toUri()).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    if (activity == null) {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 }
                 try {
-                    context.startActivity(intent)
+                    launchContext.startActivity(intent)
                 } catch (_: Throwable) {
                 }
             },
