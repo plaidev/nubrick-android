@@ -99,9 +99,44 @@ private fun compileUIBlockAction(action: UIBlockAction, data: JsonElement): UIBl
 }
 
 internal data class WebviewData(
+    val launchId: Long,
     val url: String,
     val trigger: UIBlockAction?,
-) {}
+    val pageBlock: UIPageBlock,
+    val previousPageBlock: UIPageBlock?,
+)
+
+internal class WebLinkReturnTracker {
+    private var pendingLaunchId: Long? = null
+    private var hostPaused = false
+
+    fun start(launchId: Long) {
+        pendingLaunchId = launchId
+        hostPaused = false
+    }
+
+    fun cancel(launchId: Long) {
+        if (pendingLaunchId == launchId) {
+            pendingLaunchId = null
+            hostPaused = false
+        }
+    }
+
+    fun onHostPaused() {
+        if (pendingLaunchId != null) {
+            hostPaused = true
+        }
+    }
+
+    fun onHostResumed(): Long? {
+        val launchId = pendingLaunchId
+        if (launchId == null || !hostPaused) return null
+
+        pendingLaunchId = null
+        hostPaused = false
+        return launchId
+    }
+}
 
 internal class RootStateHolder(
     private val root: UIRootBlock,
@@ -115,6 +150,7 @@ internal class RootStateHolder(
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
     val webviewData = mutableStateOf<WebviewData?>(null)
+    private var nextWebviewLaunchId = 0L
 
     // We use them for sdk bridge between flutter <-> android.
     val currentPageBlock = mutableStateOf<UIPageBlock?>(null)
@@ -163,6 +199,7 @@ internal class RootStateHolder(
             return
         }
 
+        val previousPageBlock = this.currentPageBlock.value
         this.currentPageBlock.value = destBlock
 
         if (destBlock.data?.kind == PageKind.DISMISSED) {
@@ -172,8 +209,11 @@ internal class RootStateHolder(
 
         if (destBlock.data?.kind == PageKind.WEBVIEW_MODAL) {
             this.webviewData.value = WebviewData(
+                launchId = ++nextWebviewLaunchId,
                 url = destBlock.data.webviewUrl?.let { compile(it, rootData) } ?: "",
                 trigger = destBlock.data.triggerSetting?.onTrigger,
+                pageBlock = destBlock,
+                previousPageBlock = previousPageBlock,
             )
             return
         }
@@ -221,8 +261,15 @@ internal class RootStateHolder(
         modalStateHolder.close(forceReset = true, emitDispatch = emitDispatch)
     }
 
-    fun handleWebviewDismiss() {
+    fun handleWebviewDismiss(launchId: Long): WebviewData? {
+        val dismissedData = this.webviewData.value?.takeIf { it.launchId == launchId }
+            ?: return null
+
         this.webviewData.value = null
+        if (this.currentPageBlock.value?.id == dismissedData.pageBlock.id) {
+            this.currentPageBlock.value = dismissedData.previousPageBlock
+        }
+        return dismissedData
     }
 }
 
@@ -471,40 +518,48 @@ internal fun Root(
                 }
 
                 val webviewData = rootStateHolder.webviewData.value
-                val pendingWebviewReturn = remember { mutableStateOf(false) }
-
-                LaunchedEffect(webviewData) {
-                    if (webviewData != null) {
-                        try {
-                            val customTabsIntent = CustomTabsIntent.Builder().build()
-                            customTabsIntent.launchUrl(context, webviewData.url.toUri())
-                            pendingWebviewReturn.value = true
-                        } catch (_: Throwable) {
-                            // No browser available — fire trigger immediately
-                            webviewData.trigger?.let { trigger ->
-                                listener(trigger, latestRootData.value)
+                val webLinkReturnTracker = remember(rootStateHolder) {
+                    WebLinkReturnTracker()
+                }
+                val currentWebLinkCompletion = rememberUpdatedState<(Long) -> Unit> { launchId ->
+                    val dismissedData = rootStateHolder.handleWebviewDismiss(launchId)
+                        ?: return@rememberUpdatedState
+                    dismissedData.trigger?.let { trigger ->
+                        listener(trigger, latestRootData.value)
+                    }
+                }
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner, webLinkReturnTracker) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_PAUSE -> {
+                                webLinkReturnTracker.onHostPaused()
                             }
-                            rootStateHolder.handleWebviewDismiss()
+
+                            Lifecycle.Event.ON_RESUME -> {
+                                webLinkReturnTracker.onHostResumed()?.let { launchId ->
+                                    currentWebLinkCompletion.value(launchId)
+                                }
+                            }
+
+                            else -> Unit
                         }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
                     }
                 }
 
-                if (pendingWebviewReturn.value) {
-                    val lifecycleOwner = LocalLifecycleOwner.current
-                    DisposableEffect(lifecycleOwner) {
-                        val observer = LifecycleEventObserver { _, event ->
-                            if (event == Lifecycle.Event.ON_RESUME) {
-                                webviewData?.trigger?.let { trigger ->
-                                    listener(trigger, latestRootData.value)
-                                }
-                                rootStateHolder.handleWebviewDismiss()
-                                pendingWebviewReturn.value = false
-                            }
-                        }
-                        lifecycleOwner.lifecycle.addObserver(observer)
-                        onDispose {
-                            lifecycleOwner.lifecycle.removeObserver(observer)
-                        }
+                LaunchedEffect(webviewData?.launchId) {
+                    val data = webviewData ?: return@LaunchedEffect
+                    webLinkReturnTracker.start(data.launchId)
+                    try {
+                        val customTabsIntent = CustomTabsIntent.Builder().build()
+                        customTabsIntent.launchUrl(context, data.url.toUri())
+                    } catch (_: Throwable) {
+                        webLinkReturnTracker.cancel(data.launchId)
+                        currentWebLinkCompletion.value(data.launchId)
                     }
                 }
             }
