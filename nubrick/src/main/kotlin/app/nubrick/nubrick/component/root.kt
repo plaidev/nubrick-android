@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -53,6 +54,7 @@ import app.nubrick.nubrick.component.provider.pageblock.PageBlockProvider
 import app.nubrick.nubrick.component.renderer.ModalBottomSheetBackHandler
 import app.nubrick.nubrick.component.renderer.NavigationHeader
 import app.nubrick.nubrick.component.renderer.Page
+import app.nubrick.nubrick.component.renderer.parseColor
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.schema.ModalPresentationStyle
 import app.nubrick.nubrick.schema.ModalScreenSize
@@ -60,6 +62,7 @@ import app.nubrick.nubrick.schema.PageKind
 import app.nubrick.nubrick.schema.Property
 import app.nubrick.nubrick.schema.PropertyType
 import app.nubrick.nubrick.schema.UIBlockAction
+import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.schema.UIPageBlock
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
@@ -96,6 +99,14 @@ private fun compileUIBlockAction(action: UIBlockAction, data: JsonElement): UIBl
         httpResponseAssertion = action.httpResponseAssertion,
         submitSurveyResponse = action.submitSurveyResponse,
     )
+}
+
+private fun modalContainerColor(page: UIPageBlock) = when (val renderAs = page.data?.renderAs) {
+    is UIBlock.UnionUIFlexContainerBlock -> {
+        renderAs.data.data?.frame?.background?.let(::parseColor)
+    }
+
+    else -> null
 }
 
 internal data class WebviewData(
@@ -456,6 +467,10 @@ internal fun Root(
                     val insetTop = with(LocalDensity.current) {
                         WindowInsets.statusBars.getTop(this).toDp()
                     }
+                    val sheetContainerColor = modalState.currentPageBlock
+                        ?.block
+                        ?.let(::modalContainerColor)
+                        ?: MaterialTheme.colorScheme.surface
                     ModalBottomSheet(
                         sheetState = if (isLarge) largeSheetState else sheetState,
                         onDismissRequest = {
@@ -465,6 +480,7 @@ internal fun Root(
                         dragHandle = {},
                         contentWindowInsets = { WindowInsets(0)},
                         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
+                        containerColor = sheetContainerColor,
                         tonalElevation = 0.dp, // to have the right background color as set in theme
                     ) {
                         ModalBottomSheetBackHandler {
