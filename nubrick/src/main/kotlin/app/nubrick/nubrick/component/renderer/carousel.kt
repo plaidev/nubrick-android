@@ -56,6 +56,7 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
     }
     val scope = rememberCoroutineScope()
     LaunchedEffect(state.currentPage, children.size) {
+        if (children.isEmpty()) return@LaunchedEffect
         if (block.data?.fullItemWidth == true && block.data.autoScroll == true) {
             delay((block.data.autoScrollInterval?.toLong() ?: 3) * 1000)
             scope.launch {
@@ -64,6 +65,10 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+
+    if (children.isEmpty()) {
+        return
     }
 
     val padding = parseFramePadding(block.data?.frame)
