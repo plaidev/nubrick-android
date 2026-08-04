@@ -1,0 +1,10 @@
+{
+  "__typename": "ExperimentConfigs",
+  "configs": [
+    {
+      "__typename": "ExperimentConfig",
+      "id": null,
+      "kind": null
+    }
+  ]
+}
