@@ -7,8 +7,6 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -27,6 +25,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -434,24 +433,19 @@ internal fun Root(
         EventListenerProvider(listener = listener) {
             Box(modifier) {
                 if (embeddingVisibility && displayedPageBlock != null) {
-                    AnimatedContent(
-                        targetState = displayedPageBlock,
-                        transitionSpec = {
-                            fadeIn() togetherWith fadeOut()
-                        },
-                        label = "Embedding",
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        PageBlockProvider(it) {
-                            PageDataProvider(
-                                arguments = arguments,
-                                request = it.block.data?.httpRequest
-                            ) {
-                                UIBlockActionBridgeCollector(
-                                    events = eventBridge?.events,
-                                    isCurrentPage = it.block.id == currentPageBlock?.id
-                                )
-                                Page(block = it.block)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        key(displayedPageBlock) {
+                            PageBlockProvider(displayedPageBlock) {
+                                PageDataProvider(
+                                    arguments = arguments,
+                                    request = displayedPageBlock.block.data?.httpRequest
+                                ) {
+                                    UIBlockActionBridgeCollector(
+                                        events = eventBridge?.events,
+                                        isCurrentPage = displayedPageBlock.block.id == currentPageBlock?.id
+                                    )
+                                    Page(block = displayedPageBlock.block)
+                                }
                             }
                         }
                     }
@@ -503,9 +497,9 @@ internal fun Root(
                                 targetState = modalState.displayedModalIndex,
                                 transitionSpec = {
                                     if (targetState > initialState) {
-                                        slideInHorizontally { it } togetherWith slideOutHorizontally { -it } + fadeOut()
+                                        slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
                                     } else {
-                                        slideInHorizontally { -it } togetherWith slideOutHorizontally { it } + fadeOut()
+                                        slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
                                     }
                                 },
                                 label = "Bottom Sheet"
