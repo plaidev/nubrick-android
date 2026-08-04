@@ -37,7 +37,7 @@ jobs:
       - name: Lint
         run: ./gradlew lintDebug
 
-  unit-test:
+  test:
     if: ${{ !startsWith(github.event.head_commit.message, '[bot] Release') }}
     runs-on: ubuntu-latest
     steps:
@@ -50,27 +50,16 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
+
       - name: Unit Test
         run: ./gradlew testDebugUnitTest
 
-  instrumented-test:
-    if: ${{ !startsWith(github.event.head_commit.message, '[bot] Release') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
-        with:
-          ref: ${{ inputs.ref || github.ref }}
-      - name: Setup jdk
-        uses: actions/setup-java@91d3aa4956ec4a53e477c4907347b5e3481be8c9 # v2.5.1
-        with:
-          distribution: 'zulu'
-          java-version: '21'
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+
       - name: Run Test
         uses: ReactiveCircus/android-emulator-runner@1dcd0090116d15e7c562f8db72807de5e036a4ed # v2.34.0
         with:
