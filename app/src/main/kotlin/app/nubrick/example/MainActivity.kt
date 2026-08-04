@@ -20,13 +20,10 @@ import androidx.compose.ui.unit.dp
 import app.nubrick.example.ui.theme.NubrickAndroidTheme
 import app.nubrick.nubrick.NubrickProvider
 import app.nubrick.nubrick.NubrickSDK
-import app.nubrick.nubrick.data.user.NubrickUser
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        NubrickSDK.setUserProperty("name", "jimbo")
-
         setContent {
             NubrickAndroidTheme {
                 NubrickProvider {
@@ -49,9 +46,6 @@ class MainActivity : ComponentActivity() {
                                 "TOP_COMPONENT",
                                 arguments = emptyMap<String, String>(),
                                 modifier = Modifier.height(270f.dp),
-                            )
-                            NubrickSDK.Embedding(
-                                "android_v2"
                             )
                         }
                     }
