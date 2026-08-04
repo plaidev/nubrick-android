@@ -21,6 +21,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    if: ${{ !startsWith(github.event.head_commit.message, '[bot] Release') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+      - name: Setup jdk
+        uses: actions/setup-java@91d3aa4956ec4a53e477c4907347b5e3481be8c9 # v2.5.1
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+      - name: Lint
+        run: ./gradlew lintDebug
+
   test:
     if: ${{ !startsWith(github.event.head_commit.message, '[bot] Release') }}
     runs-on: ubuntu-latest
