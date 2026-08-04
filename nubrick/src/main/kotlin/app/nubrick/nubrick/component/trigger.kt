@@ -1,5 +1,6 @@
 package app.nubrick.nubrick.component
 
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -20,6 +21,7 @@ import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.TriggerEventNameDefs
 import app.nubrick.nubrick.schema.UIRootBlock
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -78,23 +80,30 @@ internal class TriggerStateHolder(
         }
         // scope runs on Dispatchers.IO, provided by NubrickRuntime
         scope.launch {
-            self.container.handleNubrickEvent(event)
-            val (content, kind) = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
-                ?: return@launch
-            if (kind == ExperimentKind.TOOLTIP) {
-                self.onTooltip?.let { callback ->
-                    val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
-                    // Flutter MethodChannel requires calls on the main thread
+            try {
+                self.container.handleNubrickEvent(event)
+                val (content, kind) = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
+                    ?: return@launch
+                if (kind == ExperimentKind.TOOLTIP) {
+                    self.onTooltip?.let { callback ->
+                        val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
+                        // Flutter MethodChannel requires calls on the main thread
+                        withContext(Dispatchers.Main) {
+                            callback(jsonString, content.experimentId, content.variantId)
+                        }
+                    }
+                } else {
                     withContext(Dispatchers.Main) {
-                        callback(jsonString, content.experimentId, content.variantId)
+                        if (self.modalContents.indexOfFirst { it.root.id == content.root.id } < 0) {
+                            self.modalContents.add(content)
+                        }
                     }
                 }
-            } else {
-                withContext(Dispatchers.Main) {
-                    if (self.modalContents.indexOfFirst { it.root.id == content.root.id } < 0) {
-                        self.modalContents.add(content)
-                    }
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // Public boundary: never let trigger/dispatch failures crash the host app.
+                Log.w("NubrickSDK", "Failed to dispatch trigger event: ${event.name}", e)
             }
         }
     }
