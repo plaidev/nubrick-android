@@ -5,7 +5,9 @@ import android.content.ContextWrapper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
@@ -24,7 +26,7 @@ class InitializeContainmentAndroidTest {
     }
 
     @Test
-    fun initializeFailureDoesNotThrowAndLeavesSdkUninitialized() {
+    fun initializeFailureReturnsFalseAndLeavesSdkUninitialized() {
         val realContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
         val failingContext = object : ContextWrapper(realContext) {
             override fun getApplicationContext(): Context {
@@ -32,10 +34,11 @@ class InitializeContainmentAndroidTest {
             }
         }
 
-        // Must not crash the host process.
-        NubrickSDK.initialize(
-            context = failingContext,
-            config = Config(projectId = "test-project-id"),
+        assertFalse(
+            NubrickSDK.initialize(
+                context = failingContext,
+                config = Config(projectId = "test-project-id"),
+            )
         )
 
         assertNull(NubrickSDK.getUserId())
@@ -52,17 +55,39 @@ class InitializeContainmentAndroidTest {
             }
         }
 
-        NubrickSDK.initialize(
-            context = failingContext,
-            config = Config(projectId = "test-project-id"),
+        assertFalse(
+            NubrickSDK.initialize(
+                context = failingContext,
+                config = Config(projectId = "test-project-id"),
+            )
         )
         assertNull(NubrickSDK.getUserId())
 
-        NubrickSDK.initialize(
-            context = realContext,
-            config = Config(projectId = "test-project-id"),
+        assertTrue(
+            NubrickSDK.initialize(
+                context = realContext,
+                config = Config(projectId = "test-project-id"),
+            )
         )
         NubrickSDK.setUserId("user-after-retry")
         assertEquals("user-after-retry", NubrickSDK.getUserId())
+    }
+
+    @Test
+    fun initializeReturnsTrueWhenAlreadyInitialized() {
+        val realContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+
+        assertTrue(
+            NubrickSDK.initialize(
+                context = realContext,
+                config = Config(projectId = "test-project-id"),
+            )
+        )
+        assertTrue(
+            NubrickSDK.initialize(
+                context = realContext,
+                config = Config(projectId = "another-project-id"),
+            )
+        )
     }
 }

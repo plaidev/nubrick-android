@@ -375,36 +375,49 @@ object NubrickSDK {
         return null
     }
 
+    /**
+     * @return `true` if the SDK is initialized after this call (including when a previous
+     *   successful initialize is reused), `false` if construction failed and the SDK remains
+     *   uninitialized. Hosts can retry or fall back when this returns `false`.
+     */
     @Synchronized
     private fun initializeInternal(
         context: Context,
         config: Config,
         onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
-    ) {
+    ): Boolean {
         if (runtime != null) {
             warn("NubrickSDK.initialize(...) called more than once. Subsequent calls are ignored.")
-            return
+            return true
         }
-        try {
+        return try {
             runtime = NubrickRuntime(
                 config = config,
                 context = context,
                 onTooltip = onTooltip
             )
+            true
         } catch (e: Throwable) {
             // Keep runtime unset so later initialize() can retry, and never crash the host app.
             runtime = null
             Log.w("NubrickSDK", "NubrickSDK.initialize(...) failed", e)
+            false
         }
     }
 
+    /**
+     * Initializes the SDK. Safe to call more than once; later calls are ignored if already initialized.
+     *
+     * @return `true` on success (or already initialized), `false` if initialization failed.
+     *   On failure the SDK stays uninitialized and a later call may retry.
+     */
     @Synchronized
     @JvmStatic
     fun initialize(
         context: Context,
         config: Config
-    ) {
-        initializeInternal(context = context, config = config, onTooltip = null)
+    ): Boolean {
+        return initializeInternal(context = context, config = config, onTooltip = null)
     }
 
     /**
@@ -438,8 +451,8 @@ object NubrickSDK {
         context: Context,
         config: Config,
         onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
-    ) {
-        initializeInternal(context = context, config = config, onTooltip = onTooltip)
+    ): Boolean {
+        return initializeInternal(context = context, config = config, onTooltip = onTooltip)
     }
 
     @Synchronized
