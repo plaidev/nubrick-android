@@ -1,5 +1,6 @@
 package app.nubrick.nubrick.component
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.user.NubrickUser
@@ -13,11 +14,13 @@ import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.withSettings
 import org.mockito.stubbing.Answer
 
-class TriggerDispatchTest {
+@RunWith(AndroidJUnit4::class)
+class TriggerDispatchAndroidTest {
     @Test
     fun dispatchDoesNotReportUnhandledCoroutineExceptions() {
         val handled = CountDownLatch(1)

@@ -49,6 +49,7 @@ espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref =
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCore" }
+mockito-android = { module = "org.mockito:mockito-android", version.ref = "mockitoCore" }
 navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "testExtJunit" }

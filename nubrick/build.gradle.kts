@@ -86,6 +86,7 @@ dependencies {
     testImplementation(libs.mockito.core)
     androidTestImplementation(libs.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.mockito.android)
 }
 
 tasks.register<Jar>("javadocEmptyJar") {

@@ -103,10 +103,7 @@ internal class TriggerStateHolder(
                 throw e
             } catch (e: Throwable) {
                 // Public boundary: never let trigger/dispatch failures crash the host app.
-                // runCatching: android.util.Log can throw in JVM unit tests without Robolectric.
-                runCatching {
-                    Log.w("NubrickSDK", "Failed to dispatch trigger event: ${event.name}", e)
-                }
+                Log.w("NubrickSDK", "Failed to dispatch trigger event: ${event.name}", e)
             }
         }
     }
