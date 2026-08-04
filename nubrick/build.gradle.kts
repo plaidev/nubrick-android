@@ -84,9 +84,12 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)
+    androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.test.ext.junit)
     androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.mockito.android)
+    debugImplementation(libs.compose.ui.test.manifest)
 }
 
 tasks.register<Jar>("javadocEmptyJar") {
