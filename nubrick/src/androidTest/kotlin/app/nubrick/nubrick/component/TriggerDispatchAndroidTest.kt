@@ -1,6 +1,7 @@
 package app.nubrick.nubrick.component
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.user.NubrickUser
@@ -36,10 +37,13 @@ class TriggerDispatchAndroidTest {
                 null
             }),
         )
+        // NubrickUser is a final Kotlin class; Mockito cannot mock it on device.
+        // This path never touches user after handleNubrickEvent throws.
+        val user = NubrickUser(InstrumentationRegistry.getInstrumentation().targetContext)
 
         val holder = TriggerStateHolder(
             container = container,
-            user = mock(NubrickUser::class.java),
+            user = user,
             scope = CoroutineScope(
                 SupervisorJob() +
                     Dispatchers.Unconfined +
