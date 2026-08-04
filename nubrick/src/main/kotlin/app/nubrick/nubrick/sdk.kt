@@ -385,11 +385,17 @@ object NubrickSDK {
             warn("NubrickSDK.initialize(...) called more than once. Subsequent calls are ignored.")
             return
         }
-        runtime = NubrickRuntime(
-            config = config,
-            context = context,
-            onTooltip = onTooltip
-        )
+        try {
+            runtime = NubrickRuntime(
+                config = config,
+                context = context,
+                onTooltip = onTooltip
+            )
+        } catch (e: Throwable) {
+            // Keep runtime unset so later initialize() can retry, and never crash the host app.
+            runtime = null
+            Log.w("NubrickSDK", "NubrickSDK.initialize(...) failed", e)
+        }
     }
 
     @Synchronized
