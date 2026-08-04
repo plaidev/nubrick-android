@@ -1,0 +1,21 @@
+{
+  "__typename": "UIFlexContainerBlock",
+  "id": "1",
+  "futureField": "ignore-me",
+  "data": {
+    "__typename": "UIFlexContainerBlockData",
+    "extraNested": true,
+    "children": [
+      {
+        "__typename": "UITextBlock",
+        "id": "2",
+        "data": {
+          "__typename": "UITextBlockData",
+          "value": "Hello World",
+          "unknownProp": 123
+        }
+      }
+    ],
+    "gap": 16
+  }
+}

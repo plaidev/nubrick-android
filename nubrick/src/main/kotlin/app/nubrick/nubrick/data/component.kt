@@ -5,8 +5,6 @@ import app.nubrick.nubrick.SdkConstants
 import app.nubrick.nubrick.schema.UIBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 
 internal interface ComponentRepository {
     suspend fun fetchComponent(experimentId: String, id: String): Result<UIBlock>
@@ -22,7 +20,9 @@ internal class ComponentRepositoryImpl(
             val response: String = networkRepository.getWithCache(url).getOrElse {
                 return@withContext Result.failure(it)
             }
-            val json = Json.decodeFromString<JsonElement>(response)
+            val json = decodeJsonElementOrFailure(response).getOrElse {
+                return@withContext Result.failure(it)
+            }
             val configs = UIBlock.decode(json) ?: return@withContext Result.failure(FailedToDecodeException())
             return@withContext Result.success(configs)
         }

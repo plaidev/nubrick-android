@@ -1,0 +1,18 @@
+{
+  "__typename": "UIFlexContainerBlock",
+  "id": "1",
+  "data": {
+    "__typename": "UIFlexContainerBlockData",
+    "children": [
+      {
+        "__typename": "UITextBlock",
+        "id": "2",
+        "data": {
+          "__typename": "UITextBlockData",
+          "value": "Hello World"
+        }
+      }
+    ],
+    "gap": 16
+  }
+}
