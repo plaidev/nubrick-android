@@ -1,6 +1,8 @@
 package app.nubrick.nubrick.component.provider.event
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -24,6 +26,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import app.nubrick.nubrick.component.provider.container.ContainerContext
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.data.toFormData
@@ -90,8 +94,14 @@ internal fun Modifier.eventDispatcher(
     val action = action ?: return@composed this
 
     var isRequestPending by remember(action) { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val interaction = remember { MutableInteractionSource() }
+    val scope = rememberCoroutineScope()
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.984f else 1f,
+        animationSpec = tween(durationMillis = 100, easing = FastOutSlowInEasing),
+        label = "Tap feedback scale",
+    )
 
     val formValues = if (action.requiredFields.isNullOrEmpty()) {
         emptyMap()
@@ -109,6 +119,10 @@ internal fun Modifier.eventDispatcher(
 
     this
         .alpha(alpha)
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
         .clickable(enabled = enabled, interactionSource = interaction, indication = null) {
             val req = action.httpRequest
             if (req != null) {
