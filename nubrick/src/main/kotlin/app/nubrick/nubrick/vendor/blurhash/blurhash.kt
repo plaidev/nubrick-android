@@ -37,6 +37,9 @@ internal object BlurHashDecoder {
         if (blurHash == null || blurHash.length < 6) {
             return null
         }
+        if (width <= 0 || height <= 0) {
+            return null
+        }
         val numCompEnc = decode83(blurHash, 0, 1)
         val numCompX = (numCompEnc % 9) + 1
         val numCompY = (numCompEnc / 9) + 1
