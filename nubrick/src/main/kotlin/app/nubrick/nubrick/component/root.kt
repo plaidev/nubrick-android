@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
@@ -65,6 +66,7 @@ import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.schema.UIPageBlock
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
@@ -167,37 +169,49 @@ internal class RootStateHolder(
     var currentTooltipAnchorId = mutableStateOf("")
 
     fun initialize(data: JsonElement) {
-        val trigger = pages.firstOrNull {
-            it.data?.kind == PageKind.TRIGGER
-        } ?: run {
-            onDismiss(root)
-            return
-        }
+        try {
+            val trigger = pages.firstOrNull {
+                it.data?.kind == PageKind.TRIGGER
+            } ?: run {
+                onDismiss(root)
+                return
+            }
 
-        val onTrigger = trigger.data?.triggerSetting?.onTrigger
-        if (onTrigger == null) {
-          onDismiss(root)
-          return
-        }
-        onTrigger(onTrigger, data)
+            val onTrigger = trigger.data?.triggerSetting?.onTrigger
+            if (onTrigger == null) {
+                onDismiss(root)
+                return
+            }
+            onTrigger(onTrigger, data)
 
-        val destId = onTrigger.destinationPageId ?: ""
-        if (destId.isNotEmpty()) {
-            this.render(destId, rootData = data)
-        } else {
-          this.dismiss()
+            val destId = onTrigger.destinationPageId ?: ""
+            if (destId.isNotEmpty()) {
+                this.render(destId, rootData = data)
+            } else {
+                this.dismiss()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Log.w("NubrickSDK", "Failed to initialize root", e)
         }
     }
 
     fun handleNavigate(action: UIBlockAction, rootData: JsonElement) {
-        val deepLink = action.deepLink ?: ""
-        if (deepLink.isNotEmpty()) {
-            onOpenDeepLink(deepLink)
-        }
+        try {
+            val deepLink = action.deepLink ?: ""
+            if (deepLink.isNotEmpty()) {
+                onOpenDeepLink(deepLink)
+            }
 
-        val destId = action.destinationPageId ?: ""
-        if (destId.isNotEmpty()) {
-            this.render(destId, rootData = rootData)
+            val destId = action.destinationPageId ?: ""
+            if (destId.isNotEmpty()) {
+                this.render(destId, rootData = rootData)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            Log.w("NubrickSDK", "Failed to handle root navigation", e)
         }
     }
 
@@ -399,14 +413,21 @@ internal fun Root(
         ModalBottomSheetProperties(shouldDismissOnBackPress = false)
     }
     val listener = remember(rootStateHolder) {
-        { action: UIBlockAction, data: JsonElement ->
-            val compiledAction = compileUIBlockAction(action, data)
-            rootStateHolder.handleNavigate(compiledAction, latestRootData.value)
+        val handler: (UIBlockAction, JsonElement) -> Unit = { action, data ->
+            try {
+                val compiledAction = compileUIBlockAction(action, data)
+                rootStateHolder.handleNavigate(compiledAction, latestRootData.value)
 
-            rootContainer.handleAction(compiledAction) { event ->
-                currentOnEvent.value(event)
+                rootContainer.handleAction(compiledAction) { event ->
+                    currentOnEvent.value(event)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Log.w("NubrickSDK", "Failed to handle root action", e)
             }
         }
+        handler
     }
     LaunchedEffect(modalStateHolder, listener) {
         modalStateHolder.setOnTrigger { trigger, data ->
