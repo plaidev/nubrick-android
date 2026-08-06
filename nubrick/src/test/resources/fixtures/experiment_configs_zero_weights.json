@@ -1,0 +1,22 @@
+{
+  "__typename": "ExperimentConfigs",
+  "configs": [
+    {
+      "__typename": "ExperimentConfig",
+      "id": "zero-weights",
+      "kind": "POPUP",
+      "baseline": {
+        "__typename": "ExperimentVariant",
+        "id": "baseline",
+        "weight": 0
+      },
+      "variants": [
+        {
+          "__typename": "ExperimentVariant",
+          "id": "variant-a",
+          "weight": 0
+        }
+      ]
+    }
+  ]
+}
