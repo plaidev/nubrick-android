@@ -1,9 +1,12 @@
 package app.nubrick.nubrick.template
 
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.fail
 import org.junit.Test
 
 class CompilerTest {
@@ -53,6 +56,45 @@ class CompilerTest {
         assertEquals(JsonPrimitive(this.teamName), variableByPath("$.user.team.name", this.variable))
         assertEquals(this.variable["user"]?.jsonObject, variableByPath("$.user", this.variable))
     }
+
+    @Test
+    fun compileWithNullVariableDoesNotThrow() {
+        val actual = try {
+            compile("Hello {{ user.id }}", null)
+        } catch (e: Throwable) {
+            fail("compile threw: $e")
+            return
+        }
+        assertEquals("Hello ", actual)
+    }
+
+    @Test
+    fun compileMissingPathReplacesWithEmptyString() {
+        assertEquals("Hello ", compile("Hello {{ user.missing }}", this.variable))
+    }
+
+    @Test
+    fun compileUnknownFormatterFallsBackToDefault() {
+        assertEquals("Hello $userId", compile("Hello {{ user.id | nope }}", this.variable))
+    }
+
+    @Test
+    fun compileWithoutPlaceholderReturnsInput() {
+        assertEquals("plain text", compile("plain text", this.variable))
+    }
+
+    @Test
+    fun compileEmptyTemplateReturnsEmptyString() {
+        assertEquals("", compile("", this.variable))
+    }
+
+    @Test
+    fun incompleteBracesAreNotPlaceholders() {
+        assertFalse(hasPlaceholder("{{"))
+        assertFalse(hasPlaceholder("{ user.id }"))
+        assertEquals("{{", compile("{{", this.variable))
+        assertEquals("{ user.id }", compile("{ user.id }", this.variable))
+    }
 }
 
 class FormatterTest {
@@ -80,5 +122,25 @@ class FormatterTest {
     fun defaultFormatter() {
         val actual = formatValue("XYZ", JsonPrimitive(100))
         assertEquals("100", actual)
+    }
+
+    @Test
+    fun defaultFormatterNullAndJsonNullAreEmpty() {
+        assertEquals("", formatValue("", null))
+        assertEquals("", formatValue("", JsonNull))
+        assertEquals("", formatValue("upper", null))
+        assertEquals("", formatValue("lower", JsonNull))
+    }
+
+    @Test
+    fun jsonFormatterWithNullDoesNotThrow() {
+        val actual = try {
+            formatValue("json", null)
+        } catch (e: Throwable) {
+            fail("formatValue(json, null) threw: $e")
+            return
+        }
+        // Pin current soft behavior (empty / null-encoded), whatever it is, as long as no throw.
+        assertEquals("null", actual)
     }
 }
