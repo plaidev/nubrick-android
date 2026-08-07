@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextAlign as PrimitiveTextAlign
 internal fun parseFontDesign(fontDesign: FontDesign?): PrimitiveFontFamily {
     return when (fontDesign) {
         FontDesign.DEFAULT -> PrimitiveFontFamily.Default
-        FontDesign.ROUNDED -> PrimitiveFontFamily.Default
+        FontDesign.ROUNDED -> PrimitiveFontFamily.Default // Fallback to default as comose doesn't have rounded font
         FontDesign.MONOSPACE -> PrimitiveFontFamily.Monospace
         FontDesign.SERIF -> PrimitiveFontFamily.Serif
         else -> PrimitiveFontFamily.Default
