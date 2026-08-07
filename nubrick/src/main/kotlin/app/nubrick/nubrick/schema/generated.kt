@@ -2483,6 +2483,7 @@ internal class UICollectionBlockData (
 	val itemWidth: Int? = null,
 	val itemHeight: Int? = null,
 	val fullItemWidth: Boolean? = null,
+	val fullItemHeight: Boolean? = null,
 	val pageControl: Boolean? = null,
 	val autoScroll: Boolean? = null,
 	val autoScrollInterval: Float? = null,
@@ -2510,6 +2511,7 @@ internal class UICollectionBlockData (
 				itemWidth = IntDecoder.decode(element.jsonObject["itemWidth"]),
 				itemHeight = IntDecoder.decode(element.jsonObject["itemHeight"]),
 				fullItemWidth = BooleanDecoder.decode(element.jsonObject["fullItemWidth"]),
+				fullItemHeight = BooleanDecoder.decode(element.jsonObject["fullItemHeight"]),
 				pageControl = BooleanDecoder.decode(element.jsonObject["pageControl"]),
 				autoScroll = BooleanDecoder.decode(element.jsonObject["autoScroll"]),
 				autoScrollInterval = FloatDecoder.decode(element.jsonObject["autoScrollInterval"]),
@@ -2555,6 +2557,9 @@ internal class UICollectionBlockData (
 			}
 			data.fullItemWidth?.let { value ->
 				BooleanEncoder.encode(value)?.let { map["fullItemWidth"] = it }
+			}
+			data.fullItemHeight?.let { value ->
+				BooleanEncoder.encode(value)?.let { map["fullItemHeight"] = it }
 			}
 			data.pageControl?.let { value ->
 				BooleanEncoder.encode(value)?.let { map["pageControl"] = it }
