@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Override via gitignored local.properties: nubrick.projectId=...
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val nubrickProjectId = localProperties.getProperty("nubrick.projectId")
+    ?.takeIf { it.isNotBlank() }
+    ?: "cgv3p3223akg00fod19g"
 
 android {
     namespace = "app.nubrick.example"
@@ -19,6 +32,7 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        buildConfigField("String", "NUBRICK_PROJECT_ID", "\"$nubrickProjectId\"")
     }
 
     buildTypes {
@@ -39,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {

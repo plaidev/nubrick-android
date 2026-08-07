@@ -8,9 +8,10 @@ import app.nubrick.nubrick.NubrickSDK
 class ExampleApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Override locally with nubrick.projectId=... in local.properties
         val initialized = NubrickSDK.initialize(
             context = this,
-            config = Config(projectId = "cgv3p3223akg00fod19g")
+            config = Config(projectId = BuildConfig.NUBRICK_PROJECT_ID)
         )
         if (!initialized) {
             // Host can retry later or disable Nubrick-dependent UI.
