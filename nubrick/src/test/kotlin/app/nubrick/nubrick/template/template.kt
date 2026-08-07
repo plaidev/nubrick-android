@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.fail
 import org.junit.Test
 
 class CompilerTest {
@@ -59,13 +58,7 @@ class CompilerTest {
 
     @Test
     fun compileWithNullVariableDoesNotThrow() {
-        val actual = try {
-            compile("Hello {{ user.id }}", null)
-        } catch (e: Throwable) {
-            fail("compile threw: $e")
-            return
-        }
-        assertEquals("Hello ", actual)
+        assertEquals("Hello ", compile("Hello {{ user.id }}", null))
     }
 
     @Test
@@ -134,13 +127,6 @@ class FormatterTest {
 
     @Test
     fun jsonFormatterWithNullDoesNotThrow() {
-        val actual = try {
-            formatValue("json", null)
-        } catch (e: Throwable) {
-            fail("formatValue(json, null) threw: $e")
-            return
-        }
-        // Pin current soft behavior (empty / null-encoded), whatever it is, as long as no throw.
-        assertEquals("null", actual)
+        assertEquals("null", formatValue("json", null))
     }
 }
