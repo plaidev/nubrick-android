@@ -2,6 +2,8 @@ package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,8 +31,11 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
     val gap = (block.data?.gap ?: 0).dp
     val direction: FlexDirection = block.data?.direction ?: FlexDirection.ROW
     val size = DpSize((block.data?.itemWidth ?: 0).dp, (block.data?.itemHeight ?: 0).dp)
-    val gridHeight = (block.data?.frame?.paddingTop ?: 0) + (block.data?.frame?.paddingBottom ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemHeight ?: 0))
-    val gridWidth = (block.data?.frame?.paddingLeft ?: 0) + (block.data?.frame?.paddingRight ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemWidth ?: 0))
+    val calculatedHeight = (block.data?.frame?.paddingTop ?: 0) + (block.data?.frame?.paddingBottom ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemHeight ?: 0))
+    val calculatedWidth = (block.data?.frame?.paddingLeft ?: 0) + (block.data?.frame?.paddingRight ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemWidth ?: 0))
+    val gridHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: calculatedHeight
+    val gridWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: calculatedWidth
+    val collectionModifier = modifier.frameSize(block.data?.frame)
 
     val dataState = DataContext.state
     val reference = block.data?.reference
@@ -49,11 +54,13 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
     if (direction == FlexDirection.ROW) {
         LazyHorizontalGrid(
             contentPadding = padding,
-            rows = GridCells.Fixed(gridSize),
+            rows = GridCells.FixedSize(size.height.coerceAtLeast(1.dp)),
             state = state,
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalArrangement = Arrangement.spacedBy(gap),
-            modifier = modifier.height(gridHeight.dp)
+            modifier = collectionModifier
+                .fillMaxWidth()
+                .height(gridHeight.dp)
         ) {
             items(children.size) {
                 Box(Modifier.size(size)) {
@@ -66,11 +73,13 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
     } else {
         LazyVerticalGrid(
             contentPadding = padding,
-            columns = GridCells.Fixed(gridSize),
+            columns = GridCells.FixedSize(size.width.coerceAtLeast(1.dp)),
             state = state,
             verticalArrangement = Arrangement.spacedBy(gap),
             horizontalArrangement = Arrangement.spacedBy(gap),
-            modifier = modifier.width(gridWidth.dp)
+            modifier = collectionModifier
+                .fillMaxHeight()
+                .width(gridWidth.dp)
         ) {
             items(children.size) {
                 Box(Modifier.size(size)) {
