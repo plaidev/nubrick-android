@@ -106,4 +106,98 @@ class LinkNavigationTest {
         assertEquals(visiblePage.id, stateHolder.currentPageBlock.value?.id)
         assertNull(stateHolder.webviewData.value)
     }
+
+    @Test
+    fun emptyDeepLinkStillNavigatesToDestination() {
+        val page = UIPageBlock(
+            id = "page",
+            data = UIPageBlockData(kind = PageKind.COMPONENT),
+        )
+        val stateHolder = RootStateHolder(
+            root = UIRootBlock(
+                id = "root",
+                data = UIRootBlockData(pages = listOf(page)),
+            ),
+            modalStateHolder = mock(ModalStateHolder::class.java),
+        )
+        stateHolder.handleNavigate(
+            action = UIBlockAction(deepLink = "", destinationPageId = page.id),
+            rootData = JsonNull,
+        )
+        assertEquals(page.id, stateHolder.currentPageBlock.value?.id)
+    }
+
+    @Test
+    fun malformedDeepLinkIsPassedThroughToOpenHandler() {
+        var opened: String? = null
+        val stateHolder = RootStateHolder(
+            root = UIRootBlock(id = "root", data = UIRootBlockData(pages = emptyList())),
+            modalStateHolder = mock(ModalStateHolder::class.java),
+            onOpenDeepLink = { link -> opened = link },
+        )
+        stateHolder.handleNavigate(
+            action = UIBlockAction(deepLink = ":::not-a-valid-uri:::"),
+            rootData = JsonNull,
+        )
+        assertEquals(":::not-a-valid-uri:::", opened)
+    }
+
+    @Test
+    fun deepLinkAndDestinationAreBothApplied() {
+        var opened: String? = null
+        val page = UIPageBlock(
+            id = "page",
+            data = UIPageBlockData(kind = PageKind.COMPONENT),
+        )
+        val stateHolder = RootStateHolder(
+            root = UIRootBlock(
+                id = "root",
+                data = UIRootBlockData(pages = listOf(page)),
+            ),
+            modalStateHolder = mock(ModalStateHolder::class.java),
+            onOpenDeepLink = { link -> opened = link },
+        )
+        stateHolder.handleNavigate(
+            action = UIBlockAction(
+                deepLink = "https://example.com/path",
+                destinationPageId = page.id,
+            ),
+            rootData = JsonNull,
+        )
+        assertEquals("https://example.com/path", opened)
+        assertEquals(page.id, stateHolder.currentPageBlock.value?.id)
+    }
+
+    @Test
+    fun webviewModalStoresEmptyAndMalformedUrlsOnNavigate() {
+        val emptyUrlPage = UIPageBlock(
+            id = "web-empty",
+            data = UIPageBlockData(kind = PageKind.WEBVIEW_MODAL, webviewUrl = ""),
+        )
+        val weirdUrlPage = UIPageBlock(
+            id = "web-weird",
+            data = UIPageBlockData(kind = PageKind.WEBVIEW_MODAL, webviewUrl = ":::not-a-valid-uri:::"),
+        )
+        val stateHolder = RootStateHolder(
+            root = UIRootBlock(
+                id = "root",
+                data = UIRootBlockData(pages = listOf(emptyUrlPage, weirdUrlPage)),
+            ),
+            modalStateHolder = mock(ModalStateHolder::class.java),
+        )
+
+        stateHolder.handleNavigate(
+            action = UIBlockAction(destinationPageId = emptyUrlPage.id),
+            rootData = JsonNull,
+        )
+        assertEquals("", stateHolder.webviewData.value?.url)
+        assertEquals(emptyUrlPage.id, stateHolder.currentPageBlock.value?.id)
+
+        stateHolder.handleNavigate(
+            action = UIBlockAction(destinationPageId = weirdUrlPage.id),
+            rootData = JsonNull,
+        )
+        assertEquals(":::not-a-valid-uri:::", stateHolder.webviewData.value?.url)
+        assertEquals(weirdUrlPage.id, stateHolder.currentPageBlock.value?.id)
+    }
 }
