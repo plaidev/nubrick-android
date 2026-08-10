@@ -91,4 +91,22 @@ class CacheStoreTest {
         assertTrue("Cache should be expired", getResult.isFailure)
         assertTrue("Should throw NotFoundException", getResult.exceptionOrNull() is NotFoundException)
     }
+
+    @Test
+    fun `conditional remove does not wipe a newer entry`() {
+        val key = "test-key"
+        cacheStore.set(key, "old")
+        val staleSnapshot = cacheStore.get(key).getOrThrow()
+
+        cacheStore.set(key, "new")
+        assertFalse(cacheStore.remove(key, staleSnapshot))
+        assertEquals("new", cacheStore.get(key).getOrThrow().data)
+    }
+
+    @Test
+    fun `remove deletes cache entry`() {
+        cacheStore.set("k", "v")
+        cacheStore.remove("k")
+        assertTrue(cacheStore.get("k").isFailure)
+    }
 }

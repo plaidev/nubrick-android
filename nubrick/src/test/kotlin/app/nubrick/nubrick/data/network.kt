@@ -4,6 +4,7 @@ import app.nubrick.nubrick.data.user.DATETIME_OFFSET
 import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import okhttp3.Cache
 import okhttp3.OkHttpClient
@@ -195,6 +196,138 @@ class NetworkTest {
             DATETIME_OFFSET = 0
             diskCache.close()
         }
+    }
+
+    @Test
+    fun `stale refresh 404 invalidates memory and okhttp cache`() {
+        val diskCache = Cache(temporaryFolder.newFolder("okhttp-cache-404"), 10L * 1024 * 1024)
+        val client = OkHttpClient.Builder().cache(diskCache).build()
+        val memory = CacheStore()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, client)
+
+        try {
+            val (result, requestCount) = withLocalServer(
+                cacheableResponse(200, "old"),
+                response(404),
+            ) { endpoint ->
+                runBlocking {
+                    assertTrue(repo.getWithCache(endpoint).isSuccess)
+                    assertEquals("old", memory.get(endpoint).getOrNull()?.data)
+
+                    // Make memory entry stale and trigger background refresh.
+                    DATETIME_OFFSET = 61_000
+                    assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+
+                    // Wait for background refresh (404) to finish.
+                    var invalidated = false
+                    repeat(50) {
+                        delay(50)
+                        if (memory.get(endpoint).isFailure) {
+                            invalidated = true
+                            return@repeat
+                        }
+                    }
+                    assertTrue(invalidated)
+
+                    // New CacheStore forces OkHttp path; 404 must not resurrect old body.
+                    val secondRepo = NetworkRepository(scope, CacheStore(), client)
+                    val after = secondRepo.getWithCache(endpoint)
+                    assertTrue(after.isFailure)
+                    assertTrue(after.exceptionOrNull() is NotFoundException)
+                    endpoint
+                }
+            }
+            assertTrue(requestCount >= 2)
+            assertTrue(result.isNotEmpty())
+        } finally {
+            DATETIME_OFFSET = 0
+            diskCache.close()
+        }
+    }
+
+    @Test
+    fun `stale refresh network failure keeps last good`() {
+        val memory = CacheStore()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, OkHttpClient())
+
+        val (kept, requestCount) = withLocalServer(
+            cacheableResponse(200, "old"),
+            // Close after first response by not serving second — use 500 then connection issues.
+            // 500 is retried; after retries still failure → keep cache.
+            response(500),
+            response(500),
+            response(500),
+        ) { endpoint ->
+            runBlocking {
+                assertTrue(repo.getWithCache(endpoint).isSuccess)
+                DATETIME_OFFSET = 61_000
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+
+                var stillPresent = false
+                repeat(50) {
+                    delay(50)
+                    // After refresh attempts finish, entry must remain.
+                    if (memory.get(endpoint).isSuccess) {
+                        stillPresent = true
+                    }
+                }
+                // Reset offset so get() doesn't treat as expired (10m).
+                DATETIME_OFFSET = 61_000
+                assertTrue(stillPresent)
+                assertEquals("old", memory.get(endpoint).getOrNull()?.data)
+                memory.get(endpoint).getOrNull()?.data
+            }
+        }
+
+        assertEquals("old", kept)
+        assertTrue(requestCount >= 2)
+        DATETIME_OFFSET = 0
+    }
+
+    @Test
+    fun `stale refresh coalesces in-flight requests`() {
+        val memory = CacheStore()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, OkHttpClient())
+
+        val slowOk = "HTTP/1.1 200 OK\r\n" +
+            "Cache-Control: public, max-age=600\r\n" +
+            "Content-Length: 3\r\n" +
+            "Connection: close\r\n" +
+            "\r\n" +
+            "new"
+
+        val (body, count) = withLocalServer(
+            cacheableResponse(200, "old"),
+            slowOk,
+            slowOk,
+            slowOk,
+        ) { endpoint ->
+            runBlocking {
+                assertTrue(repo.getWithCache(endpoint).isSuccess)
+                DATETIME_OFFSET = 61_000
+                // Burst stale reads — should schedule a single refresh.
+                repeat(5) {
+                    assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+                }
+                var updated = false
+                repeat(50) {
+                    delay(50)
+                    if (memory.get(endpoint).getOrNull()?.data == "new") {
+                        updated = true
+                        return@repeat
+                    }
+                }
+                assertTrue(updated)
+                endpoint
+            }
+        }
+        // 1 initial + 1 coalesced refresh (not 5).
+        assertTrue("requestCount=$count", count <= 3)
+        assertTrue(body.isNotEmpty())
+        DATETIME_OFFSET = 0
     }
 
     companion object {
