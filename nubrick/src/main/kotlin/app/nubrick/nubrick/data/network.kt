@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import okhttp3.CacheControl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -68,7 +69,7 @@ internal class NetworkRepository(
         }
         scope.launch(Dispatchers.IO) {
             try {
-                getRequest(endpoint, syncDateTime, client).fold(
+                getRequest(endpoint, syncDateTime, client, forceNetwork = true).fold(
                     onSuccess = { body ->
                         cache.set(endpoint, body)
                     },
@@ -133,15 +134,19 @@ private fun isRetryable(e: Throwable): Boolean {
 internal suspend fun getRequest(
     endpoint: String,
     syncDateTime: Boolean = false,
-    client: OkHttpClient
+    client: OkHttpClient,
+    forceNetwork: Boolean = false,
 ): Result<String> = requestWithRetry {
     try {
         val t0 = System.currentTimeMillis()
-        val request = Request.Builder()
+        val builder = Request.Builder()
             .url(endpoint)
             .get()
-            .build()
-        executeRequest(client, request, syncDateTime, t0)
+        if (forceNetwork) {
+            // Stale refresh must observe origin 404/updates; do not satisfy from disk cache alone.
+            builder.cacheControl(CacheControl.FORCE_NETWORK)
+        }
+        executeRequest(client, builder.build(), syncDateTime, t0)
     } catch (e: IllegalArgumentException) {
         Result.failure(e)
     }
