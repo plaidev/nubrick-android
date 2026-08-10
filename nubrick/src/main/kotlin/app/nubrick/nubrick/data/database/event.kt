@@ -64,10 +64,12 @@ internal class UserEvent(private val db: SQLiteDatabase) {
      * The result is a map whose key is the bucket start ([ZonedDateTime]) and value is the
      * number of events that fall into that bucket.
      *
+     * The effective lower bound is the later of (now − lookback) and [since].
+     *
      * @param name           Event name to aggregate.
-     * @param unit           Time unit used as aggregation bucket.
-     * @param lookbackPeriod Number of [unit]s to look back **from the `since` date**. If null, defaults to 50 years.
-     * @param since          ISO-8601 timestamp string that defines the upper-bound (latest) date to look back from.
+     * @param unit           Time unit used as aggregation bucket and lookback unit.
+     * @param lookbackPeriod Number of [unit]s to look back from now. If null, defaults to 50 years.
+     * @param since          Lower-bound timestamp; events before this instant are excluded.
      *                       If null, defaults to 50 years ago.
      */
     fun counts(
