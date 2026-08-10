@@ -230,7 +230,7 @@ internal fun Modifier.borderRadius(frame: FrameData?): Modifier {
 }
 
 @Composable
-internal fun Modifier.frameSize(frame: FrameData?): Modifier {
+internal fun Modifier.frameSize(frame: FrameData?, includeBorder: Boolean = true): Modifier {
     var mod = this
     // size should be set most lastly to make padding insets.
     // width should be content fit by default
@@ -262,7 +262,7 @@ internal fun Modifier.frameSize(frame: FrameData?): Modifier {
         mod = mod.background(parseColor(frame.background))
     }
 
-    if (frame?.borderWidth == 0 || frame?.borderWidth == null) {
+    if (!includeBorder || frame?.borderWidth == 0 || frame?.borderWidth == null) {
         return mod
     }
 
@@ -278,11 +278,13 @@ internal fun Modifier.frameSize(frame: FrameData?): Modifier {
 
 @Composable
 internal fun Modifier.framePadding(frame: FrameData?, insetTop: Dp = 0.dp): Modifier {
+    val border = (frame?.borderWidth ?: 0).coerceAtLeast(0).dp
+
     return this.padding(
-        start = frame?.paddingLeft?.dp ?: 0.dp,
-        top = (frame?.paddingTop?.dp ?: 0.dp) + insetTop,
-        end = frame?.paddingRight?.dp ?: 0.dp,
-        bottom = frame?.paddingBottom?.dp ?: 0.dp,
+        start = (frame?.paddingLeft?.dp ?: 0.dp) + border,
+        top = (frame?.paddingTop?.dp ?: 0.dp) + insetTop + border,
+        end = (frame?.paddingRight?.dp ?: 0.dp) + border,
+        bottom = (frame?.paddingBottom?.dp ?: 0.dp) + border,
     )
 }
 
