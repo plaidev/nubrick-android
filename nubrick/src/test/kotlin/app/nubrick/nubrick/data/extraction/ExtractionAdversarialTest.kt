@@ -115,10 +115,7 @@ class ExtractionAdversarialTest {
             fail("extractExperimentVariant threw: $e")
             return
         }
-        // Soft: either baseline or null is acceptable; must not crash.
-        if (variant != null) {
-            assertEquals("baseline", variant.id)
-        }
+        assertNull(variant)
     }
 
     @Test
