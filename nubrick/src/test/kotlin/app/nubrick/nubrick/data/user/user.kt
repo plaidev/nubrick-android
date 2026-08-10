@@ -4,9 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import app.nubrick.nubrick.schema.BuiltinUserProperty
 import app.nubrick.nubrick.schema.UserPropertyType
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.anyString
@@ -24,6 +27,11 @@ import java.util.TimeZone
 import kotlin.math.abs
 
 class UtilsUnitTest {
+    @After
+    fun tearDown() {
+        DATETIME_OFFSET = 0
+    }
+
     @Test
     fun testSyncDateFromHttpDateHeader_shouldWork() {
         DATETIME_OFFSET = 0
@@ -59,17 +67,13 @@ class UtilsUnitTest {
             .withSecond(30)
             .withNano(0)
         DATETIME_OFFSET = target.toInstant().toEpochMilli() - System.currentTimeMillis()
-        try {
-            val user = NubrickUser(context = mockContext(), seed = 0)
+        val user = NubrickUser(context = mockContext(), seed = 0)
 
-            val localMinute = user.toUserProperties().first {
-                it.name == BuiltinUserProperty.localMinute.toString()
-            }
-
-            assertEquals((12 * 60 + 34).toString(), localMinute.value)
-        } finally {
-            DATETIME_OFFSET = 0
+        val localMinute = user.toUserProperties().first {
+            it.name == BuiltinUserProperty.localMinute.toString()
         }
+
+        assertEquals((12 * 60 + 34).toString(), localMinute.value)
     }
 
     @Test
@@ -185,7 +189,120 @@ class UtilsUnitTest {
         assertEquals(0, user.retention)
     }
 
-    private fun mockContext(allPreferences: Map<String, Any> = emptyMap()): Context {
+    @Test
+    fun getNormalizedUserRnd_shouldBeDeterministicForSameSeeds() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+
+        val first = user.getNormalizedUserRnd(42)
+        val second = user.getNormalizedUserRnd(42)
+
+        assertEquals(first, second, 0.0)
+    }
+
+    @Test
+    fun getNormalizedUserRnd_shouldStayInHalfOpenUnitInterval() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+
+        repeat(50) { experimentSeed ->
+            val rnd = user.getNormalizedUserRnd(experimentSeed)
+            assertTrue("rnd=$rnd seed=$experimentSeed", rnd >= 0.0 && rnd < 1.0)
+        }
+    }
+
+    @Test
+    fun getNormalizedUserRnd_shouldVaryByExperimentSeed() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+
+        val a = user.getNormalizedUserRnd(1)
+        val b = user.getNormalizedUserRnd(2)
+
+        assertNotEquals(a, b)
+    }
+
+    @Test
+    fun comeBack_shouldCountUpOnNextUtcDay_keepSameDay_andResetOnGap() {
+        val store = mutableMapOf<String, Any>()
+        setSyncedInstant(Instant.parse("2024-01-10T12:00:00Z"))
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+        assertEquals(0, user.retention)
+
+        setSyncedInstant(Instant.parse("2024-01-11T12:00:00Z"))
+        user.comeBack()
+        assertEquals(1, user.retention)
+
+        setSyncedInstant(Instant.parse("2024-01-11T18:00:00Z"))
+        user.comeBack()
+        assertEquals(1, user.retention)
+
+        setSyncedInstant(Instant.parse("2024-01-13T12:00:00Z"))
+        user.comeBack()
+        assertEquals(0, user.retention)
+    }
+
+    @Test
+    fun userId_shouldPersistAcrossInstances() {
+        val store = mutableMapOf<String, Any>()
+        val first = NubrickUser(context = mockContext(store = store), seed = 0)
+        val userId = first.id
+
+        val second = NubrickUser(context = mockContext(store = store), seed = 0)
+        assertEquals(userId, second.id)
+    }
+
+    @Test
+    fun setUserId_shouldUpdateAndPersist() {
+        val store = mutableMapOf<String, Any>()
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        user.setUserId("custom-user")
+        assertEquals("custom-user", user.id)
+        assertEquals("custom-user", user.getProperty(BuiltinUserProperty.userId.toString()))
+
+        val reloaded = NubrickUser(context = mockContext(store = store), seed = 0)
+        assertEquals("custom-user", reloaded.id)
+    }
+
+    @Test
+    fun setProperties_shouldPersistCustomValuesAndUserId() {
+        val store = mutableMapOf<String, Any>()
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        user.setProperties(
+            mapOf(
+                BuiltinUserProperty.userId.toString() to "from-map",
+                "plan" to "pro",
+            )
+        )
+
+        assertEquals("from-map", user.id)
+        assertEquals("pro", user.getProperty("plan"))
+
+        val reloaded = NubrickUser(context = mockContext(store = store), seed = 0)
+        assertEquals("from-map", reloaded.id)
+        assertEquals("pro", reloaded.getProperty("plan"))
+    }
+
+    @Test
+    fun userSeed_shouldPersistAndKeepRndStableAcrossInstances() {
+        val store = mutableMapOf<String, Any>()
+        val first = NubrickUser(context = mockContext(store = store), seed = 7)
+        val rnd = first.getNormalizedUserRnd(99)
+
+        val second = NubrickUser(context = mockContext(store = store), seed = 12345)
+        assertEquals(rnd, second.getNormalizedUserRnd(99), 0.0)
+    }
+
+    private fun setSyncedInstant(instant: Instant) {
+        DATETIME_OFFSET = instant.toEpochMilli() - System.currentTimeMillis()
+    }
+
+    private fun mockContext(
+        allPreferences: Map<String, Any> = emptyMap(),
+        store: MutableMap<String, Any>? = null,
+    ): Context {
+        val backing = store ?: mutableMapOf()
+        backing.putAll(allPreferences)
+
         val context = mock(Context::class.java)
         val preferences = mock(SharedPreferences::class.java)
         val editor = mock(SharedPreferences.Editor::class.java)
@@ -193,20 +310,40 @@ class UtilsUnitTest {
         `when`(context.packageName).thenReturn("app.nubrick.test")
         `when`(context.getSharedPreferences("app.nubrick.test.nubrik.io.user", Context.MODE_PRIVATE))
             .thenReturn(preferences)
-        `when`(preferences.getString(anyString(), anyString())).thenAnswer { invocation ->
-            invocation.arguments[1] as String?
+        `when`(preferences.getString(anyString(), any())).thenAnswer { invocation ->
+            val key = invocation.getArgument<String>(0)
+            val default = invocation.getArgument<String?>(1)
+            backing[key] as? String ?: default
         }
         `when`(preferences.getInt(anyString(), anyInt())).thenAnswer { invocation ->
-            invocation.arguments[1] as Int
+            val key = invocation.getArgument<String>(0)
+            val default = invocation.getArgument<Int>(1)
+            backing[key] as? Int ?: default
         }
         `when`(preferences.getLong(anyString(), anyLong())).thenAnswer { invocation ->
-            invocation.arguments[1] as Long
+            val key = invocation.getArgument<String>(0)
+            val default = invocation.getArgument<Long>(1)
+            when (val value = backing[key]) {
+                is Long -> value
+                is Int -> value.toLong()
+                else -> default
+            }
         }
-        `when`(preferences.all).thenReturn(allPreferences)
+        `when`(preferences.all).thenReturn(backing.toMap())
         `when`(preferences.edit()).thenReturn(editor)
-        `when`(editor.putString(anyString(), anyString())).thenReturn(editor)
-        `when`(editor.putInt(anyString(), anyInt())).thenReturn(editor)
-        `when`(editor.putLong(anyString(), anyLong())).thenReturn(editor)
+        `when`(editor.putString(anyString(), anyString())).thenAnswer { invocation ->
+            backing[invocation.getArgument(0)] = invocation.getArgument<String>(1)
+            editor
+        }
+        `when`(editor.putInt(anyString(), anyInt())).thenAnswer { invocation ->
+            backing[invocation.getArgument(0)] = invocation.getArgument<Int>(1)
+            editor
+        }
+        `when`(editor.putLong(anyString(), anyLong())).thenAnswer { invocation ->
+            backing[invocation.getArgument(0)] = invocation.getArgument<Long>(1)
+            editor
+        }
+        `when`(editor.apply()).then { }
 
         return context
     }
