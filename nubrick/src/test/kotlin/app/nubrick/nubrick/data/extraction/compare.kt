@@ -125,6 +125,17 @@ class ComparisonUnitTest {
     }
 
     @Test
+    fun shouldCompareStringInNotInWithEmptyConditionValue() {
+        // STRING keeps empty tokens from split ("" → [""]), unlike SEMVER/BOOLEAN.
+        assertEquals(false, comparePropWithConditionValue(this.strProp, null, "", ConditionOperator.In))
+        assertEquals(true, comparePropWithConditionValue(this.strProp, null, "", ConditionOperator.NotIn))
+
+        val emptyProp = UserProperty(name = "str", value = "", type = UserPropertyType.STRING)
+        assertEquals(true, comparePropWithConditionValue(emptyProp, null, "", ConditionOperator.In))
+        assertEquals(false, comparePropWithConditionValue(emptyProp, null, "", ConditionOperator.NotIn))
+    }
+
+    @Test
     fun shouldCompareSemver() {
         assertEquals(true, comparePropWithConditionValue(this.semverProp, null, "1", ConditionOperator.Equal))
         assertEquals(true, comparePropWithConditionValue(this.semverProp, null, "1.1", ConditionOperator.Equal))
