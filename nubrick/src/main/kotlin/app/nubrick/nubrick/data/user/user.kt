@@ -121,7 +121,8 @@ class NubrickUser {
 
     val retention: Int
         get() {
-            return (this.state.value.properties[BuiltinUserProperty.retentionPeriod.toString()] ?: "0").toInt()
+            return (this.state.value.properties[BuiltinUserProperty.retentionPeriod.toString()] ?: "0")
+                .toIntOrNull() ?: 0
         }
 
     internal constructor(context: Context, seed: Int? = null) {
@@ -228,9 +229,8 @@ class NubrickUser {
 
     fun comeBack() {
         val now = getCurrentDate()
-        val lastBootTime = getCurrentDate()
-        this.setBaseProperty(BuiltinUserProperty.lastBootTime.toString(), formatISO8601(lastBootTime))
-        this.lastBootTime = lastBootTime
+        this.setBaseProperty(BuiltinUserProperty.lastBootTime.toString(), formatISO8601(now))
+        this.lastBootTime = now
 
         val retentionPeriodKey = BuiltinUserProperty.retentionPeriod.toString()
         val retentionTimestamp = this.preferences?.getLong(retentionPeriodKey, now.toEpochSecond()) ?: now.toEpochSecond()
