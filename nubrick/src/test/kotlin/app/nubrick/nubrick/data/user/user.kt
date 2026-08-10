@@ -171,6 +171,20 @@ class UtilsUnitTest {
         assertEquals(UserPropertyType.STRING, date.type)
     }
 
+    @Test
+    fun retention_shouldReturnZeroWhenPropertyIsNotAnInt() {
+        val user = NubrickUser(context = mockContext(), seed = 0)
+        val setBaseProperty = NubrickUser::class.java.getDeclaredMethod(
+            "setBaseProperty",
+            String::class.java,
+            String::class.java,
+        )
+        setBaseProperty.isAccessible = true
+        setBaseProperty.invoke(user, BuiltinUserProperty.retentionPeriod.toString(), "not-a-number")
+
+        assertEquals(0, user.retention)
+    }
+
     private fun mockContext(allPreferences: Map<String, Any> = emptyMap()): Context {
         val context = mock(Context::class.java)
         val preferences = mock(SharedPreferences::class.java)
