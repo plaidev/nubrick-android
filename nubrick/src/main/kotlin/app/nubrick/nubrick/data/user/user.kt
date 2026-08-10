@@ -121,7 +121,8 @@ class NubrickUser {
 
     val retention: Int
         get() {
-            return (this.state.value.properties[BuiltinUserProperty.retentionPeriod.toString()] ?: "0").toInt()
+            return (this.state.value.properties[BuiltinUserProperty.retentionPeriod.toString()] ?: "0")
+                .toIntOrNull() ?: 0
         }
 
     internal constructor(context: Context, seed: Int? = null) {
