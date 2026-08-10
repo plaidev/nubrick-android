@@ -95,7 +95,8 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
         (block.data?.frame?.paddingRight ?: 0) + (block.data?.itemWidth ?: 0)
     val crossHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: calculatedHeight
     val crossWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: calculatedWidth
-    val collectionModifier = modifier.frameSize(block.data?.frame)
+    // Collections do not support borders in the editor, so ignore any frame border values.
+    val collectionModifier = modifier.frameSize(block.data?.frame, includeBorder = false)
     if (direction == FlexDirection.ROW) {
         HorizontalPager(
             contentPadding = padding,

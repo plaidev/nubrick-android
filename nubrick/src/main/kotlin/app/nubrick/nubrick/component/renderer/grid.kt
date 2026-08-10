@@ -35,7 +35,8 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
     val calculatedWidth = (block.data?.frame?.paddingLeft ?: 0) + (block.data?.frame?.paddingRight ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemWidth ?: 0))
     val gridHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: calculatedHeight
     val gridWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: calculatedWidth
-    val collectionModifier = modifier.frameSize(block.data?.frame)
+    // Collections do not support borders in the editor, so ignore any frame border values.
+    val collectionModifier = modifier.frameSize(block.data?.frame, includeBorder = false)
 
     val dataState = DataContext.state
     val reference = block.data?.reference
