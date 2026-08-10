@@ -7,8 +7,10 @@ import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.ExperimentCondition
 import app.nubrick.nubrick.schema.ExperimentConfig
 import app.nubrick.nubrick.schema.ExperimentConfigs
+import app.nubrick.nubrick.schema.ExperimentFrequency
 import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
+import app.nubrick.nubrick.schema.UserEventFrequencyCondition
 import app.nubrick.nubrick.schema.VariantConfig
 import org.junit.Assert
 import org.junit.Test
@@ -247,5 +249,155 @@ class ExtractionUnitTest {
             configs, listOf(ExperimentKind.CONFIG), { _ -> emptyList() }, { _, _ -> true }, { _ -> true }
         )
         Assert.assertNull(configOnly)
+    }
+
+    @Test
+    fun extractExperimentConfig_shouldRespectIsNotInFrequency() {
+        val configs = ExperimentConfigs(
+            configs = listOf(
+                ExperimentConfig(
+                    id = "in-frequency",
+                    kind = ExperimentKind.POPUP,
+                    frequency = ExperimentFrequency(period = 1),
+                ),
+                ExperimentConfig(
+                    id = "allowed",
+                    kind = ExperimentKind.POPUP,
+                ),
+            )
+        )
+
+        val selected = extractExperimentConfig(
+            configs = configs,
+            kinds = listOf(ExperimentKind.POPUP),
+            properties = { emptyList() },
+            isNotInFrequency = { experimentId, _ -> experimentId != "in-frequency" },
+            isMatchedToUserEventFrequencyConditions = { true },
+        )
+
+        Assert.assertEquals("allowed", selected?.id)
+    }
+
+    @Test
+    fun extractExperimentConfig_shouldRespectEventFrequencyConditions() {
+        val blocked = listOf(
+            UserEventFrequencyCondition(eventName = "purchase", threshold = 1)
+        )
+        val configs = ExperimentConfigs(
+            configs = listOf(
+                ExperimentConfig(
+                    id = "needs-event",
+                    kind = ExperimentKind.POPUP,
+                    eventFrequencyConditions = blocked,
+                ),
+                ExperimentConfig(
+                    id = "no-event-condition",
+                    kind = ExperimentKind.POPUP,
+                ),
+            )
+        )
+
+        val selected = extractExperimentConfig(
+            configs = configs,
+            kinds = listOf(ExperimentKind.POPUP),
+            properties = { emptyList() },
+            isNotInFrequency = { _, _ -> true },
+            isMatchedToUserEventFrequencyConditions = { conditions ->
+                conditions.isNullOrEmpty()
+            },
+        )
+
+        Assert.assertEquals("no-event-condition", selected?.id)
+    }
+
+    @Test
+    fun isInDistributionTarget_shouldFailClosedWhenPropertyMissing() {
+        val distribution = listOf(
+            ExperimentCondition(
+                property = "missing",
+                operator = ConditionOperator.Equal.name,
+                value = "x",
+            )
+        )
+        Assert.assertFalse(isInDistributionTarget(distribution, emptyList()))
+    }
+
+    @Test
+    fun isInDistributionTarget_shouldFailClosedWhenConditionFieldsAreNull() {
+        val properties = listOf(
+            UserProperty(name = "name", value = "Nubrick", type = UserPropertyType.STRING)
+        )
+
+        Assert.assertFalse(
+            isInDistributionTarget(
+                listOf(ExperimentCondition(property = null, operator = ConditionOperator.Equal.name, value = "Nubrick")),
+                properties,
+            )
+        )
+        Assert.assertFalse(
+            isInDistributionTarget(
+                listOf(ExperimentCondition(property = "name", operator = null, value = "Nubrick")),
+                properties,
+            )
+        )
+        Assert.assertFalse(
+            isInDistributionTarget(
+                listOf(ExperimentCondition(property = "name", operator = ConditionOperator.Equal.name, value = null)),
+                properties,
+            )
+        )
+    }
+
+    @Test
+    fun isInDistributionTarget_shouldFailClosedWhenOperatorIsUnknown() {
+        val properties = listOf(
+            UserProperty(name = "name", value = "Nubrick", type = UserPropertyType.STRING)
+        )
+        val distribution = listOf(
+            ExperimentCondition(
+                property = "name",
+                operator = ConditionOperator.UNKNOWN.name,
+                value = "Nubrick",
+            )
+        )
+        Assert.assertFalse(isInDistributionTarget(distribution, properties))
+    }
+
+    @Test
+    fun extractExperimentVariant_shouldSelectBaselineAtZeroRnd() {
+        val config = ExperimentConfig(
+            baseline = ExperimentVariant(id = "baseline", weight = 1),
+            variants = listOf(
+                ExperimentVariant(id = "a", weight = 1),
+                ExperimentVariant(id = "b", weight = 1),
+            )
+        )
+        Assert.assertEquals("baseline", extractExperimentVariant(config, 0.0)?.id)
+    }
+
+    @Test
+    fun extractExperimentVariant_shouldSelectLastVariantJustBelowOne() {
+        val config = ExperimentConfig(
+            baseline = ExperimentVariant(id = "baseline", weight = 1),
+            variants = listOf(
+                ExperimentVariant(id = "a", weight = 1),
+                ExperimentVariant(id = "b", weight = 1),
+                ExperimentVariant(id = "c", weight = 1),
+            )
+        )
+        // CDF ends at 1.0; rnd in [0, 1) near the top must still land in the last bucket.
+        Assert.assertEquals("c", extractExperimentVariant(config, 0.999999999)?.id)
+    }
+
+    @Test
+    fun extractExperimentVariant_shouldSelectLastVariantAtOne() {
+        val config = ExperimentConfig(
+            baseline = ExperimentVariant(id = "baseline", weight = 1),
+            variants = listOf(
+                ExperimentVariant(id = "a", weight = 1),
+                ExperimentVariant(id = "b", weight = 1),
+            )
+        )
+        Assert.assertEquals("b", extractExperimentVariant(config, 1.0)?.id)
     }
 }
