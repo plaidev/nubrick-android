@@ -425,7 +425,7 @@ class ContainerSurveyResponseTest {
     }
 
     @Test
-    fun `appendExperimentHistory forwards to database repository`() {
+    fun `appendExperimentHistory forwards to database repository`() = runBlocking {
         val databaseRepository = FakeDatabaseRepository()
         val container = newContainer(databaseRepository = databaseRepository)
 
@@ -558,20 +558,20 @@ private class FakeDatabaseRepository(
     val experimentHistories = mutableListOf<String>()
     val frequencyChecks = mutableListOf<Pair<String, ExperimentFrequency?>>()
 
-    override fun appendUserEvent(name: String) {
+    override suspend fun appendUserEvent(name: String) {
         userEvents.add(name)
     }
 
-    override fun appendExperimentHistory(experimentId: String) {
+    override suspend fun appendExperimentHistory(experimentId: String) {
         experimentHistories.add(experimentId)
     }
 
-    override fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean {
+    override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean {
         frequencyChecks.add(experimentId to frequency)
         return notInFrequency
     }
 
-    override fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean {
+    override suspend fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean {
         return matchedEventFrequency
     }
 }

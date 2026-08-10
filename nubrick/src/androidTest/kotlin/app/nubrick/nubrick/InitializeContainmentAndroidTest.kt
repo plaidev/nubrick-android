@@ -12,16 +12,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 
 @RunWith(AndroidJUnit4::class)
 class InitializeContainmentAndroidTest {
     @Before
     fun setup() {
-        NubrickSDK.resetForTest()
+        resetSdk()
     }
 
     @After
     fun teardown() {
+        resetSdk()
+    }
+
+    private fun resetSdk() = runBlocking {
         NubrickSDK.resetForTest()
     }
 

@@ -57,50 +57,35 @@ internal fun extractExperimentVariant(config: ExperimentConfig, normalizedUserRn
     return null
 }
 
-internal fun extractExperimentConfig(
+internal suspend fun extractExperimentConfig(
     configs: ExperimentConfigs,
     kinds: List<ExperimentKind>,
     properties: (seed: Int?) -> List<UserProperty>,
-    isNotInFrequency: (experimentId: String, frequency: ExperimentFrequency?) -> Boolean,
-    isMatchedToUserEventFrequencyConditions: (conditions: List<UserEventFrequencyCondition>?) -> Boolean,
+    isNotInFrequency: suspend (experimentId: String, frequency: ExperimentFrequency?) -> Boolean,
+    isMatchedToUserEventFrequencyConditions: suspend (conditions: List<UserEventFrequencyCondition>?) -> Boolean,
 ): ExperimentConfig? {
     val configList = configs.configs ?: return null
     if (configList.isEmpty()) return null
     val currentDate = getCurrentDate()
 
-    // Filter configs that match the requested kinds, are within their time window, and match all conditions
-    val matched = configList.filter { config ->
-        val configKind = config.kind ?: return@filter false
-        if (!kinds.contains(configKind)) return@filter false
+    // Filter configs that match the requested kinds, are within their time window, and match all conditions.
+    val matched = mutableListOf<ExperimentConfig>()
 
-        val startedAt = config.startedAt
-        if (startedAt != null) {
-            if (currentDate.isBefore(startedAt)) {
-                return@filter false
-            }
-        }
-        val endedAt = config.endedAt
-        if (endedAt != null) {
-            if (currentDate.isAfter(endedAt)) {
-                return@filter false
-            }
-        }
+    for (config in configList) {
+        val configKind = config.kind ?: continue
+        if (!kinds.contains(configKind)) continue
+
+        if (config.startedAt?.let { currentDate.isBefore(it) } == true) continue
+        if (config.endedAt?.let { currentDate.isAfter(it) } == true) continue
+
         val experimentId = config.id ?: ""
-        if (!isNotInFrequency(experimentId, config.frequency)) {
-            return@filter false
-        }
-        if (!isMatchedToUserEventFrequencyConditions(config.eventFrequencyConditions)) {
-            return@filter false
-        }
-        if (!isInDistributionTarget(
-                distribution = config.distribution,
-                properties = properties(config.seed),
-            )
-        ) {
-            return@filter false
-        }
-        true
+        if (!isNotInFrequency(experimentId, config.frequency)) continue
+        if (!isMatchedToUserEventFrequencyConditions(config.eventFrequencyConditions)) continue
+        if (!isInDistributionTarget(config.distribution, properties(config.seed))) continue
+
+        matched.add(config)
     }
+
     // Pick the highest-priority config. If tied, prefer the latest start date.
     // Configs without a priority are ranked lowest; without a start date, earliest.
     return matched.maxWithOrNull(

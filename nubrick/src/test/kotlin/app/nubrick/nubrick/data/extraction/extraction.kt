@@ -12,6 +12,7 @@ import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
 import app.nubrick.nubrick.schema.UserEventFrequencyCondition
 import app.nubrick.nubrick.schema.VariantConfig
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Test
 
@@ -49,7 +50,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_shouldWork() {
+    fun extractExperimentConfig_shouldWork() = runBlocking {
         val properties: (seed: Int?) -> List<UserProperty> = {
             emptyList()
         }
@@ -66,7 +67,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_shouldFilterOnlyRunningConfig() {
+    fun extractExperimentConfig_shouldFilterOnlyRunningConfig() = runBlocking {
         val properties: (seed: Int?) -> List<UserProperty> = {
             emptyList()
         }
@@ -178,7 +179,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_shouldSelectHighestPriority() {
+    fun extractExperimentConfig_shouldSelectHighestPriority() = runBlocking {
         val configs = ExperimentConfigs(
             configs = listOf(
                 ExperimentConfig("low", kind = ExperimentKind.POPUP, priority = 1),
@@ -192,7 +193,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_tiedPriorityShouldPreferLatestStartDate() {
+    fun extractExperimentConfig_tiedPriorityShouldPreferLatestStartDate() = runBlocking {
         val now = getCurrentDate()
         val earlier = now.minusSeconds(2000)
         val later = now.minusSeconds(1000)
@@ -209,7 +210,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_nilPriorityShouldBeRankedLowest() {
+    fun extractExperimentConfig_nilPriorityShouldBeRankedLowest() = runBlocking {
         val configs = ExperimentConfigs(
             configs = listOf(
                 ExperimentConfig("no_priority", kind = ExperimentKind.POPUP),
@@ -222,7 +223,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_shouldFilterByKind() {
+    fun extractExperimentConfig_shouldFilterByKind() = runBlocking {
         val configs = ExperimentConfigs(
             configs = listOf(
                 ExperimentConfig("popup", kind = ExperimentKind.POPUP),
@@ -252,7 +253,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_shouldRespectIsNotInFrequency() {
+    fun extractExperimentConfig_shouldRespectIsNotInFrequency() = runBlocking {
         val configs = ExperimentConfigs(
             configs = listOf(
                 ExperimentConfig(
@@ -279,7 +280,7 @@ class ExtractionUnitTest {
     }
 
     @Test
-    fun extractExperimentConfig_shouldRespectEventFrequencyConditions() {
+    fun extractExperimentConfig_shouldRespectEventFrequencyConditions() = runBlocking {
         val blocked = listOf(
             UserEventFrequencyCondition(eventName = "purchase", threshold = 1)
         )
