@@ -3,6 +3,9 @@ package app.nubrick.nubrick.data
 import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.schema.ApiHttpHeader
+import app.nubrick.nubrick.schema.ApiHttpRequest
+import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import app.nubrick.nubrick.schema.ExperimentConfig
 import app.nubrick.nubrick.schema.ExperimentConfigs
 import app.nubrick.nubrick.schema.ExperimentFrequency
@@ -17,6 +20,7 @@ import app.nubrick.nubrick.schema.VariantConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -162,6 +166,78 @@ class ContainerSurveyResponseTest {
     }
 
     @Test
+    fun `fetchEmbedding tracks experiment and appends history on success`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository()
+        val container = newContainer(
+            componentRepository = FakeComponentRepository(
+                mapOf(("resolved-exp" to "component-1") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "root")))
+            ),
+            experimentRepository = FakeExperimentRepository(
+                experimentConfigs = ExperimentConfigs(configs = listOf(embedConfig()))
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        container.fetchEmbedding("requested-exp").getOrThrow()
+
+        assertEquals(1, trackRepository.experimentEvents.size)
+        assertEquals("resolved-exp", trackRepository.experimentEvents.single().experimentId)
+        assertEquals("resolved-var", trackRepository.experimentEvents.single().variantId)
+        assertEquals(listOf("resolved-exp"), databaseRepository.experimentHistories)
+        assertTrue(databaseRepository.userEvents.isEmpty())
+    }
+
+    @Test
+    fun `fetchEmbedding records track and history even when component fetch fails`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository()
+        val container = newContainer(
+            componentRepository = FakeComponentRepository(),
+            experimentRepository = FakeExperimentRepository(
+                experimentConfigs = ExperimentConfigs(configs = listOf(embedConfig()))
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        val result = container.fetchEmbedding("requested-exp")
+
+        assertTrue(result.isFailure)
+        assertEquals(1, trackRepository.experimentEvents.size)
+        assertEquals("resolved-exp", trackRepository.experimentEvents.single().experimentId)
+        assertEquals(listOf("resolved-exp"), databaseRepository.experimentHistories)
+    }
+
+    @Test
+    fun `fetchEmbedding skips track and history when frequency rejects experiment`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository(notInFrequency = false)
+        val container = newContainer(
+            componentRepository = FakeComponentRepository(
+                mapOf(("resolved-exp" to "component-1") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "root")))
+            ),
+            experimentRepository = FakeExperimentRepository(
+                experimentConfigs = ExperimentConfigs(configs = listOf(
+                    embedConfig(frequency = ExperimentFrequency(period = 1))
+                ))
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        val result = container.fetchEmbedding("requested-exp")
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is NotFoundException)
+        assertTrue(trackRepository.experimentEvents.isEmpty())
+        assertTrue(databaseRepository.experimentHistories.isEmpty())
+        assertEquals(1, databaseRepository.frequencyChecks.size)
+        assertEquals("resolved-exp", databaseRepository.frequencyChecks.single().first)
+    }
+
+    @Test
     fun `fetchTriggerContent includes selected variant context`() = runBlocking {
         val block = UIBlock.UnionUIRootBlock(UIRootBlock(id = "root"))
         val componentRepository = FakeComponentRepository(
@@ -192,10 +268,203 @@ class ContainerSurveyResponseTest {
         assertEquals(block.data, content.root)
     }
 
+    @Test
+    fun `fetchTriggerContent tracks user event and appends popup history`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository()
+        val container = newContainer(
+            componentRepository = FakeComponentRepository(
+                mapOf(("trigger-exp" to "component-1") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "root")))
+            ),
+            experimentRepository = FakeExperimentRepository(
+                triggerConfigs = ExperimentConfigs(configs = listOf(popupConfig()))
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP)).getOrThrow()
+
+        assertEquals(listOf("open"), trackRepository.userEvents.map { it.name })
+        assertEquals(listOf("open"), databaseRepository.userEvents)
+        assertEquals(1, trackRepository.experimentEvents.size)
+        assertEquals("trigger-exp", trackRepository.experimentEvents.single().experimentId)
+        assertEquals(listOf("trigger-exp"), databaseRepository.experimentHistories)
+    }
+
+    @Test
+    fun `fetchTriggerContent skips experiment history for TOOLTIP`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository()
+        val container = newContainer(
+            componentRepository = FakeComponentRepository(
+                mapOf(("tooltip-exp" to "component-1") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "root")))
+            ),
+            experimentRepository = FakeExperimentRepository(
+                triggerConfigs = ExperimentConfigs(configs = listOf(
+                    ExperimentConfig(
+                        id = "tooltip-exp",
+                        kind = ExperimentKind.TOOLTIP,
+                        baseline = ExperimentVariant(
+                            id = "tooltip-var",
+                            configs = listOf(VariantConfig(value = "component-1")),
+                        ),
+                    )
+                ))
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        val (_, kind) = container.fetchTriggerContent(
+            "open",
+            listOf(ExperimentKind.TOOLTIP),
+        ).getOrThrow()
+
+        assertEquals(ExperimentKind.TOOLTIP, kind)
+        assertEquals(1, trackRepository.experimentEvents.size)
+        assertTrue(databaseRepository.experimentHistories.isEmpty())
+        assertEquals(listOf("open"), databaseRepository.userEvents)
+    }
+
+    @Test
+    fun `fetchTriggerContent records user event even when config fetch fails`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository()
+        val container = newContainer(
+            experimentRepository = FakeExperimentRepository(
+                triggerResult = Result.failure(NotFoundException()),
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        val result = container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP))
+
+        assertTrue(result.isFailure)
+        assertEquals(listOf("open"), trackRepository.userEvents.map { it.name })
+        assertEquals(listOf("open"), databaseRepository.userEvents)
+        assertTrue(trackRepository.experimentEvents.isEmpty())
+        assertTrue(databaseRepository.experimentHistories.isEmpty())
+    }
+
+    @Test
+    fun `fetchRemoteConfig tracks experiment and appends history`() = runBlocking {
+        val trackRepository = FakeTrackRepository()
+        val databaseRepository = FakeDatabaseRepository()
+        val variant = ExperimentVariant(
+            id = "config-var",
+            configs = listOf(VariantConfig(key = "flag", value = "on")),
+        )
+        val container = newContainer(
+            experimentRepository = FakeExperimentRepository(
+                experimentConfigs = ExperimentConfigs(configs = listOf(
+                    ExperimentConfig(
+                        id = "config-exp",
+                        kind = ExperimentKind.CONFIG,
+                        baseline = variant,
+                    )
+                ))
+            ),
+            trackRepository = trackRepository,
+            databaseRepository = databaseRepository,
+        )
+
+        val fetched = container.fetchRemoteConfig("config-exp").getOrThrow()
+
+        assertEquals("config-var", fetched.id)
+        assertEquals(1, trackRepository.experimentEvents.size)
+        assertEquals("config-exp", trackRepository.experimentEvents.single().experimentId)
+        assertEquals("config-var", trackRepository.experimentEvents.single().variantId)
+        assertEquals(listOf("config-exp"), databaseRepository.experimentHistories)
+    }
+
+    @Test
+    fun `compileHttpRequest compiles url headers and body templates`() {
+        val container = newContainer()
+        val variable = JsonObject(mapOf(
+            "user" to JsonObject(mapOf("id" to JsonPrimitive("ada"))),
+            "token" to JsonPrimitive("secret"),
+        ))
+
+        val compiled = container.compileHttpRequest(
+            ApiHttpRequest(
+                url = "https://example.com/users/{{ user.id }}",
+                method = ApiHttpRequestMethod.POST,
+                headers = listOf(
+                    ApiHttpHeader(name = "X-Token", value = "{{ token }}"),
+                ),
+                body = "{\"id\":\"{{ user.id }}\"}",
+            ),
+            variable,
+        )
+
+        assertEquals("https://example.com/users/ada", compiled.url)
+        assertEquals(ApiHttpRequestMethod.POST, compiled.method)
+        assertEquals(listOf(CompiledHttpHeader(name = "X-Token", value = "secret")), compiled.headers)
+        assertEquals("{\"id\":\"ada\"}", compiled.body)
+    }
+
+    @Test
+    fun `sendCompiledHttpRequest delegates to http request repository`() = runBlocking {
+        val httpRequestRepository = FakeHttpRequestRepository(
+            response = Result.success(JsonObject(mapOf("ok" to JsonPrimitive(true)))),
+        )
+        val container = newContainer(httpRequestRepository = httpRequestRepository)
+        val req = CompiledHttpRequest(
+            url = "https://example.com",
+            method = ApiHttpRequestMethod.GET,
+            headers = emptyList(),
+            body = null,
+        )
+
+        val result = container.sendCompiledHttpRequest(req).getOrThrow()
+
+        assertEquals(listOf(req), httpRequestRepository.requests)
+        assertEquals(JsonObject(mapOf("ok" to JsonPrimitive(true))), result)
+    }
+
+    @Test
+    fun `appendExperimentHistory forwards to database repository`() {
+        val databaseRepository = FakeDatabaseRepository()
+        val container = newContainer(databaseRepository = databaseRepository)
+
+        container.appendExperimentHistory("exp-1")
+
+        assertEquals(listOf("exp-1"), databaseRepository.experimentHistories)
+    }
+
+    private fun embedConfig(
+        frequency: ExperimentFrequency? = null,
+    ): ExperimentConfig {
+        return ExperimentConfig(
+            id = "resolved-exp",
+            kind = ExperimentKind.EMBED,
+            baseline = ExperimentVariant(
+                id = "resolved-var",
+                configs = listOf(VariantConfig(value = "component-1")),
+            ),
+            frequency = frequency,
+        )
+    }
+
+    private fun popupConfig(): ExperimentConfig {
+        return ExperimentConfig(
+            id = "trigger-exp",
+            kind = ExperimentKind.POPUP,
+            baseline = ExperimentVariant(
+                id = "trigger-var",
+                configs = listOf(VariantConfig(value = "component-1")),
+            ),
+        )
+    }
+
     private fun newContainer(
         componentRepository: ComponentRepository = FakeComponentRepository(),
         experimentRepository: ExperimentRepository = FakeExperimentRepository(),
         trackRepository: FakeTrackRepository = FakeTrackRepository(),
+        httpRequestRepository: FakeHttpRequestRepository = FakeHttpRequestRepository(),
+        databaseRepository: FakeDatabaseRepository = FakeDatabaseRepository(),
         experimentId: String? = null,
         variantId: String? = null,
     ): ContainerImpl {
@@ -205,8 +474,8 @@ class ContainerSurveyResponseTest {
             componentRepository = componentRepository,
             experimentRepository = experimentRepository,
             trackRepository = trackRepository,
-            httpRequestRepository = FakeHttpRequestRepository(),
-            databaseRepository = FakeDatabaseRepository(),
+            httpRequestRepository = httpRequestRepository,
+            databaseRepository = databaseRepository,
             experimentId = experimentId,
             variantId = variantId,
         )
@@ -232,13 +501,14 @@ private class FakeComponentRepository(
 private class FakeExperimentRepository(
     private val experimentConfigs: ExperimentConfigs = ExperimentConfigs(configs = emptyList()),
     private val triggerConfigs: ExperimentConfigs = ExperimentConfigs(configs = emptyList()),
+    private val triggerResult: Result<ExperimentConfigs>? = null,
 ) : ExperimentRepository {
     override suspend fun fetchExperimentConfigs(id: String): Result<ExperimentConfigs> {
         return Result.success(experimentConfigs)
     }
 
     override suspend fun fetchTriggerExperimentConfigs(name: String): Result<ExperimentConfigs> {
-        return Result.success(triggerConfigs)
+        return triggerResult ?: Result.success(triggerConfigs)
     }
 }
 
@@ -250,9 +520,16 @@ private data class SurveyResponseCall(
 
 private class FakeTrackRepository : TrackRepository {
     val surveyResponses = mutableListOf<SurveyResponseCall>()
+    val experimentEvents = mutableListOf<TrackExperimentEvent>()
+    val userEvents = mutableListOf<TrackUserEvent>()
 
-    override fun trackExperimentEvent(event: TrackExperimentEvent) = Unit
-    override fun trackEvent(event: TrackUserEvent) = Unit
+    override fun trackExperimentEvent(event: TrackExperimentEvent) {
+        experimentEvents.add(event)
+    }
+
+    override fun trackEvent(event: TrackUserEvent) {
+        userEvents.add(event)
+    }
 
     override fun sendSurveyResponse(experimentId: String, variantId: String, responseData: String) {
         surveyResponses.add(SurveyResponseCall(experimentId, variantId, responseData))
@@ -262,13 +539,39 @@ private class FakeTrackRepository : TrackRepository {
     override fun sendFlutterCrash(crashEvent: TrackCrashEvent) = Unit
 }
 
-private class FakeHttpRequestRepository : HttpRequestRepository {
-    override suspend fun request(req: CompiledHttpRequest) = Result.failure<JsonObject>(NotFoundException())
+private class FakeHttpRequestRepository(
+    private val response: Result<kotlinx.serialization.json.JsonElement> = Result.failure(NotFoundException()),
+) : HttpRequestRepository {
+    val requests = mutableListOf<CompiledHttpRequest>()
+
+    override suspend fun request(req: CompiledHttpRequest): Result<kotlinx.serialization.json.JsonElement> {
+        requests.add(req)
+        return response
+    }
 }
 
-private class FakeDatabaseRepository : DatabaseRepository {
-    override fun appendUserEvent(name: String) = Unit
-    override fun appendExperimentHistory(experimentId: String) = Unit
-    override fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?) = true
-    override fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?) = true
+private class FakeDatabaseRepository(
+    private val notInFrequency: Boolean = true,
+    private val matchedEventFrequency: Boolean = true,
+) : DatabaseRepository {
+    val userEvents = mutableListOf<String>()
+    val experimentHistories = mutableListOf<String>()
+    val frequencyChecks = mutableListOf<Pair<String, ExperimentFrequency?>>()
+
+    override fun appendUserEvent(name: String) {
+        userEvents.add(name)
+    }
+
+    override fun appendExperimentHistory(experimentId: String) {
+        experimentHistories.add(experimentId)
+    }
+
+    override fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean {
+        frequencyChecks.add(experimentId to frequency)
+        return notInFrequency
+    }
+
+    override fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean {
+        return matchedEventFrequency
+    }
 }
