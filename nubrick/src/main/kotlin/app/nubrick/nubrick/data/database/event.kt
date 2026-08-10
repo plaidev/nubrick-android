@@ -40,25 +40,6 @@ internal class UserEvent(private val db: SQLiteDatabase) {
         return db.insert(UserEventTable.Name, null, values)
     }
 
-    fun existAfter(name: String, after: ZonedDateTime): Boolean {
-        val cursor = this.db.query(
-            UserEventTable.Name,
-            arrayOf(BaseColumns._ID),
-            "${UserEventTable.Columns.Name} = ? AND ${UserEventTable.Columns.Timestamp} > ?",
-            arrayOf(name, formatISO8601(after)),
-            null,
-            null,
-            null,
-            "1"
-        )
-        var result: Boolean
-        with(cursor) {
-            result = moveToNext()
-        }
-        cursor.close()
-        return result
-    }
-
     /**
      * Calculate the number of events aggregated by the given [unit].
      * The result is a map whose key is the bucket start ([ZonedDateTime]) and value is the
