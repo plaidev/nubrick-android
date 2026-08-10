@@ -10,12 +10,15 @@ import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.ExperimentFrequency
 import app.nubrick.nubrick.schema.UserEventFrequencyCondition
 import app.nubrick.nubrick.schema.FrequencyUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal interface DatabaseRepository {
-    fun appendUserEvent(name: String)
-    fun appendExperimentHistory(experimentId: String)
-    fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean
-    fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean
+    suspend fun appendUserEvent(name: String)
+    suspend fun appendExperimentHistory(experimentId: String)
+    suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean
+    suspend fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean
+    suspend fun close() {}
 }
 
 private const val DATABASE_NAME = "Nativebrik.sdk.db"
@@ -37,20 +40,35 @@ internal class NubrickDbHelper(context: Context): SQLiteOpenHelper(context, DATA
     }
 }
 
-internal class DatabaseRepositoryImpl(private val db: SQLiteDatabase): DatabaseRepository {
-    private val history = ExperimentHistory(this.db)
-    private val userEvent = UserEvent(this.db)
+internal class DatabaseRepositoryImpl private constructor(
+    private val databaseProvider: () -> SQLiteDatabase,
+    private val closeDatabase: () -> Unit,
+): DatabaseRepository {
+    constructor(db: SQLiteDatabase) : this(databaseProvider = { db }, closeDatabase = {})
+    constructor(dbHelper: NubrickDbHelper) : this(
+        databaseProvider = { dbHelper.writableDatabase },
+        closeDatabase = { dbHelper.close() },
+    )
 
-    override fun appendUserEvent(name: String) {
-        userEvent.append(name)
+    // These are first accessed from withDatabase(), so opening the database remains on IO.
+    private val db: SQLiteDatabase by lazy { databaseProvider() }
+    private val history: ExperimentHistory by lazy { ExperimentHistory(db) }
+    private val userEvent: UserEvent by lazy { UserEvent(db) }
+
+    override suspend fun appendUserEvent(name: String) {
+        withDatabase {
+            userEvent.append(name)
+        }
     }
 
-    override fun appendExperimentHistory(experimentId: String) {
-        history.append(experimentId)
+    override suspend fun appendExperimentHistory(experimentId: String) {
+        withDatabase {
+            history.append(experimentId)
+        }
     }
 
-    override fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean {
-        if (frequency == null) return true
+    override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean = withDatabase {
+        if (frequency == null) return@withDatabase true
 
         val period = frequency.period ?: (365 * 50)
         val unit = frequency.unit ?: FrequencyUnit.DAY
@@ -63,13 +81,13 @@ internal class DatabaseRepositoryImpl(private val db: SQLiteDatabase): DatabaseR
 
         val after = unit.subtract(period, baseDate)
         val count = history.countAfter(experimentId, after)
-        return count.toInt() == 0
+        count.toInt() == 0
     }
 
-    override fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean {
-        if (condition == null) return true
-        val eventName = condition.eventName ?: return true
-        val threshold = condition.threshold ?: return true
+    override suspend fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean = withDatabase {
+        if (condition == null) return@withDatabase true
+        val eventName = condition.eventName ?: return@withDatabase true
+        val threshold = condition.threshold ?: return@withDatabase true
         val unit = condition.unit ?: FrequencyUnit.DAY
         val comparison = condition.comparison ?: ConditionOperator.Equal
         val counts = userEvent.counts(
@@ -79,6 +97,15 @@ internal class DatabaseRepositoryImpl(private val db: SQLiteDatabase): DatabaseR
             since = condition.since
         )
         val total = counts.values.sum()
-        return compareInteger(total, listOf(threshold), comparison)
+        compareInteger(total, listOf(threshold), comparison)
     }
+
+    override suspend fun close() = withContext(Dispatchers.IO) {
+        closeDatabase()
+    }
+
+    private suspend fun <T> withDatabase(block: () -> T): T =
+        withContext(Dispatchers.IO) {
+            block()
+        }
 }

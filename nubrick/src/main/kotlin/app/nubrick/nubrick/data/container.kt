@@ -94,7 +94,7 @@ internal interface Container {
         kinds: List<ExperimentKind>,
     ): Result<Pair<ExperimentContent, ExperimentKind>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
-    fun appendExperimentHistory(experimentId: String)
+    suspend fun appendExperimentHistory(experimentId: String)
 
     fun storeNativeCrash(throwable: Throwable)
     fun sendFlutterCrash(crashEvent: TrackCrashEvent)
@@ -320,7 +320,7 @@ internal class ContainerImpl(
         return Result.success(extracted.variant)
     }
 
-    override fun appendExperimentHistory(experimentId: String) {
+    override suspend fun appendExperimentHistory(experimentId: String) {
         this.databaseRepository.appendExperimentHistory(experimentId)
     }
 
@@ -350,7 +350,7 @@ internal class ContainerImpl(
         }
     }
 
-    private fun extractVariant(
+    private suspend fun extractVariant(
         configs: ExperimentConfigs,
         kinds: List<ExperimentKind>,
     ): Result<ExtractedVariant> {

@@ -9,6 +9,7 @@ import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
 import app.nubrick.nubrick.schema.UserPropertyType
 import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import org.junit.Assert.assertEquals
@@ -30,7 +31,7 @@ class ExtractionAdversarialTest {
         return ExperimentConfigs.decode(element)
     }
 
-    private fun extractConfig(configs: ExperimentConfigs): ExperimentConfig? {
+    private suspend fun extractConfig(configs: ExperimentConfigs): ExperimentConfig? {
         return extractExperimentConfig(
             configs = configs,
             kinds = listOf(ExperimentKind.POPUP, ExperimentKind.EMBED),
@@ -41,79 +42,79 @@ class ExtractionAdversarialTest {
     }
 
     @Test
-    fun emptyConfigsFixtureExtractsNullWithoutThrowing() {
+    fun emptyConfigsFixtureExtractsNullWithoutThrowing() = runBlocking {
         val configs = try {
             decodeConfigs("experiment_configs_empty.json")
         } catch (e: Throwable) {
             fail("decode threw: $e")
-            return
+            return@runBlocking
         }
         assertNotNull(configs)
         val extracted = try {
             extractConfig(configs!!)
         } catch (e: Throwable) {
             fail("extract threw: $e")
-            return
+            return@runBlocking
         }
         assertNull(extracted)
     }
 
     @Test
-    fun nullConfigsFixtureExtractsNullWithoutThrowing() {
+    fun nullConfigsFixtureExtractsNullWithoutThrowing() = runBlocking {
         val configs = try {
             decodeConfigs("experiment_configs_null_configs.json")
         } catch (e: Throwable) {
             fail("decode threw: $e")
-            return
+            return@runBlocking
         }
         assertNotNull(configs)
         val extracted = try {
             extractConfig(configs!!)
         } catch (e: Throwable) {
             fail("extract threw: $e")
-            return
+            return@runBlocking
         }
         assertNull(extracted)
     }
 
     @Test
-    fun partialConfigsFixtureExtractsNullWithoutThrowing() {
+    fun partialConfigsFixtureExtractsNullWithoutThrowing() = runBlocking {
         val configs = try {
             decodeConfigs("experiment_configs_partial.json")
         } catch (e: Throwable) {
             fail("decode threw: $e")
-            return
+            return@runBlocking
         }
         assertNotNull(configs)
         val extracted = try {
             extractConfig(configs!!)
         } catch (e: Throwable) {
             fail("extract threw: $e")
-            return
+            return@runBlocking
         }
         assertNull(extracted)
     }
 
     @Test
-    fun zeroWeightsVariantDoesNotThrow() {
+    fun zeroWeightsVariantDoesNotThrow() = runBlocking {
         val configs = try {
             decodeConfigs("experiment_configs_zero_weights.json")
         } catch (e: Throwable) {
             fail("decode threw: $e")
-            return
+            return@runBlocking
         }
         val config = try {
             extractConfig(configs!!)
         } catch (e: Throwable) {
             fail("extractConfig threw: $e")
-            return
+            return@runBlocking
         }
         assertNotNull(config)
         val variant = try {
             extractExperimentVariant(config!!, normalizedUserRnd = 0.5)
         } catch (e: Throwable) {
             fail("extractExperimentVariant threw: $e")
-            return
+            return@runBlocking
         }
         assertNull(variant)
     }

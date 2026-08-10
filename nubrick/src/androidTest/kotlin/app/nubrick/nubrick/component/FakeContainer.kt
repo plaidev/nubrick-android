@@ -84,7 +84,7 @@ internal class FakeContainer(
     override suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant> =
         Result.failure(UnsupportedOperationException("not used in smoke test"))
 
-    override fun appendExperimentHistory(experimentId: String) {}
+    override suspend fun appendExperimentHistory(experimentId: String) {}
 
     override fun storeNativeCrash(throwable: Throwable) {}
 

@@ -8,6 +8,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 
 import org.junit.Assert.*
 
@@ -20,13 +21,13 @@ import org.junit.Assert.*
 class ExampleInstrumentedTest {
     @Before
     fun setup() {
-        NubrickSDK.resetForTest()
+        resetSdk()
         clearUserPreferences()
     }
 
     @After
     fun teardown() {
-        NubrickSDK.resetForTest()
+        resetSdk()
         clearUserPreferences()
     }
 
@@ -39,6 +40,10 @@ class ExampleInstrumentedTest {
             .commit()
     }
 
+    private fun resetSdk() = runBlocking {
+        NubrickSDK.resetForTest()
+    }
+
     @Test
     fun useAppContext() {
         // Context of the app under test.
@@ -48,7 +53,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun initializeAndReinitialize_doNotThrow() {
-        NubrickSDK.resetForTest()
+        resetSdk()
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
 
         NubrickSDK.initialize(
@@ -65,7 +70,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun userApis_uninitialized_returnNullAndDoNotThrow() {
-        NubrickSDK.resetForTest()
+        resetSdk()
 
         assertNull(NubrickSDK.getUserId())
         assertNull(NubrickSDK.getUserProperty("plan"))
@@ -82,7 +87,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun userApis_initialized_roundtrip() {
-        NubrickSDK.resetForTest()
+        resetSdk()
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
         NubrickSDK.initialize(
             context = appContext,
@@ -102,7 +107,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun userPluralApis_initialized_roundtrip() {
-        NubrickSDK.resetForTest()
+        resetSdk()
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
         NubrickSDK.initialize(
             context = appContext,

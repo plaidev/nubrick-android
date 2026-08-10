@@ -1,7 +1,6 @@
 package app.nubrick.nubrick
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -134,7 +133,7 @@ private class NubrickRuntime(
     @Volatile private var onEvent: ((event: Event) -> Unit)? = null
     @Volatile private var onDispatch: ((event: NubrickEvent) -> Unit)? = null
     private val user: NubrickUser
-    private val db: SQLiteDatabase
+    private val databaseRepository: DatabaseRepositoryImpl
     private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val uncachedHttpClient: OkHttpClient
     private val cachedHttpClient: OkHttpClient
@@ -147,7 +146,7 @@ private class NubrickRuntime(
         val appContext = context.applicationContext
 
         this.user = NubrickUser(appContext)
-        this.db = NubrickDbHelper(appContext).writableDatabase
+        this.databaseRepository = DatabaseRepositoryImpl(NubrickDbHelper(appContext))
 
         // Create all repositories at SDK level
         val cache = CacheStore()
@@ -163,8 +162,6 @@ private class NubrickRuntime(
         val experimentRepository = ExperimentRepositoryImpl(config, networkRepository)
         val trackRepository = TrackRepositoryImpl(config, this.user, this.sdkScope, this.uncachedHttpClient)
         val httpRequestRepository = HttpRequestRepositoryImpl(this.uncachedHttpClient)
-        val databaseRepository = DatabaseRepositoryImpl(this.db)
-
         this.onEvent = config.onEvent
         this.onDispatch = config.onDispatch
         this.container = ContainerImpl(
@@ -185,7 +182,7 @@ private class NubrickRuntime(
             experimentRepository = experimentRepository,
             trackRepository = trackRepository,
             httpRequestRepository = httpRequestRepository,
-            databaseRepository = databaseRepository,
+            databaseRepository = this.databaseRepository,
             formRepository = FormRepositoryImpl(),
         )
         this.trigger = TriggerStateHolder(this.container, this.user, this.sdkScope, onTooltip)
@@ -209,7 +206,7 @@ private class NubrickRuntime(
     }
 
     // Only used by resetForTest(); the runtime is process-scoped and does not need public teardown.
-    fun close() {
+    suspend fun close() {
         if (!this.sdkScope.isActive) return
         this.container.close()
         this.sdkScope.cancel()
@@ -221,7 +218,7 @@ private class NubrickRuntime(
         ) {
             Thread.setDefaultUncaughtExceptionHandler(this.defaultExceptionHandler)
         }
-        this.db.close()
+        this.databaseRepository.close()
     }
 
     fun dispatch(event: NubrickEvent) {
@@ -238,7 +235,9 @@ private class NubrickRuntime(
 
     fun appendTooltipExperimentHistory(experimentId: String) {
         if (experimentId.isEmpty()) return
-        this.container.appendExperimentHistory(experimentId)
+        this.sdkScope.launch {
+            this@NubrickRuntime.container.appendExperimentHistory(experimentId)
+        }
     }
 
     fun fetchRemoteConfig(id: String, listener: RemoteConfigListener) {
@@ -455,10 +454,11 @@ object NubrickSDK {
         return initializeInternal(context = context, config = config, onTooltip = onTooltip)
     }
 
-    @Synchronized
-    internal fun resetForTest() {
-        runtime?.close()
-        runtime = null
+    internal suspend fun resetForTest() {
+        val runtimeToClose = synchronized(this) {
+            runtime.also { runtime = null }
+        }
+        runtimeToClose?.close()
     }
 
     @JvmStatic

@@ -8,6 +8,7 @@ import org.junit.Assert
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 
 class DatabaseRepositoryAndroidTest {
     private lateinit var db: SQLiteDatabase
@@ -27,7 +28,7 @@ class DatabaseRepositoryAndroidTest {
     }
 
     @Test
-    fun eventFrequencyConditionCountsEventsInSameBucket() {
+    fun eventFrequencyConditionCountsEventsInSameBucket() = runBlocking {
         repository.appendUserEvent("purchase")
         repository.appendUserEvent("purchase")
 
