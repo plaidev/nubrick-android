@@ -38,7 +38,6 @@ internal class ExperimentHistory(private val db: SQLiteDatabase) {
         experimentId: String,
         after: ZonedDateTime
     ): Long {
-        val sortOrder = "${ExperimentHistoryTable.Columns.Timestamp} DESC"
         val deleteSelection = "${ExperimentHistoryTable.Columns.Timestamp} < ?"
         val deleteSelectionArgs = arrayOf(formatISO8601(getCurrentDate().minusDays(365 * 4)))
         this.db.delete(ExperimentHistoryTable.Name, deleteSelection, deleteSelectionArgs)
@@ -60,7 +59,7 @@ internal class ExperimentHistory(private val db: SQLiteDatabase) {
             selectionArgs,
             null,
             null,
-            sortOrder
+            null
         )
         var count: Long = 0
         with(cursor) {
