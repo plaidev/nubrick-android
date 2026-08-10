@@ -23,13 +23,17 @@ internal fun extractExperimentVariant(config: ExperimentConfig, normalizedUserRn
     val variants = config.variants ?: return baseline
     if (variants.isEmpty()) return baseline
 
-    val baselineWeight = baseline.weight ?: 1
+    // Null weight defaults to 1; negative weights are clamped to 0 so CDF stays well-defined.
+    val baselineWeight = (baseline.weight ?: 1).coerceAtLeast(0)
     val weights: MutableList<Int> = mutableListOf(baselineWeight)
     variants.forEach {
-        val weight = it.weight ?: 1
+        val weight = (it.weight ?: 1).coerceAtLeast(0)
         weights.add(weight)
     }
     val weightSum = weights.sum()
+    // All-zero (or clamped-to-zero) weights would yield NaN probabilities and silently
+    // fall through to baseline; treat as no selectable variant instead.
+    if (weightSum <= 0) return null
 
     // here is calculation of the picking from the probability.
     // X is selected when p_X(x) >= F_X(x)

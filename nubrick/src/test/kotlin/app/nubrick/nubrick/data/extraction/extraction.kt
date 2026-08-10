@@ -400,4 +400,45 @@ class ExtractionUnitTest {
         )
         Assert.assertEquals("b", extractExperimentVariant(config, 1.0)?.id)
     }
+
+    @Test
+    fun extractExperimentVariant_shouldReturnNullWhenAllWeightsAreZero() {
+        val config = ExperimentConfig(
+            baseline = ExperimentVariant(id = "baseline", weight = 0),
+            variants = listOf(
+                ExperimentVariant(id = "a", weight = 0),
+                ExperimentVariant(id = "b", weight = 0),
+            )
+        )
+        Assert.assertNull(extractExperimentVariant(config, 0.0))
+        Assert.assertNull(extractExperimentVariant(config, 0.5))
+        Assert.assertNull(extractExperimentVariant(config, 1.0))
+    }
+
+    @Test
+    fun extractExperimentVariant_shouldReturnNullWhenWeightsAreNegativeAndSumToNonPositive() {
+        val config = ExperimentConfig(
+            baseline = ExperimentVariant(id = "baseline", weight = -1),
+            variants = listOf(
+                ExperimentVariant(id = "a", weight = -2),
+            )
+        )
+        Assert.assertNull(extractExperimentVariant(config, 0.5))
+    }
+
+    @Test
+    fun extractExperimentVariant_shouldClampNegativeWeightsAndSelectPositiveOnes() {
+        val config = ExperimentConfig(
+            baseline = ExperimentVariant(id = "baseline", weight = -5),
+            variants = listOf(
+                ExperimentVariant(id = "a", weight = 1),
+                ExperimentVariant(id = "b", weight = 1),
+            )
+        )
+        // After clamping, weights are [0, 1, 1] → equal chance for a and b.
+        Assert.assertEquals("a", extractExperimentVariant(config, 0.01)?.id)
+        Assert.assertEquals("a", extractExperimentVariant(config, 0.49)?.id)
+        Assert.assertEquals("b", extractExperimentVariant(config, 0.51)?.id)
+        Assert.assertEquals("b", extractExperimentVariant(config, 0.99)?.id)
+    }
 }
