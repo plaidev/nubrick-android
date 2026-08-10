@@ -23,6 +23,45 @@ class ComparisonUnitTest {
     }
 
     @Test
+    fun shouldCompareWithAsTypeIntegerOverride() {
+        val prop = UserProperty(name = "str", value = "100", type = UserPropertyType.STRING)
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.INTEGER, "100", ConditionOperator.Equal))
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.INTEGER, "90", ConditionOperator.GreaterThan))
+        assertEquals(false, comparePropWithConditionValue(prop, UserPropertyType.INTEGER, "100", ConditionOperator.NotEqual))
+    }
+
+    @Test
+    fun shouldCompareWithAsTypeBooleanOverride() {
+        val prop = UserProperty(name = "str", value = "true", type = UserPropertyType.STRING)
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.BOOLEAN, "true", ConditionOperator.Equal))
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.BOOLEAN, "false", ConditionOperator.NotEqual))
+    }
+
+    @Test
+    fun shouldCompareWithAsTypeTimestampOverride() {
+        val prop = UserProperty(name = "str", value = "2011-10-05T14:48:00.000Z", type = UserPropertyType.STRING)
+        assertEquals(
+            true,
+            comparePropWithConditionValue(prop, UserPropertyType.TIMESTAMPZ, "1317826080", ConditionOperator.Equal)
+        )
+    }
+
+    @Test
+    fun shouldCompareWithAsTypeStringOverride() {
+        val prop = UserProperty(name = "int", value = "100", type = UserPropertyType.INTEGER)
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.STRING, "100", ConditionOperator.Equal))
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.STRING, "10,100,200", ConditionOperator.In))
+        assertEquals(false, comparePropWithConditionValue(prop, UserPropertyType.STRING, "99", ConditionOperator.Equal))
+    }
+
+    @Test
+    fun shouldCompareWithAsTypeDoubleOverride() {
+        val prop = UserProperty(name = "str", value = "12.3", type = UserPropertyType.STRING)
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.DOUBLE, "12.3", ConditionOperator.Equal))
+        assertEquals(true, comparePropWithConditionValue(prop, UserPropertyType.DOUBLE, "0,20", ConditionOperator.Between))
+    }
+
+    @Test
     fun shouldCompareInteger() {
         assertEquals(true, comparePropWithConditionValue(this.intProp, null, "100 ", ConditionOperator.Equal))
         assertEquals(false, comparePropWithConditionValue(this.intProp, null, "100", ConditionOperator.NotEqual))
