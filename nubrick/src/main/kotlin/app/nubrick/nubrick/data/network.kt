@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import okhttp3.CacheControl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -15,6 +16,8 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.SocketTimeoutException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val CONNECT_TIMEOUT = 10 * 1000
 internal const val READ_TIMEOUT = 5 * 1000
@@ -34,21 +37,68 @@ internal class NetworkRepository(
     private val cache: CacheStore,
     private val client: OkHttpClient,
 ) {
+    private val refreshing = ConcurrentHashMap<String, AtomicBoolean>()
+
     suspend fun getWithCache(endpoint: String, syncDateTime: Boolean = false): Result<String> {
         val cached = cache.get(endpoint).getOrElse {
             val result = getRequest(endpoint, syncDateTime, client).getOrElse { error ->
                 return Result.failure(error)
             }
-            cache.set(endpoint, result).getOrNull()
+            cache.set(endpoint, result)
             return Result.success(result)
         }
         if (cached.isStale()) {
-            scope.launch(Dispatchers.IO) {
-                val result = getRequest(endpoint, syncDateTime, client).getOrNull() ?: return@launch
-                cache.set(endpoint, result).getOrNull()
-            }
+            scheduleStaleRefresh(endpoint, syncDateTime)
         }
         return Result.success(cached.data)
+    }
+
+    /**
+     * Drops the in-memory entry and, when present, the matching OkHttp disk-cache entry.
+     * Used for definitive absences (404), not transient network failures.
+     */
+    fun invalidate(endpoint: String) {
+        cache.remove(endpoint)
+        evictHttpCache(endpoint)
+    }
+
+    private fun scheduleStaleRefresh(endpoint: String, syncDateTime: Boolean) {
+        val gate = refreshing.computeIfAbsent(endpoint) { AtomicBoolean(false) }
+        if (!gate.compareAndSet(false, true)) {
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                getRequest(endpoint, syncDateTime, client, forceNetwork = true).fold(
+                    onSuccess = { body ->
+                        cache.set(endpoint, body)
+                    },
+                    onFailure = { error ->
+                        // Offline / timeouts / 5xx: keep the body we last fetched successfully.
+                        // 404: experiment/component is gone — drop caches.
+                        if (error is NotFoundException) {
+                            invalidate(endpoint)
+                        }
+                    },
+                )
+            } finally {
+                refreshing.remove(endpoint, gate)
+            }
+        }
+    }
+
+    private fun evictHttpCache(endpoint: String) {
+        val httpCache = client.cache ?: return
+        try {
+            val iterator = httpCache.urls()
+            while (iterator.hasNext()) {
+                if (iterator.next() == endpoint) {
+                    iterator.remove()
+                }
+            }
+        } catch (_: Exception) {
+            // Best-effort eviction; memory invalidate already happened.
+        }
     }
 }
 
@@ -84,15 +134,19 @@ private fun isRetryable(e: Throwable): Boolean {
 internal suspend fun getRequest(
     endpoint: String,
     syncDateTime: Boolean = false,
-    client: OkHttpClient
+    client: OkHttpClient,
+    forceNetwork: Boolean = false,
 ): Result<String> = requestWithRetry {
     try {
         val t0 = System.currentTimeMillis()
-        val request = Request.Builder()
+        val builder = Request.Builder()
             .url(endpoint)
             .get()
-            .build()
-        executeRequest(client, request, syncDateTime, t0)
+        if (forceNetwork) {
+            // Stale refresh must observe origin 404/updates; do not satisfy from disk cache alone.
+            builder.cacheControl(CacheControl.FORCE_NETWORK)
+        }
+        executeRequest(client, builder.build(), syncDateTime, t0)
     } catch (e: IllegalArgumentException) {
         Result.failure(e)
     }
