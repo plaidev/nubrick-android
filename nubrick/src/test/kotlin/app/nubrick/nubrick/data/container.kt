@@ -116,16 +116,20 @@ class ContainerSurveyResponseTest {
                 )
             ))
         )
+        val databaseRepository = FakeDatabaseRepository()
         val container = newContainer(
             componentRepository = componentRepository,
             experimentRepository = experimentRepository,
+            databaseRepository = databaseRepository,
         )
 
+        val callerThread = Thread.currentThread()
         val fetched = container.fetchEmbedding("requested-exp").getOrThrow()
 
         assertEquals("resolved-exp", fetched.experimentId)
         assertEquals("resolved-var", fetched.variantId)
         assertEquals(block.data, fetched.root)
+        assertTrue(databaseRepository.frequencyCheckThreads.single() !== callerThread)
     }
 
     @Test
@@ -557,6 +561,7 @@ private class FakeDatabaseRepository(
     val userEvents = mutableListOf<String>()
     val experimentHistories = mutableListOf<String>()
     val frequencyChecks = mutableListOf<Pair<String, ExperimentFrequency?>>()
+    val frequencyCheckThreads = mutableListOf<Thread>()
 
     override suspend fun appendUserEvent(name: String) {
         userEvents.add(name)
@@ -568,6 +573,7 @@ private class FakeDatabaseRepository(
 
     override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean {
         frequencyChecks.add(experimentId to frequency)
+        frequencyCheckThreads.add(Thread.currentThread())
         return notInFrequency
     }
 

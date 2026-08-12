@@ -125,6 +125,22 @@ class ComparisonUnitTest {
     }
 
     @Test
+    fun regexMatchTimesOutForExpensivePatterns() {
+        val startedAt = System.nanoTime()
+
+        assertEquals(false, containsPattern("a".repeat(9_999) + "!", "(a+)+$"))
+
+        val elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000
+        assertEquals(true, elapsedMillis < 500)
+    }
+
+    @Test
+    fun regexMatchRejectsOversizedPatternOrInput() {
+        assertEquals(false, containsPattern("a", "a".repeat(1_001)))
+        assertEquals(false, containsPattern("a".repeat(10_001), "a"))
+    }
+
+    @Test
     fun shouldCompareStringInNotInWithEmptyConditionValue() {
         // STRING keeps empty tokens from split ("" → [""]), unlike SEMVER/BOOLEAN.
         assertEquals(false, comparePropWithConditionValue(this.strProp, null, "", ConditionOperator.In))
