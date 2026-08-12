@@ -103,10 +103,22 @@ class CacheStoreTest {
         assertEquals("new", cacheStore.get(key).getOrThrow().data)
     }
 
+
     @Test
     fun `remove deletes cache entry`() {
         cacheStore.set("k", "v")
         cacheStore.remove("k")
         assertTrue(cacheStore.get("k").isFailure)
+    }
+
+    @Test
+    fun `removeByPrefix clears matching keys only`() {
+        cacheStore.set("https://cdn/projects/p1/experiments/components/e1/c1", "a")
+        cacheStore.set("https://cdn/projects/p1/experiments/components/e1/c2", "b")
+        cacheStore.set("https://cdn/projects/p1/experiments/id/e1", "cfg")
+        cacheStore.removeByPrefix("https://cdn/projects/p1/experiments/components/")
+        assertTrue(cacheStore.get("https://cdn/projects/p1/experiments/components/e1/c1").isFailure)
+        assertTrue(cacheStore.get("https://cdn/projects/p1/experiments/components/e1/c2").isFailure)
+        assertEquals("cfg", cacheStore.get("https://cdn/projects/p1/experiments/id/e1").getOrThrow().data)
     }
 }

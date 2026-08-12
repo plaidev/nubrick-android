@@ -23,6 +23,9 @@ internal class CacheStore {
         return Result.success(cached)
     }
 
+    /** Returns the entry without applying TTL expiry/removal. */
+    fun getIfPresent(key: String): CacheObject? = cache[key]
+
     fun set(key: String, value: String): Result<Unit> {
         val now = getCurrentDate()
         val cacheObject = CacheObject(
@@ -43,6 +46,10 @@ internal class CacheStore {
      */
     fun remove(key: String, expected: CacheObject): Boolean {
         return cache.remove(key, expected)
+    }
+
+    fun removeByPrefix(prefix: String) {
+        cache.keys.filter { it.startsWith(prefix) }.forEach { cache.remove(it) }
     }
 }
 
