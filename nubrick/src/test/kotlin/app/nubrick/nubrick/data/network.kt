@@ -9,6 +9,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -328,6 +329,37 @@ class NetworkTest {
         assertTrue("requestCount=$count", count <= 3)
         assertTrue(body.isNotEmpty())
         DATETIME_OFFSET = 0
+    }
+
+    @Test
+    fun `componentCachePrefix derives components path from config url`() {
+        val configUrl = "https://cdn.nativebrik.com/projects/p1/experiments/id/e1"
+        assertEquals(
+            "https://cdn.nativebrik.com/projects/p1/experiments/components/",
+            componentCachePrefix(configUrl),
+        )
+        assertTrue(isExperimentConfigUrl(configUrl))
+        assertTrue(isExperimentConfigUrl("https://cdn/projects/p1/experiments/trigger/open"))
+        assertFalse(isExperimentConfigUrl("https://cdn/projects/p1/experiments/components/e1/c1"))
+    }
+
+    @Test
+    fun `changed experiment config body drops component cache entries by prefix`() {
+        val memory = CacheStore()
+        val configUrl = "https://cdn.nativebrik.com/projects/p1/experiments/id/e1"
+        val componentUrl = "https://cdn.nativebrik.com/projects/p1/experiments/components/e1/c1"
+        memory.set(configUrl, """{"configs":[]}""")
+        memory.set(componentUrl, "component-v1")
+
+        val previous = memory.getIfPresent(configUrl)?.data
+        val updated = """{"configs":[{"id":"e1"}]}"""
+        memory.set(configUrl, updated)
+        if (isExperimentConfigUrl(configUrl) && previous != updated) {
+            componentCachePrefix(configUrl)?.let { memory.removeByPrefix(it) }
+        }
+
+        assertTrue(memory.get(componentUrl).isFailure)
+        assertEquals(updated, memory.get(configUrl).getOrThrow().data)
     }
 
     companion object {

@@ -44,7 +44,7 @@ internal class NetworkRepository(
             val result = getRequest(endpoint, syncDateTime, client).getOrElse { error ->
                 return Result.failure(error)
             }
-            cache.set(endpoint, result).getOrNull()
+            storeFromNetwork(endpoint, result)
             return Result.success(result)
         }
         if (cached.isStale()) {
@@ -62,6 +62,11 @@ internal class NetworkRepository(
         evictHttpCache(endpoint)
     }
 
+    fun invalidateByPrefix(prefix: String) {
+        cache.removeByPrefix(prefix)
+        evictHttpCacheByPrefix(prefix)
+    }
+
     private fun scheduleStaleRefresh(endpoint: String, syncDateTime: Boolean) {
         val gate = refreshing.computeIfAbsent(endpoint) { AtomicBoolean(false) }
         if (!gate.compareAndSet(false, true)) {
@@ -71,7 +76,7 @@ internal class NetworkRepository(
             try {
                 getRequest(endpoint, syncDateTime, client, forceNetwork = true).fold(
                     onSuccess = { body ->
-                        cache.set(endpoint, body)
+                        storeFromNetwork(endpoint, body)
                     },
                     onFailure = { error ->
                         // Offline / timeouts / 5xx: keep last-good.
@@ -84,6 +89,18 @@ internal class NetworkRepository(
             } finally {
                 refreshing.remove(endpoint, gate)
             }
+        }
+    }
+
+    /**
+     * Persist a network body. When an experiment config changes, drop related component
+     * caches so config and component generations stay aligned.
+     */
+    private fun storeFromNetwork(endpoint: String, body: String) {
+        val previous = cache.getIfPresent(endpoint)?.data
+        cache.set(endpoint, body)
+        if (isExperimentConfigUrl(endpoint) && previous != body) {
+            componentCachePrefix(endpoint)?.let { invalidateByPrefix(it) }
         }
     }
 
@@ -100,6 +117,39 @@ internal class NetworkRepository(
             // Best-effort eviction; memory invalidate already happened.
         }
     }
+
+    private fun evictHttpCacheByPrefix(prefix: String) {
+        val httpCache = client.cache ?: return
+        try {
+            val iterator = httpCache.urls()
+            while (iterator.hasNext()) {
+                if (iterator.next().startsWith(prefix)) {
+                    iterator.remove()
+                }
+            }
+        } catch (_: Exception) {
+            // Best-effort.
+        }
+    }
+}
+
+internal fun isExperimentConfigUrl(url: String): Boolean {
+    return url.contains("/experiments/id/") || url.contains("/experiments/trigger/")
+}
+
+/**
+ * Builds `.../projects/{projectId}/experiments/components/` from a CDN experiment config URL.
+ */
+internal fun componentCachePrefix(configUrl: String): String? {
+    val marker = "/projects/"
+    val start = configUrl.indexOf(marker)
+    if (start < 0) return null
+    val afterProjects = configUrl.substring(start + marker.length)
+    val projectId = afterProjects.substringBefore('/')
+    if (projectId.isEmpty()) return null
+    val originEnd = configUrl.indexOf(marker)
+    if (originEnd < 0) return null
+    return configUrl.substring(0, originEnd) + marker + projectId + "/experiments/components/"
 }
 
 private fun readStream(stream: InputStream, maxSize: Int = MAX_RESPONSE_SIZE): String {
