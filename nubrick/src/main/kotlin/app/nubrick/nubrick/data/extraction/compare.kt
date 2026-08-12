@@ -7,7 +7,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
-import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.Locale
 import java.util.regex.Pattern
@@ -82,8 +82,8 @@ private fun parseTimestampSeconds(value: String): Long? {
         ?: parseTimestampSecondsOrNull { ZonedDateTime.parse(trimmed).toInstant() }
         ?: parseTimestampSecondsOrNull { OffsetDateTime.parse(trimmed).toInstant() }
         ?: parseTimestampSecondsOrNull { Instant.parse(trimmed) }
-        ?: parseTimestampSecondsOrNull { LocalDateTime.parse(trimmed).atZone(ZoneId.systemDefault()).toInstant() }
-        ?: parseTimestampSecondsOrNull { LocalDate.parse(trimmed).atStartOfDay(ZoneId.systemDefault()).toInstant() }
+        ?: parseTimestampSecondsOrNull { LocalDateTime.parse(trimmed).toInstant(ZoneOffset.UTC) }
+        ?: parseTimestampSecondsOrNull { LocalDate.parse(trimmed).atStartOfDay(ZoneOffset.UTC).toInstant() }
 }
 
 private fun parseTimestampSecondsOrNull(parse: () -> Instant?): Long? {

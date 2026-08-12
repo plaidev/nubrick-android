@@ -5,6 +5,7 @@ import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.UserPropertyType
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.TimeZone
 
 class ComparisonUnitTest {
     private val strProp = UserProperty(name = "str", value = "Hello", type = UserPropertyType.STRING)
@@ -193,6 +194,63 @@ class ComparisonUnitTest {
         val dateProp = UserProperty(name = "time", value = "2011-10-05", type = UserPropertyType.TIMESTAMPZ)
 
         assertEquals(true, comparePropWithConditionValue(dateProp, null, "2011-10-05", ConditionOperator.Equal))
+    }
+
+    @Test
+    fun shouldAcceptSupportedTimestampFormats() {
+        val timestampProp = UserProperty(name = "time", value = "1718438400", type = UserPropertyType.TIMESTAMPZ)
+
+        listOf(
+            "1718438400",
+            "2024-06-15T08:00:00Z",
+            "2024-06-15T17:00:00+09:00",
+            "2024-06-15T08:00:00",
+            "2024-06-15T08:00:00.999Z",
+            "2024-06-15T17:00:00.999+09:00",
+            "2024-06-15T08:00:00.999"
+        ).forEach { value ->
+            assertEquals(true, comparePropWithConditionValue(timestampProp, null, value, ConditionOperator.Equal))
+        }
+
+        val dateProp = UserProperty(name = "time", value = "1718409600", type = UserPropertyType.TIMESTAMPZ)
+        assertEquals(true, comparePropWithConditionValue(dateProp, null, "2024-06-15", ConditionOperator.Equal))
+    }
+
+    @Test
+    fun shouldInterpretOffsetLessTimestampsAsUtcRegardlessOfDeviceTimeZone() {
+        val originalTimeZone = TimeZone.getDefault()
+        val dateTimeProp = UserProperty(
+            name = "time",
+            value = "2011-10-05T14:48:00Z",
+            type = UserPropertyType.TIMESTAMPZ
+        )
+        val dateProp = UserProperty(
+            name = "time",
+            value = "2011-10-05T00:00:00Z",
+            type = UserPropertyType.TIMESTAMPZ
+        )
+
+        try {
+            listOf("America/Los_Angeles", "Asia/Tokyo").forEach { timeZoneId ->
+                TimeZone.setDefault(TimeZone.getTimeZone(timeZoneId))
+
+                assertEquals(
+                    true,
+                    comparePropWithConditionValue(
+                        dateTimeProp,
+                        null,
+                        "2011-10-05T14:48:00",
+                        ConditionOperator.Equal
+                    )
+                )
+                assertEquals(
+                    true,
+                    comparePropWithConditionValue(dateProp, null, "2011-10-05", ConditionOperator.Equal)
+                )
+            }
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+        }
     }
 
     @Test
