@@ -13,6 +13,10 @@ import java.util.Locale
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
+private const val MAX_REGEX_PATTERN_LENGTH = 1_000
+private const val MAX_REGEX_INPUT_LENGTH = 10_000
+private const val REGEX_MATCH_TIMEOUT_NANOS = 50_000_000L
+
 internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPropertyType?, value: String, op: ConditionOperator): Boolean {
     val values = value.split(",")
     val propType = asType ?: prop.type
@@ -502,13 +506,45 @@ internal fun compareSemverAsComparisonResult(lhs: String, rhs: String): Int {
 }
 
 internal fun containsPattern(input: String, pattern: String): Boolean {
+    if (pattern.length > MAX_REGEX_PATTERN_LENGTH || input.length > MAX_REGEX_INPUT_LENGTH) {
+        return false
+    }
+
     return try {
         val regex = Pattern.compile(pattern)
-        regex.matcher(input).find()
+        val deadlineNanos = System.nanoTime() + REGEX_MATCH_TIMEOUT_NANOS
+        regex.matcher(TimeLimitedCharSequence(input, deadlineNanos)).find()
     } catch (e: PatternSyntaxException) {
+        false
+    } catch (e: RegexMatchTimeoutException) {
         false
     }
 }
+
+/**
+ * Makes Java's regex engine check its deadline while reading the input. Java's
+ * [Pattern] API does not provide a cancellable or timed matching operation.
+ */
+private class TimeLimitedCharSequence(
+    private val value: CharSequence,
+    private val deadlineNanos: Long,
+) : CharSequence {
+    override val length: Int
+        get() = value.length
+
+    override fun get(index: Int): Char {
+        if (System.nanoTime() - deadlineNanos >= 0) {
+            throw RegexMatchTimeoutException()
+        }
+        return value[index]
+    }
+
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
+        return TimeLimitedCharSequence(value.subSequence(startIndex, endIndex), deadlineNanos)
+    }
+}
+
+private class RegexMatchTimeoutException : RuntimeException()
 
 internal fun parseStringToBoolean(str: String): Boolean {
     val normalized = str

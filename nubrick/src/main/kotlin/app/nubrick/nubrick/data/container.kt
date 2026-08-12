@@ -229,7 +229,9 @@ internal class ContainerImpl(
         val configs = this.experimentRepository.fetchExperimentConfigs(experimentId).getOrElse {
             return Result.failure(it)
         }
-        val extracted = this.extractVariant(configs = configs, listOf(ExperimentKind.EMBED))
+        val extracted = withContext(Dispatchers.IO) {
+            this@ContainerImpl.extractVariant(configs = configs, listOf(ExperimentKind.EMBED))
+        }
             .getOrElse {
                 return Result.failure(it)
             }
