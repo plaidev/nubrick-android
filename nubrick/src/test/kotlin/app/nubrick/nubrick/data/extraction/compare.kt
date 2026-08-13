@@ -116,6 +116,7 @@ class ComparisonUnitTest {
     fun shouldCompareString() {
         assertEquals(true, comparePropWithConditionValue(this.strProp, null, "[a-zA-Z]+", ConditionOperator.Regex))
         assertEquals(false, comparePropWithConditionValue(this.strProp, null, "[0-9]+", ConditionOperator.Regex))
+        assertEquals(true, comparePropWithConditionValue(this.strProp, null, "Hell[o,]", ConditionOperator.Regex))
 
         assertEquals(true, comparePropWithConditionValue(this.strProp, null, "Hello", ConditionOperator.Equal))
         assertEquals(false, comparePropWithConditionValue(this.strProp, null, "Hello", ConditionOperator.NotEqual))
