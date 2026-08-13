@@ -11,6 +11,8 @@ plugins {
 group = "app.nubrick"
 version = libs.versions.nubrick.get()
 
+val legalResourcesDir = layout.buildDirectory.dir("generated/legalResources")
+
 android {
     namespace = "app.nubrick.nubrick"
     compileSdk = libs.versions.androidCompileSdk.get().toInt()
@@ -49,6 +51,9 @@ android {
     }
     kotlinOptions {
         jvmTarget = libs.versions.jvmTarget.get()
+    }
+    sourceSets {
+        getByName("main").resources.srcDir(legalResourcesDir)
     }
     publishing {
         singleVariant("release") {
@@ -95,6 +100,26 @@ dependencies {
 tasks.register<Jar>("javadocEmptyJar") {
     archiveClassifier = "javadoc"
 }
+
+val prepareLegalResources = tasks.register<Sync>("prepareLegalResources") {
+    from(rootProject.layout.projectDirectory) {
+        include("LICENSE", "NOTICE", "THIRD-PARTY-NOTICES")
+        into("META-INF/nubrick")
+    }
+    into(legalResourcesDir)
+}
+
+tasks.matching { it.name == "processReleaseJavaRes" }.configureEach {
+    dependsOn(prepareLegalResources)
+}
+
+tasks.withType<org.gradle.jvm.tasks.Jar>().configureEach {
+    if (name == "releaseSourcesJar") {
+        dependsOn(prepareLegalResources)
+        from(legalResourcesDir)
+    }
+}
+
 tasks.register<Zip>("makeArchive") {
     dependsOn("publishMavenPublicationToMavenRepository")
     from(layout.buildDirectory.dir("repos/app/nubrick/nubrick/$version"))
