@@ -1,5 +1,11 @@
-// from: https://github.com/woltapp/blurhash/blob/master/Kotlin/lib/src/main/java/com/wolt/blurhashkt/BlurHashDecoder.kt
-// MIT License
+/*
+ * Portions copyright (c) 2018 Wolt Enterprises.
+ * Derived from https://github.com/woltapp/blurhash/blob/master/Kotlin/lib/src/main/java/com/wolt/blurhashkt/BlurHashDecoder.kt
+ * and modified by Nubrick contributors.
+ *
+ * Licensed under the MIT License. The full license text is in
+ * THIRD-PARTY-NOTICES at the repository root.
+ */
 package app.nubrick.nubrick.vendor.blurhash
 
 import android.graphics.Bitmap
