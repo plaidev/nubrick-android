@@ -16,7 +16,8 @@ internal class CacheStore {
         val now = getCurrentDate()
         val diff = now.toEpochSecond() - cached.timestamp.toEpochSecond()
         if (diff > CACHE_TIME_SECONDS) {
-            cache.remove(key)
+            // Only remove the entry we observed to avoid wiping a concurrent set().
+            cache.remove(key, cached)
             return Result.failure(NotFoundException())
         }
         return Result.success(cached)
@@ -32,6 +33,17 @@ internal class CacheStore {
         return Result.success(Unit)
     }
 
+    fun remove(key: String) {
+        cache.remove(key)
+    }
+
+    /**
+     * Removes [key] only when the stored value is still [expected].
+     * Returns true when the entry was removed.
+     */
+    fun remove(key: String, expected: CacheObject): Boolean {
+        return cache.remove(key, expected)
+    }
 }
 
 internal data class CacheObject(
