@@ -81,7 +81,9 @@ internal class TriggerStateHolder(
         // scope runs on Dispatchers.IO, provided by NubrickRuntime
         scope.launch {
             try {
-                self.container.handleNubrickEvent(event)
+                withContext(Dispatchers.Main) {
+                    self.container.handleNubrickEvent(event)
+                }
                 val (content, kind) = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
                     ?: return@launch
                 if (kind == ExperimentKind.TOOLTIP) {

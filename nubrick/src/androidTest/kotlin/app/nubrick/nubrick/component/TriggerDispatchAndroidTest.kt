@@ -1,5 +1,6 @@
 package app.nubrick.nubrick.component
 
+import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.nubrick.nubrick.NubrickEvent
@@ -12,6 +13,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -60,5 +62,38 @@ class TriggerDispatchAndroidTest {
         // Give the coroutine a moment; containment means the handler must never fire.
         exceptionLatch.await(200, TimeUnit.MILLISECONDS)
         assertNull(unhandled.get())
+    }
+
+    @Test
+    fun dispatchCallsHandleNubrickEventOnMainThread() {
+        val handled = CountDownLatch(1)
+        val dispatchThread = AtomicReference<Thread>()
+        val container = mock(
+            Container::class.java,
+            withSettings().defaultAnswer(Answer { invocation ->
+                when (invocation.method.name) {
+                    "handleNubrickEvent" -> {
+                        dispatchThread.set(Thread.currentThread())
+                        handled.countDown()
+                        null
+                    }
+                    // Avoid NPE after the callback: production continues to fetchTriggerContent.
+                    "fetchTriggerContent" -> Result.failure<Any>(UnsupportedOperationException("unused"))
+                    else -> null
+                }
+            }),
+        )
+        val user = NubrickUser(InstrumentationRegistry.getInstrumentation().targetContext)
+        val holder = TriggerStateHolder(
+            container = container,
+            user = user,
+            // Match production: NubrickRuntime uses Dispatchers.IO.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        )
+
+        holder.dispatch(NubrickEvent("test"))
+
+        assertTrue(handled.await(2, TimeUnit.SECONDS))
+        assertEquals(Looper.getMainLooper().thread, dispatchThread.get())
     }
 }
