@@ -6,6 +6,7 @@ androidMinSdk = "26"
 androidTargetSdk = "36"
 appcompat = "1.6.1"
 browser = "1.8.0"
+binaryCompatibilityValidator = "0.18.1"
 coil = "2.5.0"
 composeBom = "2025.09.01"
 coreKtx = "1.15.0"
@@ -57,6 +58,7 @@ test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "testExtJun
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binaryCompatibilityValidator" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

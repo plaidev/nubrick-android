@@ -5,4 +5,18 @@ plugins {
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.binary.compatibility.validator)
+}
+
+apiValidation {
+    ignoredProjects.addAll(listOf("app", "e2e", "example-java-xml"))
+    ignoredClasses.addAll(
+        listOf(
+            "app.nubrick.nubrick.BuildConfig",
+            "app.nubrick.nubrick.ComposableSingletons\$SdkKt",
+            "app.nubrick.nubrick.component.ComposableSingletons\$RootKt",
+            "app.nubrick.nubrick.component.renderer.ComposableSingletons\$NavmodalKt",
+            "app.nubrick.nubrick.view.ComposableSingletons\$NubrickOverlayViewKt",
+        )
+    )
 }

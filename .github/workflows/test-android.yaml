@@ -51,7 +51,7 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
       - name: Unit Test
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew :nubrick:apiCheck testDebugUnitTest
 
   android-test:
     if: ${{ !startsWith(github.event.head_commit.message, '[bot] Release') }}
