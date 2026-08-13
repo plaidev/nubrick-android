@@ -18,7 +18,8 @@ private const val MAX_REGEX_INPUT_LENGTH = 10_000
 private const val REGEX_MATCH_TIMEOUT_NANOS = 50_000_000L
 
 internal fun comparePropWithConditionValue(prop: UserProperty, asType: UserPropertyType?, value: String, op: ConditionOperator): Boolean {
-    val values = value.split(",")
+    // Regex values are raw patterns. Other operators use comma-separated condition values.
+    val values = if (op == ConditionOperator.Regex) listOf(value) else value.split(",")
     val propType = asType ?: prop.type
     return when (propType) {
         UserPropertyType.INTEGER -> {
