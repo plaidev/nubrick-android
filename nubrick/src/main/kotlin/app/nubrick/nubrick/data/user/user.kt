@@ -93,6 +93,8 @@ internal data class UserProperty(
 )
 
 private const val USER_CUSTOM_PROPERTY_KEY_PREFIX = "NATIVEBRIK_CUSTOM_"
+private const val RETENTION_PERIOD_COUNT_KEY = "retentionPeriodCount"
+private val RETENTION_PERIOD_TIMESTAMP_KEY = BuiltinUserProperty.retentionPeriod.toString()
 
 internal data class NubrickUserState(
     val properties: Map<String, String> = emptyMap(),
@@ -232,38 +234,39 @@ class NubrickUser {
         this.setBaseProperty(BuiltinUserProperty.lastBootTime.toString(), formatISO8601(now))
         this.lastBootTime = now
 
-        val retentionPeriodKey = BuiltinUserProperty.retentionPeriod.toString()
-        val retentionTimestamp = this.preferences?.getLong(retentionPeriodKey, now.toEpochSecond()) ?: now.toEpochSecond()
-        val retentionPeriodCountKey = "retentionPeriodCount"
-        val retentionCount = this.preferences?.getInt(retentionPeriodCountKey, 0) ?: 0
-        this.setBaseProperty(retentionPeriodKey, retentionCount.toString())
+        val retentionCount = this.preferences?.getInt(RETENTION_PERIOD_COUNT_KEY, 0) ?: 0
+        val today = now.toLocalDate()
+        val retentionTimestamp = this.preferences
+            ?.takeIf { it.contains(RETENTION_PERIOD_TIMESTAMP_KEY) }
+            ?.getLong(RETENTION_PERIOD_TIMESTAMP_KEY, 0)
+        val lastRetentionDate = retentionTimestamp
+            ?.let { Instant.ofEpochSecond(it).atZone(now.zone).toLocalDate() }
 
-        // 1 day is equal to 86400 seconds
-        val lastDaysSince0 = retentionTimestamp / (86400)
-        val daysSince0 = now.toEpochSecond() / (86400)
-        if (lastDaysSince0 == daysSince0 - 1) {
-            // count up retention. because user is returned in 1 day
-            val countedUp = retentionCount + 1
-            this.preferences?.edit()
-                ?.putLong(retentionPeriodKey, now.toEpochSecond())
-                ?.putInt(retentionPeriodCountKey, countedUp)
-                ?.apply()
-            this.setBaseProperty(retentionPeriodKey, countedUp.toString())
-        } else if (lastDaysSince0 == daysSince0) {
-            // save the initial count
-            this.preferences?.edit()
-                ?.putLong(retentionPeriodKey, retentionTimestamp)
-                ?.putInt(retentionPeriodCountKey, retentionCount)
-                ?.apply()
-        } else if (lastDaysSince0 < daysSince0 - 1) {
-            // reset retention. because user won't be returned in 1 day
-            val reset = 0
-            this.preferences?.edit()
-                ?.putLong(retentionPeriodKey, now.toEpochSecond())
-                ?.putInt(retentionPeriodCountKey, reset)
-                ?.apply()
-            this.setBaseProperty(retentionPeriodKey, reset.toString())
+        when {
+            lastRetentionDate == null -> {
+                this.saveRetentionPeriod(now, retentionCount)
+            }
+            lastRetentionDate == today -> {
+                this.setBaseProperty(BuiltinUserProperty.retentionPeriod.toString(), retentionCount.toString())
+            }
+            lastRetentionDate.plusDays(1) == today -> {
+                this.saveRetentionPeriod(now, retentionCount + 1)
+            }
+            lastRetentionDate < today -> {
+                this.saveRetentionPeriod(now, 0)
+            }
+            else -> {
+                this.setBaseProperty(BuiltinUserProperty.retentionPeriod.toString(), retentionCount.toString())
+            }
         }
+    }
+
+    private fun saveRetentionPeriod(now: ZonedDateTime, count: Int) {
+        this.preferences?.edit()
+            ?.putLong(RETENTION_PERIOD_TIMESTAMP_KEY, now.toEpochSecond())
+            ?.putInt(RETENTION_PERIOD_COUNT_KEY, count)
+            ?.apply()
+        this.setBaseProperty(BuiltinUserProperty.retentionPeriod.toString(), count.toString())
     }
 
     // n in [0,1)

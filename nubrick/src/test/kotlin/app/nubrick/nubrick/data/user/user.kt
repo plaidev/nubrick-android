@@ -27,9 +27,12 @@ import java.util.TimeZone
 import kotlin.math.abs
 
 class UtilsUnitTest {
+    private val originalTimeZone = TimeZone.getDefault()
+
     @After
     fun tearDown() {
         DATETIME_OFFSET = 0
+        TimeZone.setDefault(originalTimeZone)
     }
 
     @Test
@@ -220,8 +223,9 @@ class UtilsUnitTest {
     }
 
     @Test
-    fun comeBack_shouldCountUpOnNextUtcDay_keepSameDay_andResetOnGap() {
+    fun comeBack_shouldCountUpOnNextLocalDay_keepSameDay_andResetOnGap() {
         val store = mutableMapOf<String, Any>()
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
         setSyncedInstant(Instant.parse("2024-01-10T12:00:00Z"))
         val user = NubrickUser(context = mockContext(store = store), seed = 0)
         assertEquals(0, user.retention)
@@ -230,13 +234,104 @@ class UtilsUnitTest {
         user.comeBack()
         assertEquals(1, user.retention)
 
-        setSyncedInstant(Instant.parse("2024-01-11T18:00:00Z"))
+        setSyncedInstant(Instant.parse("2024-01-11T13:00:00Z"))
         user.comeBack()
         assertEquals(1, user.retention)
 
         setSyncedInstant(Instant.parse("2024-01-13T12:00:00Z"))
         user.comeBack()
         assertEquals(0, user.retention)
+    }
+
+    @Test
+    fun comeBack_shouldNotCountUpWhenUtcDayChangesOnSameLocalDay() {
+        val store = mutableMapOf<String, Any>()
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
+        setSyncedInstant(Instant.parse("2024-01-11T07:30:00Z")) // Jan 10, 23:30 PST
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        setSyncedInstant(Instant.parse("2024-01-11T08:30:00Z")) // Jan 11, 00:30 PST
+        user.comeBack()
+        assertEquals(1, user.retention)
+
+        setSyncedInstant(Instant.parse("2024-01-12T07:30:00Z")) // Jan 11, 23:30 PST
+        user.comeBack()
+        assertEquals(1, user.retention)
+    }
+
+    @Test
+    fun comeBack_shouldCountUpWhenLocalDayChangesWithinSameUtcDay() {
+        val store = mutableMapOf<String, Any>()
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
+        setSyncedInstant(Instant.parse("2024-01-10T14:30:00Z")) // Jan 10, 23:30 JST
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        setSyncedInstant(Instant.parse("2024-01-10T15:30:00Z")) // Jan 11, 00:30 JST
+        user.comeBack()
+
+        assertEquals(1, user.retention)
+    }
+
+    @Test
+    fun comeBack_shouldUseConsecutiveLocalDatesAcrossDst() {
+        val store = mutableMapOf<String, Any>()
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"))
+        setSyncedInstant(Instant.parse("2024-03-10T07:30:00Z")) // Mar 9, 23:30 PST
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        setSyncedInstant(Instant.parse("2024-03-11T06:30:00Z")) // Mar 10, 23:30 PDT
+        user.comeBack()
+
+        assertEquals(1, user.retention)
+    }
+
+    @Test
+    fun comeBack_shouldApplyLocalDayStreakRulesWithExistingRetentionTimestamp() {
+        val store = mutableMapOf<String, Any>(
+            BuiltinUserProperty.retentionPeriod.toString() to Instant.parse("2024-01-10T00:00:00Z").epochSecond,
+            "retentionPeriodCount" to 7,
+        )
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
+        setSyncedInstant(Instant.parse("2024-01-11T12:00:00Z"))
+
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        assertEquals(8, user.retention)
+
+        setSyncedInstant(Instant.parse("2024-01-12T12:00:00Z"))
+        user.comeBack()
+
+        assertEquals(9, user.retention)
+    }
+
+    @Test
+    fun comeBack_shouldResetStaleRetentionTimestamp() {
+        val store = mutableMapOf<String, Any>(
+            BuiltinUserProperty.retentionPeriod.toString() to Instant.parse("2024-01-09T00:00:00Z").epochSecond,
+            "retentionPeriodCount" to 7,
+        )
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
+        setSyncedInstant(Instant.parse("2024-01-11T12:00:00Z"))
+
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        assertEquals(0, user.retention)
+    }
+
+    @Test
+    fun comeBack_shouldIgnoreRetentionTimestampFromFutureLocalDay() {
+        val retentionTimestamp = Instant.parse("2024-01-12T12:00:00Z").epochSecond
+        val store = mutableMapOf<String, Any>(
+            BuiltinUserProperty.retentionPeriod.toString() to retentionTimestamp,
+            "retentionPeriodCount" to 7,
+        )
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo"))
+        setSyncedInstant(Instant.parse("2024-01-11T12:00:00Z"))
+
+        val user = NubrickUser(context = mockContext(store = store), seed = 0)
+
+        assertEquals(7, user.retention)
+        assertEquals(retentionTimestamp, store[BuiltinUserProperty.retentionPeriod.toString()])
     }
 
     @Test
@@ -310,6 +405,9 @@ class UtilsUnitTest {
         `when`(context.packageName).thenReturn("app.nubrick.test")
         `when`(context.getSharedPreferences("app.nubrick.test.nubrik.io.user", Context.MODE_PRIVATE))
             .thenReturn(preferences)
+        `when`(preferences.contains(anyString())).thenAnswer { invocation ->
+            backing.containsKey(invocation.getArgument<String>(0))
+        }
         `when`(preferences.getString(anyString(), any())).thenAnswer { invocation ->
             val key = invocation.getArgument<String>(0)
             val default = invocation.getArgument<String?>(1)
