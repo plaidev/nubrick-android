@@ -33,7 +33,7 @@ class NetworkTest {
             response(500),
             response(502),
             response(200, "ok")
-        ) { endpoint ->
+        ) { endpoint, _ ->
             runBlocking { getRequest(endpoint, client = client) }
         }
 
@@ -44,7 +44,7 @@ class NetworkTest {
 
     @Test
     fun `get request does not retry not found`() {
-        val (result, requestCount) = withLocalServer(response(404)) { endpoint ->
+        val (result, requestCount) = withLocalServer(response(404)) { endpoint, _ ->
             runBlocking { getRequest(endpoint, client = client) }
         }
 
@@ -55,7 +55,7 @@ class NetworkTest {
 
     @Test
     fun `get request does not retry client errors`() {
-        val (result, requestCount) = withLocalServer(response(400, "bad request")) { endpoint ->
+        val (result, requestCount) = withLocalServer(response(400, "bad request")) { endpoint, _ ->
             runBlocking { getRequest(endpoint, client = client) }
         }
 
@@ -72,7 +72,7 @@ class NetworkTest {
             response(500),
             response(502),
             response(200, "ok")
-        ) { endpoint ->
+        ) { endpoint, _ ->
             runBlocking { postRequest(endpoint, "{}", client) }
         }
 
@@ -84,7 +84,7 @@ class NetworkTest {
     @Test
     fun `oversized successful response returns failure`() {
         val oversizedBody = "x".repeat(5 * 1024 * 1024 + 1)
-        val (result, requestCount) = withLocalServer(response(200, oversizedBody)) { endpoint ->
+        val (result, requestCount) = withLocalServer(response(200, oversizedBody)) { endpoint, _ ->
             runBlocking { getRequest(endpoint, client = client) }
         }
 
@@ -103,7 +103,7 @@ class NetworkTest {
 
     @Test
     fun `custom http request returns failure for invalid json response`() {
-        val (result, requestCount) = withLocalServer(response(200, "{")) { endpoint ->
+        val (result, requestCount) = withLocalServer(response(200, "{")) { endpoint, _ ->
             runBlocking {
                 HttpRequestRepositoryImpl(client).request(
                     CompiledHttpRequest(
@@ -145,7 +145,7 @@ class NetworkTest {
         val scope = CoroutineScope(Dispatchers.IO)
 
         try {
-            val (result, requestCount) = withLocalServer(cacheableResponse(200, "ok")) { endpoint ->
+            val (result, requestCount) = withLocalServer(cacheableResponse(200, "ok")) { endpoint, _ ->
                 runBlocking {
                     val first = NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
                     assertTrue(first.isSuccess)
@@ -175,7 +175,7 @@ class NetworkTest {
         try {
             val (result, requestCount) = withLocalServer(
                 cacheableResponse(200, "ok", dateHeader = "Tue, 19 May 2099 00:00:00 GMT")
-            ) { endpoint ->
+            ) { endpoint, _ ->
                 runBlocking {
                     val first = NetworkRepository(scope, CacheStore(), client)
                         .getWithCache(endpoint, syncDateTime = true)
@@ -210,7 +210,7 @@ class NetworkTest {
             val (result, requestCount) = withLocalServer(
                 cacheableResponse(200, "old"),
                 response(404),
-            ) { endpoint ->
+            ) { endpoint, _ ->
                 runBlocking {
                     assertTrue(repo.getWithCache(endpoint).isSuccess)
                     assertEquals("old", memory.get(endpoint).getOrNull()?.data)
@@ -252,37 +252,39 @@ class NetworkTest {
         val scope = CoroutineScope(Dispatchers.IO)
         val repo = NetworkRepository(scope, memory, OkHttpClient())
 
+        // Initial GET + stale refresh with MAX_RETRIES=2 → 3 attempts (1s + 2s delays).
+        val expectedRequests = 1 + 3
         val (kept, requestCount) = withLocalServer(
             cacheableResponse(200, "old"),
-            // Close after first response by not serving second — use 500 then connection issues.
-            // 500 is retried; after retries still failure → keep cache.
             response(500),
             response(500),
             response(500),
-        ) { endpoint ->
+        ) { endpoint, served ->
             runBlocking {
                 assertTrue(repo.getWithCache(endpoint).isSuccess)
                 DATETIME_OFFSET = 61_000
                 assertEquals("old", repo.getWithCache(endpoint).getOrNull())
 
-                var stillPresent = false
-                repeat(50) {
+                // Wait until all refresh attempts hit the server (not just "still cached while in flight").
+                var refreshFinished = false
+                repeat(200) {
                     delay(50)
-                    // After refresh attempts finish, entry must remain.
-                    if (memory.get(endpoint).isSuccess) {
-                        stillPresent = true
+                    if (served.get() >= expectedRequests) {
+                        refreshFinished = true
+                        return@repeat
                     }
                 }
-                // Reset offset so get() doesn't treat as expired (10m).
-                DATETIME_OFFSET = 61_000
-                assertTrue(stillPresent)
+                assertTrue("expected $expectedRequests server hits, got ${served.get()}", refreshFinished)
+                // Allow the refresh coroutine to apply the final failure handling.
+                delay(100)
+
                 assertEquals("old", memory.get(endpoint).getOrNull()?.data)
                 memory.get(endpoint).getOrNull()?.data
             }
         }
 
         assertEquals("old", kept)
-        assertTrue(requestCount >= 2)
+        assertTrue("requestCount=$requestCount", requestCount >= expectedRequests)
         DATETIME_OFFSET = 0
     }
 
@@ -304,7 +306,7 @@ class NetworkTest {
             slowOk,
             slowOk,
             slowOk,
-        ) { endpoint ->
+        ) { endpoint, _ ->
             runBlocking {
                 assertTrue(repo.getWithCache(endpoint).isSuccess)
                 DATETIME_OFFSET = 61_000
@@ -333,10 +335,11 @@ class NetworkTest {
     companion object {
         private fun <T> withLocalServer(
             vararg responses: String,
-            request: (String) -> T
+            request: (endpoint: String, requestCount: AtomicInteger) -> T
         ): Pair<T, Int> {
             val serverSocket = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
-            serverSocket.soTimeout = 5000
+            // Retry delays are 1s + 2s; keep accept open across gaps between attempts.
+            serverSocket.soTimeout = 10_000
             val requestCount = AtomicInteger(0)
             val executor = Executors.newSingleThreadExecutor()
             val server = executor.submit {
@@ -361,8 +364,8 @@ class NetworkTest {
                 }
             }
 
-            val result = request("http://127.0.0.1:${serverSocket.localPort}/test")
-            server.get(10, TimeUnit.SECONDS)
+            val result = request("http://127.0.0.1:${serverSocket.localPort}/test", requestCount)
+            server.get(15, TimeUnit.SECONDS)
             executor.shutdownNow()
             return result to requestCount.get()
         }
