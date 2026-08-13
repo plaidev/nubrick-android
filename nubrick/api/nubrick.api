@@ -405,3 +405,4 @@ public final class app/nubrick/nubrick/view/NubrickOverlayView : androidx/compos
 public abstract interface class app/nubrick/nubrick/view/NubrickSizeListener {
 	public abstract fun onSizeChange (Lapp/nubrick/nubrick/NubrickSize;Lapp/nubrick/nubrick/NubrickSize;)V
 }
+
