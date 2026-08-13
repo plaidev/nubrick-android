@@ -100,6 +100,7 @@ fun interface NubrickGlobalEventListener {
 
 /**
  * Java-friendly callback for events dispatched through [NubrickSDK.dispatch].
+ * Invoked on the main thread.
  */
 fun interface NubrickDispatchListener {
     fun onDispatch(event: NubrickEvent)
@@ -108,6 +109,7 @@ fun interface NubrickDispatchListener {
 data class Config @JvmOverloads constructor(
     val projectId: String,
     val onEvent: ((event: Event) -> Unit)? = null,
+    /** Called on the main thread for events dispatched through [NubrickSDK.dispatch]. */
     val onDispatch: ((event: NubrickEvent) -> Unit)? = null,
     val trackCrashes: Boolean = true,
 )
