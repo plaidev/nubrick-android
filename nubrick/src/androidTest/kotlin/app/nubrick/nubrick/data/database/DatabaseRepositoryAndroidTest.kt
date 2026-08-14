@@ -4,8 +4,8 @@ import android.database.sqlite.SQLiteDatabase
 import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.FrequencyUnit
 import app.nubrick.nubrick.schema.UserEventFrequencyCondition
-import org.junit.Assert
 import org.junit.After
+import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
