@@ -13,6 +13,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class InitializeContainmentAndroidTest {
@@ -76,6 +78,27 @@ class InitializeContainmentAndroidTest {
         )
         NubrickSDK.setUserId("user-after-retry")
         assertEquals("user-after-retry", NubrickSDK.getUserId())
+    }
+
+    @Test
+    fun initializeAndResetSucceedOffTheMainThread() {
+        val realContext = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val initialized = executor.submit<Boolean> {
+                NubrickSDK.initialize(
+                    context = realContext,
+                    config = Config(projectId = "test-project-id"),
+                )
+            }.get(5, TimeUnit.SECONDS)
+            assertTrue(initialized)
+
+            executor.submit {
+                runBlocking { NubrickSDK.resetForTest() }
+            }.get(5, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test

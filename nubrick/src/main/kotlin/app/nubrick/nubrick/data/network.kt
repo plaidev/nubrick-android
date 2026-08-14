@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val CONNECT_TIMEOUT = 10 * 1000
 internal const val READ_TIMEOUT = 5 * 1000
-private const val HTTP_OK = 200
 private const val HTTP_NOT_FOUND = 404
 private const val MAX_RETRIES = 2
 private val RETRY_DELAYS = longArrayOf(1000, 2000)
@@ -131,6 +130,18 @@ private fun isRetryable(e: Throwable): Boolean {
     return e is SocketTimeoutException || (e is HttpException && e.statusCode >= 500)
 }
 
+/** Outbox retries only help for transient failures. 4xx other than 408/429 will
+ * not succeed on a later attempt, so those records should be dropped. */
+internal fun isRetryableTrackingFailure(error: Throwable): Boolean {
+    return when (error) {
+        is SocketTimeoutException -> true
+        is HttpException -> error.statusCode >= 500 || error.statusCode == 408 || error.statusCode == 429
+        is NotFoundException -> false
+        is IOException -> true
+        else -> false
+    }
+}
+
 internal suspend fun getRequest(
     endpoint: String,
     syncDateTime: Boolean = false,
@@ -178,6 +189,20 @@ internal suspend fun postRequest(endpoint: String, data: String, client: OkHttpC
     return requestWithRetry { executeRequest(client, request) }
 }
 
+/** Tracking owns retry scheduling in its durable outbox, so each call makes
+ * one request and leaves unconfirmed records on disk for a later attempt. */
+internal suspend fun postTrackingRequest(endpoint: String, data: String, client: OkHttpClient): Result<String> {
+    val request = try {
+        Request.Builder()
+            .url(endpoint)
+            .post(data.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+    } catch (e: IllegalArgumentException) {
+        return Result.failure(e)
+    }
+    return executeRequest(client, request)
+}
+
 internal fun sendHttpRequest(req: CompiledHttpRequest, client: OkHttpClient): Result<String> {
     val url = req.url ?: return Result.failure(SkipHttpRequestException())
     val method = req.method ?: ApiHttpRequestMethod.GET
@@ -219,12 +244,11 @@ private fun executeRequest(
                 syncDateFromHttpDateHeader(t0, System.currentTimeMillis(), response.header("Date"))
             }
 
-            return when (response.code) {
-                HTTP_OK -> {
-                    val body = response.body ?: return Result.failure(IOException("Empty response body"))
-                    Result.success(readStream(body.byteStream()))
+            return when {
+                response.code in 200..299 -> {
+                    Result.success(response.body?.byteStream()?.let(::readStream) ?: "")
                 }
-                HTTP_NOT_FOUND -> Result.failure(NotFoundException())
+                response.code == HTTP_NOT_FOUND -> Result.failure(NotFoundException())
                 else -> Result.failure(HttpException(response.code, readErrorBody(response.body)))
             }
         }
