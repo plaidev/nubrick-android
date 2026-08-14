@@ -42,6 +42,7 @@ import app.nubrick.nubrick.data.TrackCrashEvent
 import app.nubrick.nubrick.data.TrackRepositoryImpl
 import app.nubrick.nubrick.data.database.DatabaseRepositoryImpl
 import app.nubrick.nubrick.data.database.NubrickDbHelper
+import app.nubrick.nubrick.data.database.TrackOutbox
 import java.io.File
 import java.util.concurrent.TimeUnit
 import app.nubrick.nubrick.data.user.NubrickUser
@@ -148,7 +149,8 @@ private class NubrickRuntime(
         val appContext = context.applicationContext
 
         this.user = NubrickUser(appContext)
-        this.databaseRepository = DatabaseRepositoryImpl(NubrickDbHelper(appContext))
+        val dbHelper = NubrickDbHelper(appContext)
+        this.databaseRepository = DatabaseRepositoryImpl(dbHelper)
 
         // Create all repositories at SDK level
         val cache = CacheStore()
@@ -162,7 +164,13 @@ private class NubrickRuntime(
         val networkRepository = NetworkRepository(this.sdkScope, cache, this.cachedHttpClient)
         val componentRepository = ComponentRepositoryImpl(config, networkRepository)
         val experimentRepository = ExperimentRepositoryImpl(config, networkRepository)
-        val trackRepository = TrackRepositoryImpl(config, this.user, this.sdkScope, this.uncachedHttpClient)
+        val trackRepository = TrackRepositoryImpl(
+            config,
+            this.user,
+            this.sdkScope,
+            TrackOutbox(dbHelper),
+            this.uncachedHttpClient,
+        )
         val httpRequestRepository = HttpRequestRepositoryImpl(this.uncachedHttpClient)
         this.onEvent = config.onEvent
         this.onDispatch = config.onDispatch

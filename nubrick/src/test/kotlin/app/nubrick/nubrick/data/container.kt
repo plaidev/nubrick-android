@@ -527,11 +527,11 @@ private class FakeTrackRepository : TrackRepository {
     val experimentEvents = mutableListOf<TrackExperimentEvent>()
     val userEvents = mutableListOf<TrackUserEvent>()
 
-    override fun trackExperimentEvent(event: TrackExperimentEvent) {
+    override suspend fun trackExperimentEvent(event: TrackExperimentEvent) {
         experimentEvents.add(event)
     }
 
-    override fun trackEvent(event: TrackUserEvent) {
+    override suspend fun trackEvent(event: TrackUserEvent) {
         userEvents.add(event)
     }
 

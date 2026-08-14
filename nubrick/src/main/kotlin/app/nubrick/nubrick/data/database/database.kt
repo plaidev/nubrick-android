@@ -22,20 +22,29 @@ internal interface DatabaseRepository {
 }
 
 private const val DATABASE_NAME = "Nativebrik.sdk.db"
-private const val DATABASE_VERSION = 1
+private const val DATABASE_VERSION = 2
 internal class NubrickDbHelper(context: Context): SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
     override fun onCreate(db: SQLiteDatabase) {
         try {
             db.execSQL(SQL_CREATE_EXPERIMENT_HISTORY_TABLE)
             db.execSQL(SQL_CREATE_USER_EVENT_TABLE)
+            db.execSQL(SQL_CREATE_TRACK_OUTBOX_TABLE)
         } catch (_: Exception) {
             throw Exception("Nubrick SDK couldn't create a sqlite database.")
         }
     }
 
-    override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {}
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        try {
+            if (oldVersion < 2) {
+                db.execSQL(SQL_CREATE_TRACK_OUTBOX_TABLE)
+            }
+        } catch (_: Exception) {
+            throw Exception("Nubrick SDK couldn't create a sqlite database.")
+        }
+    }
 
-    override fun onDowngrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
+    override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         onUpgrade(db, oldVersion, newVersion)
     }
 }
