@@ -46,7 +46,7 @@ internal class ExperimentHistory(private val db: SQLiteDatabase) {
         val selection = """
             ${ExperimentHistoryTable.Columns.ExperimentId} = ?
             AND
-            ${ExperimentHistoryTable.Columns.Timestamp} > ?
+            ${ExperimentHistoryTable.Columns.Timestamp} >= ?
         """.trimIndent()
         val selectionArgs = arrayOf(
             experimentId,

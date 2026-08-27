@@ -1,9 +1,15 @@
 package app.nubrick.nubrick.data.database
 
 import android.database.sqlite.SQLiteDatabase
+import app.nubrick.nubrick.data.user.DATETIME_OFFSET
+import app.nubrick.nubrick.data.user.getCurrentDate
 import app.nubrick.nubrick.schema.ConditionOperator
+import app.nubrick.nubrick.schema.ExperimentFrequency
 import app.nubrick.nubrick.schema.FrequencyUnit
 import app.nubrick.nubrick.schema.UserEventFrequencyCondition
+import java.time.DayOfWeek
+import java.time.ZonedDateTime
+import java.time.temporal.TemporalAdjusters
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
@@ -44,6 +50,119 @@ class DatabaseRepositoryAndroidTest {
         )
 
         Assert.assertTrue(matched)
+    }
+
+    @Test
+    fun dailyExperimentFrequencyAllowsDisplayOnTheNextLocalDay() = runBlocking {
+        val originalOffset = DATETIME_OFFSET
+        try {
+            val displayedAt = getCurrentDate()
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+            setCurrentDate(displayedAt)
+            repository.appendExperimentHistory("daily-experiment")
+
+            val blockedOnSameDay = repository.isNotInFrequency(
+                "daily-experiment",
+                ExperimentFrequency(period = 1, unit = FrequencyUnit.DAY),
+            )
+            setCurrentDate(displayedAt.plusDays(1))
+            val allowed = repository.isNotInFrequency(
+                "daily-experiment",
+                ExperimentFrequency(period = 1, unit = FrequencyUnit.DAY),
+            )
+
+            Assert.assertFalse(blockedOnSameDay)
+            Assert.assertTrue(allowed)
+        } finally {
+            DATETIME_OFFSET = originalOffset
+        }
+    }
+
+    @Test
+    fun weeklyExperimentFrequencyAllowsDisplayInTheNextCalendarWeek() = runBlocking {
+        val originalOffset = DATETIME_OFFSET
+        try {
+            val displayedAt = getCurrentDate()
+                .with(TemporalAdjusters.nextOrSame(DayOfWeek.WEDNESDAY))
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+            setCurrentDate(displayedAt)
+            repository.appendExperimentHistory("weekly-experiment")
+
+            setCurrentDate(
+                displayedAt.with(TemporalAdjusters.next(DayOfWeek.MONDAY)).withHour(12)
+            )
+            val allowed = repository.isNotInFrequency(
+                "weekly-experiment",
+                ExperimentFrequency(period = 1, unit = FrequencyUnit.WEEK),
+            )
+
+            Assert.assertTrue(allowed)
+        } finally {
+            DATETIME_OFFSET = originalOffset
+        }
+    }
+
+    @Test
+    fun monthlyExperimentFrequencyAllowsDisplayInTheNextCalendarMonth() = runBlocking {
+        val originalOffset = DATETIME_OFFSET
+        try {
+            val displayedAt = getCurrentDate()
+                .withDayOfMonth(15)
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+            setCurrentDate(displayedAt)
+            repository.appendExperimentHistory("monthly-experiment")
+
+            setCurrentDate(displayedAt.plusMonths(1).withDayOfMonth(1).withHour(12))
+            val allowed = repository.isNotInFrequency(
+                "monthly-experiment",
+                ExperimentFrequency(period = 1, unit = FrequencyUnit.MONTH),
+            )
+
+            Assert.assertTrue(allowed)
+        } finally {
+            DATETIME_OFFSET = originalOffset
+        }
+    }
+
+    @Test
+    fun nonPositiveFrequencyPeriodsDoNotRestrictDelivery() = runBlocking {
+        val originalOffset = DATETIME_OFFSET
+        try {
+            val displayedAt = getCurrentDate()
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+            setCurrentDate(displayedAt)
+            repository.appendExperimentHistory("hourly-experiment")
+
+            listOf(0, -1).forEach { period ->
+                val allowed = repository.isNotInFrequency(
+                    "hourly-experiment",
+                    ExperimentFrequency(period = period, unit = FrequencyUnit.HOUR),
+                )
+
+                Assert.assertTrue("period=$period", allowed)
+            }
+
+            val blockedWithNoPeriodOrUnit = repository.isNotInFrequency(
+                "hourly-experiment",
+                ExperimentFrequency(),
+            )
+
+            Assert.assertFalse(blockedWithNoPeriodOrUnit)
+        } finally {
+            DATETIME_OFFSET = originalOffset
+        }
     }
 
     @Test
@@ -157,6 +276,10 @@ class DatabaseRepositoryAndroidTest {
 }
 
 private const val TEST_META = """{"platform":"android"}"""
+
+private fun setCurrentDate(date: ZonedDateTime) {
+    DATETIME_OFFSET = date.toInstant().toEpochMilli() - System.currentTimeMillis()
+}
 
 private suspend fun TrackOutbox.insertEvent(
     eventId: String,
