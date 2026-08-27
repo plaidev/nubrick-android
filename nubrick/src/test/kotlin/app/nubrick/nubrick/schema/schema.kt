@@ -18,7 +18,8 @@ class SchemaUnitTest {
                     "id": "2",
                     "data": {
                         "__typename": "UITextBlockData",
-                        "value": "Hello World"
+                        "value": "Hello World",
+                        "lineHeight": 19.2
                     }
                 }],
                 "gap": 16
@@ -36,6 +37,7 @@ class SchemaUnitTest {
             assertEquals(1, block.data.data?.children?.size)
             val child = block.data.data?.children?.get(0) as? UIBlock.UnionUITextBlock
             assertEquals("Hello World", child?.data?.data?.value)
+            assertEquals(19.2f, child?.data?.data?.lineHeight)
         } else {
             assert(false)
         }
@@ -50,7 +52,8 @@ class SchemaUnitTest {
                     UITextBlock(
                         id = "2",
                         data = UITextBlockData(
-                            value = "Hello World"
+                            value = "Hello World",
+                            lineHeight = 19.2f,
                         )
                     )
                 )),
