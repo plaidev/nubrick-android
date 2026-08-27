@@ -3462,6 +3462,7 @@ internal class UITextBlock (
 internal class UITextBlockData (
 	val value: String? = null,
 	val size: Int? = null,
+	val lineHeight: Float? = null,
 	val color: ColorValue? = null,
 	val design: FontDesign? = null,
 	val weight: FontWeight? = null,
@@ -3481,6 +3482,7 @@ internal class UITextBlockData (
 			return UITextBlockData(
 				value = StringDecoder.decode(element.jsonObject["value"]),
 				size = IntDecoder.decode(element.jsonObject["size"]),
+				lineHeight = FloatDecoder.decode(element.jsonObject["lineHeight"]),
 				color = ColorValue.decode(element.jsonObject["color"]),
 				design = FontDesign.decode(element.jsonObject["design"]),
 				weight = FontWeight.decode(element.jsonObject["weight"]),
@@ -3502,6 +3504,9 @@ internal class UITextBlockData (
 			}
 			data.size?.let { value ->
 				IntEncoder.encode(value)?.let { map["size"] = it }
+			}
+			data.lineHeight?.let { value ->
+				FloatEncoder.encode(value)?.let { map["lineHeight"] = it }
 			}
 			data.color?.let { value ->
 				ColorValue.encode(value)?.let { map["color"] = it }
