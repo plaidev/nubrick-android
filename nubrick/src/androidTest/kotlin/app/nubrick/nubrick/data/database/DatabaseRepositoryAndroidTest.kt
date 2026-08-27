@@ -153,6 +153,13 @@ class DatabaseRepositoryAndroidTest {
 
                 Assert.assertTrue("period=$period", allowed)
             }
+
+            val allowedWithMissingPeriod = repository.isNotInFrequency(
+                "hourly-experiment",
+                ExperimentFrequency(unit = FrequencyUnit.HOUR),
+            )
+
+            Assert.assertTrue(allowedWithMissingPeriod)
         } finally {
             DATETIME_OFFSET = originalOffset
         }

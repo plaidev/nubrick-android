@@ -80,7 +80,7 @@ internal class DatabaseRepositoryImpl private constructor(
     override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean = withDatabase {
         if (frequency == null) return@withDatabase true
 
-        val period = frequency.period ?: (365 * 50)
+        val period = frequency.period ?: return@withDatabase true
         if (period <= 0) return@withDatabase true
         val unit = frequency.unit ?: FrequencyUnit.DAY
 
