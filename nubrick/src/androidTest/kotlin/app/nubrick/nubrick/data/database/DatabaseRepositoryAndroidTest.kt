@@ -171,11 +171,25 @@ class DatabaseRepositoryAndroidTest {
         Assert.assertNotNull(outbox.insertEvent("old", createdAt = 1))
         Assert.assertNotNull(outbox.insertEvent("new", createdAt = 2))
 
-        val batch = outbox.nextNormalBatch(maxEvents = 50, maxPayloadBytes = 512 * 1024)
+        val batch = outbox.nextBatch(maxEvents = 50, maxPayloadBytes = 512 * 1024)
         Assert.assertEquals(listOf("old", "new"), batch.map { it.eventId })
 
         outbox.remove(listOf("old"))
-        Assert.assertEquals(listOf("new"), outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId })
+        Assert.assertEquals(listOf("new"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
+    }
+
+    @Test
+    fun trackOutboxDoesNotLetCrashesOvertakeEarlierEvents() = runBlocking {
+        val outbox = TrackOutbox(databaseProvider = { db })
+        outbox.insertEvent("event-before", createdAt = 1)
+        outbox.insertEvent("crash", createdAt = 2, eventType = "crash")
+        outbox.insertEvent("event-after", createdAt = 3)
+
+        Assert.assertEquals(listOf("event-before"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
+        outbox.remove(listOf("event-before"))
+        Assert.assertEquals(listOf("crash"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
+        outbox.remove(listOf("crash"))
+        Assert.assertEquals(listOf("event-after"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
     }
 
     @Test
@@ -191,7 +205,7 @@ class DatabaseRepositoryAndroidTest {
 
         Assert.assertEquals(
             listOf("second", "third"),
-            outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId },
+            outbox.nextBatch(50, 512 * 1024).map { it.eventId },
         )
     }
 
@@ -212,7 +226,7 @@ class DatabaseRepositoryAndroidTest {
 
         Assert.assertEquals(
             listOf("second"),
-            outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId },
+            outbox.nextBatch(50, 512 * 1024).map { it.eventId },
         )
     }
 
@@ -227,10 +241,9 @@ class DatabaseRepositoryAndroidTest {
         outbox.insertEvent("event-1", createdAt = 2)
         outbox.insertEvent("event-2", createdAt = 3)
 
-        Assert.assertNull(outbox.nextCrash())
         Assert.assertEquals(
             listOf("event-1", "event-2"),
-            outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId },
+            outbox.nextBatch(50, 512 * 1024).map { it.eventId },
         )
     }
 
@@ -243,7 +256,7 @@ class DatabaseRepositoryAndroidTest {
         Assert.assertNotNull(outbox.insertEvent("same", createdAt = 2, payload = payload))
         Assert.assertEquals(
             listOf("same"),
-            outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId },
+            outbox.nextBatch(50, 512 * 1024).map { it.eventId },
         )
     }
 
@@ -257,7 +270,7 @@ class DatabaseRepositoryAndroidTest {
         val outbox = TrackOutbox(databaseProvider = { db })
         outbox.insertEvent("event-a", createdAt = 1, userId = "user-a", meta = """{"appVersion":"1.0"}""")
 
-        val stored = outbox.nextNormalBatch(50, 512 * 1024).single()
+        val stored = outbox.nextBatch(50, 512 * 1024).single()
         Assert.assertEquals("user-a", stored.userId)
         Assert.assertEquals("""{"appVersion":"1.0"}""", stored.meta)
     }
@@ -269,9 +282,9 @@ class DatabaseRepositoryAndroidTest {
         outbox.insertEvent("b1", createdAt = 2, userId = "user-b")
         outbox.insertEvent("a2", createdAt = 3, userId = "user-a")
 
-        Assert.assertEquals(listOf("a1"), outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId })
+        Assert.assertEquals(listOf("a1"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
         outbox.remove(listOf("a1"))
-        Assert.assertEquals(listOf("b1"), outbox.nextNormalBatch(50, 512 * 1024).map { it.eventId })
+        Assert.assertEquals(listOf("b1"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
     }
 }
 
@@ -288,4 +301,4 @@ private suspend fun TrackOutbox.insertEvent(
     userId: String = "user-a",
     payload: String = "{\"eventUuid\":\"$eventId\"}",
     meta: String = TEST_META,
-) = insert(eventId, payload, eventType, createdAt, userId, meta)
+) = insertAndGetPendingCount(eventId, payload, eventType, createdAt, userId, meta)
