@@ -52,8 +52,10 @@ class CompilerTest {
     fun shouldGetVariableByPath() {
         assertEquals(JsonPrimitive(this.userId), variableByPath("user.id", this.variable))
         assertEquals(null, variableByPath("user.xxx.yyy", this.variable))
-        assertEquals(JsonPrimitive(this.teamName), variableByPath("$.user.team.name", this.variable))
-        assertEquals(this.variable["user"]?.jsonObject, variableByPath("$.user", this.variable))
+        assertEquals(JsonPrimitive(this.teamName), variableByPath("user.team.name", this.variable))
+        assertEquals(this.variable["user"]?.jsonObject, variableByPath("user", this.variable))
+        assertEquals(null, variableByPath("$.user.team.name", this.variable))
+        assertEquals(null, variableByPath("$", this.variable))
     }
 
     @Test
@@ -87,6 +89,21 @@ class CompilerTest {
         assertFalse(hasPlaceholder("{ user.id }"))
         assertEquals("{{", compile("{{", this.variable))
         assertEquals("{ user.id }", compile("{ user.id }", this.variable))
+    }
+
+    @Test
+    fun structuredGrammarGolden() {
+        assertEquals(true, hasPlaceholder("{{user.name}}"))
+        assertEquals(true, hasPlaceholder("Hello {{ user.name }}"))
+        assertEquals(true, hasPlaceholder("{{user.name | upper}}"))
+        assertEquals(true, hasPlaceholder("{{ user.name | json }}"))
+        assertFalse(hasPlaceholder("{{}}"))
+        assertFalse(hasPlaceholder("{{$.user.id}}"))
+        assertFalse(hasPlaceholder("{{user:name}}"))
+        assertFalse(hasPlaceholder("{{foo/bar}}"))
+        assertEquals("{{$.user.id}}", compile("{{$.user.id}}", this.variable))
+        assertEquals("{{user:name}} {{foo/bar}} {{}}", compile("{{user:name}} {{foo/bar}} {{}}", this.variable))
+        assertEquals("null", compile("{{ user.missing | json }}", this.variable))
     }
 }
 
