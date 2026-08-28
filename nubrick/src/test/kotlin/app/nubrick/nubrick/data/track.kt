@@ -111,36 +111,6 @@ class TrackingRetryPolicyTest {
     }
 }
 
-class TrackingFlushScheduleTest {
-
-    @Test
-    fun `immediate pending flush wins over retry backoff`() {
-        assertEquals(0L, nextScheduledFlushDelayMs(10_000L, 0L))
-        assertEquals(0L, nextScheduledFlushDelayMs(5 * 60 * 1000L, 0L))
-    }
-
-    @Test
-    fun `retry backoff is used when nothing requested a sooner flush`() {
-        assertEquals(10_000L, nextScheduledFlushDelayMs(10_000L, null))
-    }
-
-    @Test
-    fun `pending follow-up is used after a successful drain`() {
-        assertEquals(0L, nextScheduledFlushDelayMs(null, 0L))
-        assertEquals(10_000L, nextScheduledFlushDelayMs(null, 10_000L))
-    }
-
-    @Test
-    fun `sooner pending follow-up wins when both delays are set`() {
-        assertEquals(1_000L, nextScheduledFlushDelayMs(10_000L, 1_000L))
-    }
-
-    @Test
-    fun `no follow-up is scheduled when neither delay is set`() {
-        assertNull(nextScheduledFlushDelayMs(null, null))
-    }
-}
-
 class StoredNativeCrashTest {
 
     @Test

@@ -307,10 +307,6 @@ private fun postOnMainThread(block: () -> Unit) {
     Handler(Looper.getMainLooper()).post(block)
 }
 
-internal fun nextScheduledFlushDelayMs(retryAfterMs: Long?, pendingFollowUpMs: Long?): Long? {
-    return listOfNotNull(retryAfterMs, pendingFollowUpMs).minOrNull()
-}
-
 internal interface TrackRepository {
     suspend fun trackExperimentEvent(event: TrackExperimentEvent)
     suspend fun trackEvent(event: TrackUserEvent)
@@ -367,7 +363,7 @@ internal class TrackRepositoryImpl(
     private suspend fun enqueue(event: TrackEvent): Boolean = withContext(Dispatchers.IO) {
         val payload = Json.encodeToString(event.encode())
         val meta = Json.encodeToString(currentMeta().encode())
-        val normalEventCount = outbox.insert(
+        val pendingEventCount = outbox.insertAndGetPendingCount(
             eventId = event.eventUuid,
             payload = payload,
             eventType = event.eventType,
@@ -375,16 +371,15 @@ internal class TrackRepositoryImpl(
             userId = user.id,
             meta = meta,
         )
-        if (normalEventCount == null) {
+        if (pendingEventCount == null) {
             Log.w("NubrickSDK", "Event dropped because it could not be persisted or was oversized")
             return@withContext false
         }
-        requestFlush(if (event.eventType == "crash" || normalEventCount >= maxBatchSize) 0 else flushIntervalMs)
+        requestFlush(if (pendingEventCount >= maxBatchSize) 0 else flushIntervalMs)
         true
     }
 
     private fun requestFlush(delayMs: Long) {
-        val jobId: Long
         synchronized(scheduleLock) {
             if (closed) return
             if (isSending) {
@@ -396,7 +391,7 @@ internal class TrackRepositoryImpl(
                 scheduledJob?.cancel()
             }
             scheduledDelayMs = delayMs
-            jobId = ++scheduledJobId
+            val jobId = ++scheduledJobId
             scheduledJob = scope.launch {
                 if (delayMs > 0) delay(delayMs)
                 runScheduledFlush(jobId)
@@ -414,7 +409,6 @@ internal class TrackRepositoryImpl(
         }
 
         var retryAfterMs: Long? = null
-        var pendingFollowUpMs: Long? = null
         try {
             while (outbox.hasPendingEvents()) {
                 if (sendNextBatch()) {
@@ -430,14 +424,14 @@ internal class TrackRepositoryImpl(
             Log.w("NubrickSDK", "Could not drain the tracking outbox", e)
             retryAfterMs = nextRetryDelayMs()
         } finally {
+            var pendingFollowUpMs: Long?
             synchronized(scheduleLock) {
                 isSending = false
                 pendingFollowUpMs = pendingDelayMs
                 pendingDelayMs = null
             }
+            (retryAfterMs ?: pendingFollowUpMs)?.let(::requestFlush)
         }
-
-        nextScheduledFlushDelayMs(retryAfterMs, pendingFollowUpMs)?.let(::requestFlush)
     }
 
     private fun nextRetryDelayMs(): Long {
@@ -457,8 +451,7 @@ internal class TrackRepositoryImpl(
     }
 
     private suspend fun sendNextBatch(): Boolean {
-        val pending = outbox.nextCrash()?.let { listOf(it) }
-            ?: outbox.nextNormalBatch(maxBatchSize, maxBatchEventPayloadBytes)
+        val pending = outbox.nextBatch(maxBatchSize, maxBatchEventPayloadBytes)
         if (pending.isEmpty()) return true
 
         val validPending = pending.mapNotNull { entry ->

@@ -61,7 +61,7 @@ internal class TrackOutbox(
 
     private val db: SQLiteDatabase by lazy { databaseProvider() }
 
-    suspend fun insert(
+    suspend fun insertAndGetPendingCount(
         eventId: String,
         payload: String,
         eventType: String,
@@ -94,30 +94,25 @@ internal class TrackOutbox(
             } finally {
                 db.endTransaction()
             }
-            if (eventType == CRASH_EVENT_TYPE) 0 else countNormalEvents()
+            pendingEventCount()
         } catch (_: Exception) {
             null
         }
     }
 
-    suspend fun nextCrash(): PendingTrackEvent? = withDatabase {
-        query(
-            selection = "${TrackOutboxTable.Columns.EventType} = ?",
-            selectionArgs = arrayOf(CRASH_EVENT_TYPE),
-            limit = 1,
-        ).firstOrNull()
-    }
-
-    suspend fun nextNormalBatch(maxEvents: Int, maxPayloadBytes: Int): List<PendingTrackEvent> = withDatabase {
-        val entries = query(
-            selection = "${TrackOutboxTable.Columns.EventType} != ?",
-            selectionArgs = arrayOf(CRASH_EVENT_TYPE),
-            limit = maxEvents,
-        )
+    /**
+     * Returns the oldest events in FIFO order. Crash payloads remain isolated,
+     * but do not overtake events that were queued earlier.
+     */
+    suspend fun nextBatch(maxEvents: Int, maxPayloadBytes: Int): List<PendingTrackEvent> = withDatabase {
+        val entries = query(maxEvents)
         val first = entries.firstOrNull() ?: return@withDatabase emptyList()
+        if (first.eventType == CRASH_EVENT_TYPE) return@withDatabase listOf(first)
+
         val batch = mutableListOf<PendingTrackEvent>()
         var payloadBytes = 0
         for (entry in entries) {
+            if (entry.eventType == CRASH_EVENT_TYPE) break
             if (entry.userId != first.userId || entry.meta != first.meta) break
             if (batch.isNotEmpty() && payloadBytes + entry.byteCount > maxPayloadBytes) break
             batch += entry
@@ -137,7 +132,7 @@ internal class TrackOutbox(
     }
 
     suspend fun hasPendingEvents(): Boolean = withDatabase {
-        count("1", null, null) > 0
+        pendingEventCount() > 0
     }
 
     private suspend fun <T> withDatabase(block: () -> T): T =
@@ -147,22 +142,16 @@ internal class TrackOutbox(
             }
         }
 
-    private fun countNormalEvents(): Int = count(
-        "${TrackOutboxTable.Columns.EventType} != ?",
-        arrayOf(CRASH_EVENT_TYPE),
-        null,
-    )
-
-    private fun count(selection: String, selectionArgs: Array<String>?, defaultValue: Int? = 0): Int {
+    private fun pendingEventCount(): Int {
         db.rawQuery(
-            "SELECT COUNT(*) FROM ${TrackOutboxTable.Name} WHERE $selection",
-            selectionArgs,
+            "SELECT COUNT(*) FROM ${TrackOutboxTable.Name}",
+            null,
         ).use { cursor ->
-            return if (cursor.moveToFirst()) cursor.getInt(0) else defaultValue ?: 0
+            return if (cursor.moveToFirst()) cursor.getInt(0) else 0
         }
     }
 
-    private fun query(selection: String, selectionArgs: Array<String>, limit: Int): List<PendingTrackEvent> {
+    private fun query(limit: Int): List<PendingTrackEvent> {
         return db.query(
             TrackOutboxTable.Name,
             arrayOf(
@@ -173,8 +162,8 @@ internal class TrackOutbox(
                 TrackOutboxTable.Columns.UserId,
                 TrackOutboxTable.Columns.Meta,
             ),
-            selection,
-            selectionArgs,
+            null,
+            null,
             null,
             null,
             "${BaseColumns._ID} ASC",
@@ -196,7 +185,7 @@ internal class TrackOutbox(
     }
 
     private fun enforceLimits() {
-        var totalCount = count("1", null)
+        var totalCount = pendingEventCount()
         var totalBytes = totalPendingBytes()
         var evicted = false
 
