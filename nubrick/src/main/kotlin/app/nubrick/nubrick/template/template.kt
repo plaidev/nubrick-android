@@ -5,7 +5,6 @@ import kotlinx.serialization.json.JsonObject
 
 private data class Placeholder(val path: String, val formatter: String)
 
-// Same grammar as nativebrik front / Go: {{ path }} and {{ path | formatter }}.
 private val placeholderRegex = Regex("\\{\\{\\s*([a-zA-Z0-9_.-]{1,300})\\s*(?:\\|\\s*([a-zA-Z0-9_-]*)\\s*)?\\}\\}")
 
 private fun parseToPlaceholder(value: String): Placeholder? {
