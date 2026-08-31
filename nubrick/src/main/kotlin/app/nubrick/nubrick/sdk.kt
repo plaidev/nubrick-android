@@ -124,6 +124,11 @@ sealed class NubrickSize {
     data object Fill : NubrickSize()
 }
 
+internal fun remoteNubrickSize(value: Int?): NubrickSize = when {
+    value == null || value <= 0 -> NubrickSize.Fill
+    else -> NubrickSize.Fixed(value)
+}
+
 private class NubrickUninitializedException : IllegalStateException(
     "NubrickSDK used before NubrickSDK.initialize(...)."
 )
@@ -668,11 +673,11 @@ object FlutterBridge {
         val triggerDestinationPage = pages?.firstOrNull {
             it.id == triggerDestinationId
         }
-        val frameWidth = triggerDestinationPage?.data?.frameWidth ?: 0
-        val frameHeight = triggerDestinationPage?.data?.frameHeight ?: 0
+        val frameWidth = triggerDestinationPage?.data?.frameWidth
+        val frameHeight = triggerDestinationPage?.data?.frameHeight
         return Pair(
-            if (frameWidth == 0) NubrickSize.Fill else NubrickSize.Fixed(frameWidth),
-            if (frameHeight == 0) NubrickSize.Fill else NubrickSize.Fixed(frameHeight)
+            remoteNubrickSize(frameWidth),
+            remoteNubrickSize(frameHeight)
         )
     }
 

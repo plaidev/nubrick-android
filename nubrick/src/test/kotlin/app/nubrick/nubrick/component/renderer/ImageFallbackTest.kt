@@ -11,4 +11,12 @@ class ImageFallbackTest {
         )
         assertEquals(ImageFallback(blurhash = "", width = 0, height = 0), fallback)
     }
+
+    @Test
+    fun parseReturnsNoneWhenDimensionsExceedDecoderLimit() {
+        val fallback = parseImageFallbackToBlurhash(
+            "https://example.com/img.jpg?w=513&h=1&b=LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+        )
+        assertEquals(ImageFallback(blurhash = "", width = 0, height = 0), fallback)
+    }
 }

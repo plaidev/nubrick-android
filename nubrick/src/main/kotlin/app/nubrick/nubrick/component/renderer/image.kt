@@ -28,10 +28,11 @@ internal fun parseImageFallbackToBlurhash(src: String): ImageFallback {
     val none = ImageFallback(blurhash = "", width = 0, height = 0)
     try {
         val uri = Uri.parse(src)
-        val width = uri.getQueryParameter("w") ?: return none
-        val height = uri.getQueryParameter("h") ?: return none
+        val width = uri.getQueryParameter("w")?.toIntOrNull() ?: return none
+        val height = uri.getQueryParameter("h")?.toIntOrNull() ?: return none
         val blurhash = uri.getQueryParameter("b") ?: return none
-        return ImageFallback(blurhash = blurhash, width = width.toInt(), height = height.toInt())
+        if (!BlurHashDecoder.supportsDimensions(width, height)) return none
+        return ImageFallback(blurhash = blurhash, width = width, height = height)
     } catch (_: Exception) {
         return none
     }

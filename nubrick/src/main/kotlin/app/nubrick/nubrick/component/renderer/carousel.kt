@@ -35,14 +35,17 @@ internal fun Modifier.collectionItemSize(
 ): Modifier {
     return if (fillsMainAxis && direction == FlexDirection.ROW) {
         this
-            .height((block.data?.itemHeight ?: 0).dp)
+            .height((block.data?.itemHeight ?: 0).coerceAtLeast(0).dp)
             .fillMaxWidth()
     } else if (fillsMainAxis) {
         this
-            .width((block.data?.itemWidth ?: 0).dp)
+            .width((block.data?.itemWidth ?: 0).coerceAtLeast(0).dp)
             .fillMaxHeight()
     } else {
-        this.size(DpSize((block.data?.itemWidth ?: 0).dp, (block.data?.itemHeight ?: 0).dp))
+        this.size(DpSize(
+            (block.data?.itemWidth ?: 0).coerceAtLeast(0).dp,
+            (block.data?.itemHeight ?: 0).coerceAtLeast(0).dp,
+        ))
     }
 }
 
@@ -87,22 +90,23 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
     }
 
     val padding = parseFramePadding(block.data?.frame)
-    val gap = (block.data?.gap ?: 0).dp
-    val size = DpSize((block.data?.itemWidth ?: 0).dp, (block.data?.itemHeight ?: 0).dp)
-    val calculatedHeight = (block.data?.frame?.paddingTop ?: 0) +
-        (block.data?.frame?.paddingBottom ?: 0) + (block.data?.itemHeight ?: 0)
-    val calculatedWidth = (block.data?.frame?.paddingLeft ?: 0) +
-        (block.data?.frame?.paddingRight ?: 0) + (block.data?.itemWidth ?: 0)
-    val crossHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: calculatedHeight
-    val crossWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: calculatedWidth
+    val gap = (block.data?.gap ?: 0).coerceAtLeast(0).dp
+    val itemWidth = (block.data?.itemWidth ?: 0).coerceAtLeast(0)
+    val itemHeight = (block.data?.itemHeight ?: 0).coerceAtLeast(0)
+    val size = DpSize(itemWidth.dp, itemHeight.dp)
     // Collections do not support borders in the editor, so ignore any frame border values.
     val collectionModifier = modifier.frameSize(block.data?.frame, includeBorder = false)
     if (direction == FlexDirection.ROW) {
+        val crossHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: run {
+            val value = (block.data?.frame?.paddingTop ?: 0).coerceAtLeast(0).toLong() +
+                (block.data?.frame?.paddingBottom ?: 0).coerceAtLeast(0) + itemHeight
+            value.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: return
+        }
         HorizontalPager(
             contentPadding = padding,
             pageSpacing = gap,
             state = state,
-            pageSize = if (fillsMainAxis) PageSize.Fill else PageSize.Fixed(size.width),
+            pageSize = if (fillsMainAxis) PageSize.Fill else PageSize.Fixed(size.width.coerceAtLeast(1.dp)),
             modifier = collectionModifier
                 .fillMaxWidth()
                 .height(crossHeight.dp)
@@ -117,11 +121,16 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
             }
         }
     } else {
+        val crossWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: run {
+            val value = (block.data?.frame?.paddingLeft ?: 0).coerceAtLeast(0).toLong() +
+                (block.data?.frame?.paddingRight ?: 0).coerceAtLeast(0) + itemWidth
+            value.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: return
+        }
         VerticalPager(
             contentPadding = padding,
             pageSpacing = gap,
             state = state,
-            pageSize = if (fillsMainAxis) PageSize.Fill else PageSize.Fixed(size.height),
+            pageSize = if (fillsMainAxis) PageSize.Fill else PageSize.Fixed(size.height.coerceAtLeast(1.dp)),
             modifier = collectionModifier
                 .fillMaxHeight()
                 .width(crossWidth.dp)

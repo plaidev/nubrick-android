@@ -12,7 +12,7 @@ internal data class PendingTrackEvent(
     val eventId: String,
     val payload: String,
     val eventType: String,
-    val byteCount: Int,
+    val byteCount: Long,
     val userId: String,
     val meta: String,
 )
@@ -69,8 +69,8 @@ internal class TrackOutbox(
         userId: String,
         meta: String,
     ): Int? = withDatabase {
-        val byteCount = payload.toByteArray(Charsets.UTF_8).size
-        if (byteCount > limits.maxEventBytes) return@withDatabase null
+        val byteCount = payload.toByteArray(Charsets.UTF_8).size.toLong()
+        if (byteCount > limits.maxEventBytes.toLong()) return@withDatabase null
 
         try {
             db.beginTransaction()
@@ -110,11 +110,11 @@ internal class TrackOutbox(
         if (first.eventType == CRASH_EVENT_TYPE) return@withDatabase listOf(first)
 
         val batch = mutableListOf<PendingTrackEvent>()
-        var payloadBytes = 0
+        var payloadBytes = 0L
         for (entry in entries) {
             if (entry.eventType == CRASH_EVENT_TYPE) break
             if (entry.userId != first.userId || entry.meta != first.meta) break
-            if (batch.isNotEmpty() && payloadBytes + entry.byteCount > maxPayloadBytes) break
+            if (batch.isNotEmpty() && payloadBytes > maxPayloadBytes.toLong() - entry.byteCount) break
             batch += entry
             payloadBytes += entry.byteCount
         }
@@ -175,7 +175,7 @@ internal class TrackOutbox(
                         eventId = cursor.getString(0),
                         payload = cursor.getString(1),
                         eventType = cursor.getString(2),
-                        byteCount = cursor.getInt(3),
+                        byteCount = cursor.getLong(3).coerceAtLeast(0L),
                         userId = cursor.getString(4),
                         meta = cursor.getString(5),
                     ))
@@ -189,7 +189,7 @@ internal class TrackOutbox(
         var totalBytes = totalPendingBytes()
         var evicted = false
 
-        while (totalCount > limits.maxEventCount || totalBytes > limits.maxQueueBytes) {
+        while (totalCount > limits.maxEventCount || totalBytes > limits.maxQueueBytes.toLong()) {
             val oldest = oldestPendingEvent() ?: break
             val (id, byteCount) = oldest
             db.delete(TrackOutboxTable.Name, "${BaseColumns._ID} = ?", arrayOf(id.toString()))
@@ -203,14 +203,14 @@ internal class TrackOutbox(
         }
     }
 
-    private fun totalPendingBytes(): Int = db.rawQuery(
+    private fun totalPendingBytes(): Long = db.rawQuery(
         "SELECT COALESCE(SUM(${TrackOutboxTable.Columns.ByteCount}), 0) FROM ${TrackOutboxTable.Name}",
         null,
     ).use { cursor ->
-        if (cursor.moveToFirst()) cursor.getInt(0) else 0
+        if (cursor.moveToFirst()) cursor.getLong(0).coerceAtLeast(0L) else 0L
     }
 
-    private fun oldestPendingEvent(): Pair<Long, Int>? = db.query(
+    private fun oldestPendingEvent(): Pair<Long, Long>? = db.query(
         TrackOutboxTable.Name,
         arrayOf(BaseColumns._ID, TrackOutboxTable.Columns.ByteCount),
         null,
@@ -220,7 +220,7 @@ internal class TrackOutbox(
         "${BaseColumns._ID} ASC",
         "1",
     ).use { cursor ->
-        if (cursor.moveToFirst()) cursor.getLong(0) to cursor.getInt(1) else null
+        if (cursor.moveToFirst()) cursor.getLong(0) to cursor.getLong(1).coerceAtLeast(0L) else null
     }
 
     private companion object {

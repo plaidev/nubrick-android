@@ -109,4 +109,23 @@ class CacheStoreTest {
         cacheStore.remove("k")
         assertTrue(cacheStore.get("k").isFailure)
     }
+
+    @Test
+    fun `cache evicts the oldest entry when its byte budget is exceeded`() {
+        cacheStore = CacheStore(maxBytes = 3)
+        cacheStore.set("first", "abc")
+        cacheStore.set("second", "d")
+
+        assertTrue(cacheStore.get("first").isFailure)
+        assertEquals("d", cacheStore.get("second").getOrNull()?.data)
+    }
+
+    @Test
+    fun `cache keeps an existing entry when its replacement exceeds the byte budget`() {
+        cacheStore = CacheStore(maxBytes = 3)
+        cacheStore.set("key", "old")
+        cacheStore.set("key", "oversized")
+
+        assertEquals("old", cacheStore.get("key").getOrNull()?.data)
+    }
 }
