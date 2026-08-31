@@ -27,14 +27,17 @@ import kotlinx.serialization.json.jsonArray
 internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
     val state = rememberLazyGridState(0, 0)
     val padding = parseFramePadding(block.data?.frame)
-    val gridSize = block.data?.gridSize ?: 1
-    val gap = (block.data?.gap ?: 0).dp
+    val gridSize = (block.data?.gridSize ?: 1).coerceAtLeast(1)
+    val gapValue = (block.data?.gap ?: 0).coerceAtLeast(0)
+    val gap = gapValue.dp
     val direction: FlexDirection = block.data?.direction ?: FlexDirection.ROW
-    val size = DpSize((block.data?.itemWidth ?: 0).dp, (block.data?.itemHeight ?: 0).dp)
-    val calculatedHeight = (block.data?.frame?.paddingTop ?: 0) + (block.data?.frame?.paddingBottom ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemHeight ?: 0))
-    val calculatedWidth = (block.data?.frame?.paddingLeft ?: 0) + (block.data?.frame?.paddingRight ?: 0) + (gridSize - 1) * (block.data?.gap ?: 0) + (gridSize * (block.data?.itemWidth ?: 0))
-    val gridHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: calculatedHeight
-    val gridWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: calculatedWidth
+    val itemWidth = (block.data?.itemWidth ?: 0).coerceAtLeast(0)
+    val itemHeight = (block.data?.itemHeight ?: 0).coerceAtLeast(0)
+    val size = DpSize(itemWidth.dp, itemHeight.dp)
+    val paddingTop = (block.data?.frame?.paddingTop ?: 0).coerceAtLeast(0)
+    val paddingBottom = (block.data?.frame?.paddingBottom ?: 0).coerceAtLeast(0)
+    val paddingLeft = (block.data?.frame?.paddingLeft ?: 0).coerceAtLeast(0)
+    val paddingRight = (block.data?.frame?.paddingRight ?: 0).coerceAtLeast(0)
     // Collections do not support borders in the editor, so ignore any frame border values.
     val collectionModifier = modifier.frameSize(block.data?.frame, includeBorder = false)
 
@@ -53,6 +56,11 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
     }
 
     if (direction == FlexDirection.ROW) {
+        val gridHeight = block.data?.frame?.height?.takeIf { it > 0 } ?: run {
+            val value = paddingTop.toDouble() + paddingBottom +
+                (gridSize - 1).toDouble() * gapValue + gridSize.toDouble() * itemHeight
+            value.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: return
+        }
         LazyHorizontalGrid(
             contentPadding = padding,
             rows = GridCells.FixedSize(size.height.coerceAtLeast(1.dp)),
@@ -72,6 +80,11 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
             }
         }
     } else {
+        val gridWidth = block.data?.frame?.width?.takeIf { it > 0 } ?: run {
+            val value = paddingLeft.toDouble() + paddingRight +
+                (gridSize - 1).toDouble() * gapValue + gridSize.toDouble() * itemWidth
+            value.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: return
+        }
         LazyVerticalGrid(
             contentPadding = padding,
             columns = GridCells.FixedSize(size.width.coerceAtLeast(1.dp)),

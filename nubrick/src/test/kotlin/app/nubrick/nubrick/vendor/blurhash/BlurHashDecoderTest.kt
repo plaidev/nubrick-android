@@ -26,4 +26,9 @@ class BlurHashDecoderTest {
     fun decodeReturnsNullForNegativeSize() {
         assertNull(BlurHashDecoder.decode(blurHash = validBlurHash, width = -1, height = 10))
     }
+
+    @Test
+    fun decodeReturnsNullBeforeAllocatingOversizedBitmap() {
+        assertNull(BlurHashDecoder.decode(blurHash = validBlurHash, width = 513, height = 1))
+    }
 }

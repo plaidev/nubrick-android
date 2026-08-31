@@ -234,24 +234,32 @@ internal fun Modifier.frameSize(frame: FrameData?, includeBorder: Boolean = true
     var mod = this
     // size should be set most lastly to make padding insets.
     // width should be content fit by default
-    if (frame?.width != null) {
-        mod = if (frame.width == 0) {
+    frame?.width?.let { width ->
+        mod = when {
+            width == 0 -> {
             // parent fit
             mod.fillMaxWidth()
-        } else {
+            }
+            width > 0 -> {
             // fixed size
-            mod.width(frame.width.dp)
+                mod.width(width.dp)
+            }
+            else -> mod
         }
     }
 
     // height should be content fit by default
-    if (frame?.height != null) {
-        mod = if (frame.height == 0) {
+    frame?.height?.let { height ->
+        mod = when {
+            height == 0 -> {
             // parent fit
             mod.fillMaxHeight()
-        } else {
+            }
+            height > 0 -> {
             // fixed size
-            mod.height(frame.height.dp)
+                mod.height(height.dp)
+            }
+            else -> mod
         }
     }
 
@@ -267,7 +275,7 @@ internal fun Modifier.frameSize(frame: FrameData?, includeBorder: Boolean = true
     }
 
     mod = mod.border(
-        width = frame.borderWidth.dp,
+        width = frame.borderWidth.coerceAtLeast(0).dp,
         color = parseColor(frame.borderColor),
         shape = roundedShape,
     )
@@ -281,20 +289,20 @@ internal fun Modifier.framePadding(frame: FrameData?, insetTop: Dp = 0.dp): Modi
     val border = (frame?.borderWidth ?: 0).coerceAtLeast(0).dp
 
     return this.padding(
-        start = (frame?.paddingLeft?.dp ?: 0.dp) + border,
-        top = (frame?.paddingTop?.dp ?: 0.dp) + insetTop + border,
-        end = (frame?.paddingRight?.dp ?: 0.dp) + border,
-        bottom = (frame?.paddingBottom?.dp ?: 0.dp) + border,
+        start = (frame?.paddingLeft ?: 0).coerceAtLeast(0).dp + border,
+        top = (frame?.paddingTop ?: 0).coerceAtLeast(0).dp + insetTop + border,
+        end = (frame?.paddingRight ?: 0).coerceAtLeast(0).dp + border,
+        bottom = (frame?.paddingBottom ?: 0).coerceAtLeast(0).dp + border,
     )
 }
 
 
 internal fun parseFramePadding(frame: FrameData?): PaddingValues {
     return PaddingValues(
-        start = frame?.paddingLeft?.dp ?: 0.dp,
-        top = frame?.paddingTop?.dp ?: 0.dp,
-        end = frame?.paddingRight?.dp ?: 0.dp,
-        bottom = frame?.paddingBottom?.dp ?: 0.dp,
+        start = (frame?.paddingLeft ?: 0).coerceAtLeast(0).dp,
+        top = (frame?.paddingTop ?: 0).coerceAtLeast(0).dp,
+        end = (frame?.paddingRight ?: 0).coerceAtLeast(0).dp,
+        bottom = (frame?.paddingBottom ?: 0).coerceAtLeast(0).dp,
     )
 }
 
@@ -361,7 +369,7 @@ internal fun parseHorizontalJustifyContent(
     gap: Int?,
     justifyContent: JustifyContent?
 ): Arrangement.Horizontal {
-    val gap = gap?.dp ?: 0.dp
+    val gap = (gap ?: 0).coerceAtLeast(0).dp
     return when (justifyContent) {
         JustifyContent.START -> Arrangement.spacedBy(gap, Alignment.Start)
         JustifyContent.CENTER -> Arrangement.spacedBy(gap, Alignment.CenterHorizontally)
@@ -375,7 +383,7 @@ internal fun parseVerticalJustifyContent(
     gap: Int?,
     justifyContent: JustifyContent?
 ): Arrangement.Vertical {
-    val gap = gap?.dp ?: 0.dp
+    val gap = (gap ?: 0).coerceAtLeast(0).dp
     return when (justifyContent) {
         JustifyContent.START -> Arrangement.spacedBy(gap, Alignment.Top)
         JustifyContent.CENTER -> Arrangement.spacedBy(gap, Alignment.CenterVertically)

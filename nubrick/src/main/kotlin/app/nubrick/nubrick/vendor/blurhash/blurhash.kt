@@ -15,6 +15,8 @@ import kotlin.math.pow
 import kotlin.math.withSign
 
 internal object BlurHashDecoder {
+    private const val MAX_DIMENSION = 512
+
 
     // cache Math.cos() calculations to improve performance.
     // The number of calculations can be huge for many bitmaps: width * height * numCompX * numCompY * 2 * nBitmaps
@@ -43,7 +45,7 @@ internal object BlurHashDecoder {
         if (blurHash == null || blurHash.length < 6) {
             return null
         }
-        if (width <= 0 || height <= 0) {
+        if (!supportsDimensions(width, height)) {
             return null
         }
         val numCompEnc = decode83(blurHash, 0, 1)
@@ -66,6 +68,9 @@ internal object BlurHashDecoder {
         }
         return composeBitmap(width, height, numCompX, numCompY, colors, useCache)
     }
+
+    internal fun supportsDimensions(width: Int, height: Int): Boolean =
+        width in 1..MAX_DIMENSION && height in 1..MAX_DIMENSION
 
     private fun decode83(str: String, from: Int = 0, to: Int = str.length): Int {
         var result = 0

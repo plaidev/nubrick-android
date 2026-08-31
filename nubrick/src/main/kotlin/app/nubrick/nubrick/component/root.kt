@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.NubrickSize
+import app.nubrick.nubrick.remoteNubrickSize
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import app.nubrick.nubrick.component.provider.container.ContainerProvider
@@ -268,10 +269,8 @@ internal class RootStateHolder(
         }
 
         if (destBlock.data?.kind == PageKind.COMPONENT) {
-            val frameWidth = destBlock.data.frameWidth ?: 0
-            val frameHeight = destBlock.data.frameHeight ?: 0
-            val width = if (frameWidth == 0) NubrickSize.Fill else NubrickSize.Fixed(frameWidth)
-            val height = if (frameHeight == 0) NubrickSize.Fill else NubrickSize.Fixed(frameHeight)
+            val width = remoteNubrickSize(destBlock.data.frameWidth)
+            val height = remoteNubrickSize(destBlock.data.frameHeight)
             onSizeChange?.invoke(width, height)
         }
 

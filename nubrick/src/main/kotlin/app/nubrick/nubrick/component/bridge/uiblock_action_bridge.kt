@@ -22,7 +22,7 @@ public class UIBlockActionBridge {
     internal val events: SharedFlow<UIBlockAction> = _events
 
     suspend fun dispatch(event: String) {
-        val json = Json.decodeFromString<JsonElement>(event)
+        val json = runCatching { Json.decodeFromString<JsonElement>(event) }.getOrNull() ?: return
         val dispatcher = UIBlockAction.decode(json) ?: return
         _events.emit(dispatcher)
     }
