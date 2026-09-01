@@ -6,25 +6,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import okhttp3.Cache
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketTimeoutException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class NetworkTest {
-    @get:Rule
-    val temporaryFolder = TemporaryFolder()
-
     private val client = OkHttpClient()
 
     @Test
@@ -137,135 +132,171 @@ class NetworkTest {
     }
 
     @Test
-    fun `cached get request uses okhttp disk cache when memory cache is empty`() {
-        val diskCache = Cache(temporaryFolder.newFolder("okhttp-cache"), 10L * 1024 * 1024)
-        val client = OkHttpClient.Builder()
-            .cache(diskCache)
-            .build()
-        val scope = CoroutineScope(Dispatchers.IO)
-
-        try {
-            val (result, requestCount) = withLocalServer(cacheableResponse(200, "ok")) { endpoint, _ ->
-                runBlocking {
-                    val first = NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
-                    assertTrue(first.isSuccess)
-                    assertEquals("ok", first.getOrNull())
-
-                    NetworkRepository(scope, CacheStore(), client).getWithCache(endpoint)
-                }
-            }
-
-            assertTrue(result.isSuccess)
-            assertEquals("ok", result.getOrNull())
-            assertEquals(1, requestCount)
-        } finally {
-            diskCache.close()
-        }
-    }
-
-    @Test
-    fun `cached get request does not sync date time from cached response`() {
-        DATETIME_OFFSET = 0
-        val diskCache = Cache(temporaryFolder.newFolder("okhttp-cache-date"), 10L * 1024 * 1024)
-        val client = OkHttpClient.Builder()
-            .cache(diskCache)
-            .build()
-        val scope = CoroutineScope(Dispatchers.IO)
-
-        try {
-            val (result, requestCount) = withLocalServer(
-                cacheableResponse(200, "ok", dateHeader = "Tue, 19 May 2099 00:00:00 GMT")
-            ) { endpoint, _ ->
-                runBlocking {
-                    val first = NetworkRepository(scope, CacheStore(), client)
-                        .getWithCache(endpoint, syncDateTime = true)
-                    assertTrue(first.isSuccess)
-                    assertTrue(DATETIME_OFFSET > 1000L)
-
-                    DATETIME_OFFSET = 0
-
-                    NetworkRepository(scope, CacheStore(), client)
-                        .getWithCache(endpoint, syncDateTime = true)
-                }
-            }
-
-            assertTrue(result.isSuccess)
-            assertEquals(0L, DATETIME_OFFSET)
-            assertEquals(1, requestCount)
-        } finally {
-            DATETIME_OFFSET = 0
-            diskCache.close()
-        }
-    }
-
-    @Test
-    fun `stale refresh 404 invalidates memory and okhttp cache`() {
-        val diskCache = Cache(temporaryFolder.newFolder("okhttp-cache-404"), 10L * 1024 * 1024)
-        val client = OkHttpClient.Builder().cache(diskCache).build()
-        val memory = CacheStore()
-        val scope = CoroutineScope(Dispatchers.IO)
-        val repo = NetworkRepository(scope, memory, client)
-
-        try {
-            val (result, requestCount) = withLocalServer(
-                cacheableResponse(200, "old"),
-                response(404),
-            ) { endpoint, _ ->
-                runBlocking {
-                    assertTrue(repo.getWithCache(endpoint).isSuccess)
-                    assertEquals("old", memory.get(endpoint).getOrNull()?.data)
-
-                    // Make memory entry stale and trigger background refresh.
-                    DATETIME_OFFSET = 61_000
-                    assertEquals("old", repo.getWithCache(endpoint).getOrNull())
-
-                    // Wait for background refresh (404) to finish.
-                    var invalidated = false
-                    repeat(50) {
-                        delay(50)
-                        if (memory.get(endpoint).isFailure) {
-                            invalidated = true
-                            return@repeat
-                        }
-                    }
-                    assertTrue(invalidated)
-
-                    // New CacheStore forces OkHttp path; 404 must not resurrect old body.
-                    val secondRepo = NetworkRepository(scope, CacheStore(), client)
-                    val after = secondRepo.getWithCache(endpoint)
-                    assertTrue(after.isFailure)
-                    assertTrue(after.exceptionOrNull() is NotFoundException)
-                    endpoint
-                }
-            }
-            assertTrue(requestCount >= 2)
-            assertTrue(result.isNotEmpty())
-        } finally {
-            DATETIME_OFFSET = 0
-            diskCache.close()
-        }
-    }
-
-    @Test
-    fun `stale refresh network failure keeps previously fetched body`() {
+    fun `memory cache hit returns immediately and revalidates in background`() {
         val memory = CacheStore()
         val scope = CoroutineScope(Dispatchers.IO)
         val repo = NetworkRepository(scope, memory, OkHttpClient())
 
-        // Initial GET + stale refresh with MAX_RETRIES=2 → 3 attempts (1s + 2s delays).
+        val (body, requestCount) = withLocalServer(
+            response(200, "old"),
+            response(200, "new"),
+        ) { endpoint, _ ->
+            runBlocking {
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+
+                var updated = false
+                repeat(50) {
+                    delay(50)
+                    if (memory.get(endpoint).getOrNull()?.data == "new") {
+                        updated = true
+                        return@repeat
+                    }
+                }
+                assertTrue(updated)
+                memory.get(endpoint).getOrNull()?.data
+            }
+        }
+
+        assertEquals("new", body)
+        assertEquals(2, requestCount)
+    }
+
+    @Test
+    fun `expired retention cap fetches from network before returning`() {
+        val memory = CacheStore(retentionSeconds = 30)
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, OkHttpClient())
+
+        val (body, requestCount) = withLocalServer(
+            response(200, "old"),
+            response(200, "fresh"),
+        ) { endpoint, _ ->
+            runBlocking {
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+                DATETIME_OFFSET = 31_000
+                val second = repo.getWithCache(endpoint)
+                assertEquals("fresh", second.getOrNull())
+                second.getOrNull()
+            }
+        }
+
+        assertEquals("fresh", body)
+        assertEquals(2, requestCount)
+        DATETIME_OFFSET = 0
+    }
+
+    @Test
+    fun `revalidate 404 deletes memory cache entry`() {
+        val memory = CacheStore()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, OkHttpClient())
+
+        val (result, requestCount) = withLocalServer(
+            response(200, "old"),
+            response(404),
+        ) { endpoint, _ ->
+            runBlocking {
+                assertTrue(repo.getWithCache(endpoint).isSuccess)
+                assertEquals("old", memory.get(endpoint).getOrNull()?.data)
+
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+
+                var invalidated = false
+                repeat(50) {
+                    delay(50)
+                    if (memory.get(endpoint).isFailure) {
+                        invalidated = true
+                        return@repeat
+                    }
+                }
+                assertTrue(invalidated)
+
+                val after = repo.getWithCache(endpoint)
+                assertTrue(after.isFailure)
+                assertTrue(after.exceptionOrNull() is NotFoundException)
+                endpoint
+            }
+        }
+        assertTrue(requestCount >= 2)
+        assertTrue(result.isNotEmpty())
+    }
+
+    @Test
+    fun `revalidate 404 does not remove a newer cache entry`() {
+        val memory = CacheStore()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, OkHttpClient())
+        val serverSocket = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        val revalidationStarted = CountDownLatch(1)
+        val releaseRevalidation = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        val server = executor.submit {
+            serverSocket.use { socket ->
+                repeat(2) { responseIndex ->
+                    socket.accept().use { client ->
+                        val reader = client.getInputStream().bufferedReader()
+                        while (reader.readLine()?.isNotEmpty() == true) {
+                            // Drain headers before writing the response.
+                        }
+                        if (responseIndex == 1) {
+                            revalidationStarted.countDown()
+                            releaseRevalidation.await(5, TimeUnit.SECONDS)
+                        }
+                        client.getOutputStream().use { output ->
+                            output.write(
+                                if (responseIndex == 0) response(200, "old").toByteArray()
+                                else response(404).toByteArray()
+                            )
+                            output.flush()
+                        }
+                    }
+                }
+            }
+        }
+
+        try {
+            val endpoint = "http://127.0.0.1:${serverSocket.localPort}/test"
+            runBlocking {
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+                assertTrue(revalidationStarted.await(5, TimeUnit.SECONDS))
+
+                memory.set(endpoint, "new")
+                releaseRevalidation.countDown()
+
+                repeat(50) {
+                    delay(50)
+                    if (memory.get(endpoint).getOrNull()?.data == "new") return@repeat
+                }
+                assertEquals("new", memory.get(endpoint).getOrNull()?.data)
+            }
+            server.get(5, TimeUnit.SECONDS)
+        } finally {
+            releaseRevalidation.countDown()
+            serverSocket.close()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `revalidate network failure keeps previously fetched body`() {
+        val memory = CacheStore()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val repo = NetworkRepository(scope, memory, OkHttpClient())
+
+        // Initial GET + revalidate with MAX_RETRIES=2 → 3 attempts (1s + 2s delays).
         val expectedRequests = 1 + 3
         val (kept, requestCount) = withLocalServer(
-            cacheableResponse(200, "old"),
+            response(200, "old"),
             response(500),
             response(500),
             response(500),
         ) { endpoint, served ->
             runBlocking {
                 assertTrue(repo.getWithCache(endpoint).isSuccess)
-                DATETIME_OFFSET = 61_000
                 assertEquals("old", repo.getWithCache(endpoint).getOrNull())
 
-                // Wait until all refresh attempts hit the server (not just "still cached while in flight").
                 var refreshFinished = false
                 repeat(200) {
                     delay(50)
@@ -275,7 +306,6 @@ class NetworkTest {
                     }
                 }
                 assertTrue("expected $expectedRequests server hits, got ${served.get()}", refreshFinished)
-                // Allow the refresh coroutine to apply the final failure handling.
                 delay(100)
 
                 assertEquals("old", memory.get(endpoint).getOrNull()?.data)
@@ -285,32 +315,28 @@ class NetworkTest {
 
         assertEquals("old", kept)
         assertTrue("requestCount=$requestCount", requestCount >= expectedRequests)
-        DATETIME_OFFSET = 0
     }
 
     @Test
-    fun `stale refresh coalesces in-flight requests`() {
+    fun `revalidate coalesces in-flight requests`() {
         val memory = CacheStore()
         val scope = CoroutineScope(Dispatchers.IO)
         val repo = NetworkRepository(scope, memory, OkHttpClient())
 
         val slowOk = "HTTP/1.1 200 OK\r\n" +
-            "Cache-Control: public, max-age=600\r\n" +
             "Content-Length: 3\r\n" +
             "Connection: close\r\n" +
             "\r\n" +
             "new"
 
         val (body, count) = withLocalServer(
-            cacheableResponse(200, "old"),
+            response(200, "old"),
             slowOk,
             slowOk,
             slowOk,
         ) { endpoint, _ ->
             runBlocking {
                 assertTrue(repo.getWithCache(endpoint).isSuccess)
-                DATETIME_OFFSET = 61_000
-                // Burst stale reads — should schedule a single refresh.
                 repeat(5) {
                     assertEquals("old", repo.getWithCache(endpoint).getOrNull())
                 }
@@ -326,10 +352,9 @@ class NetworkTest {
                 endpoint
             }
         }
-        // 1 initial + 1 coalesced refresh (not 5).
+        // 1 initial + 1 coalesced revalidate (not 5).
         assertTrue("requestCount=$count", count <= 3)
         assertTrue(body.isNotEmpty())
-        DATETIME_OFFSET = 0
     }
 
     companion object {
@@ -380,21 +405,6 @@ class NetworkTest {
                 else -> "HTTP"
             }
             return "HTTP/1.1 $statusCode $reason\r\n" +
-                "Content-Length: ${body.toByteArray().size}\r\n" +
-                "Connection: close\r\n" +
-                "\r\n" +
-                body
-        }
-
-        private fun cacheableResponse(statusCode: Int, body: String = "", dateHeader: String? = null): String {
-            val reason = when (statusCode) {
-                200 -> "OK"
-                else -> "HTTP"
-            }
-            val date = dateHeader?.let { "Date: $it\r\n" } ?: ""
-            return "HTTP/1.1 $statusCode $reason\r\n" +
-                date +
-                "Cache-Control: public, max-age=600\r\n" +
                 "Content-Length: ${body.toByteArray().size}\r\n" +
                 "Connection: close\r\n" +
                 "\r\n" +

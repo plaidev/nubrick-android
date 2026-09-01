@@ -6,7 +6,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import okhttp3.CacheControl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -36,7 +35,7 @@ internal class NetworkRepository(
     private val cache: CacheStore,
     private val client: OkHttpClient,
 ) {
-    private val refreshing = ConcurrentHashMap<String, AtomicBoolean>()
+    private val revalidatingURLs = ConcurrentHashMap<String, AtomicBoolean>()
 
     suspend fun getWithCache(endpoint: String, syncDateTime: Boolean = false): Result<String> {
         val cached = cache.get(endpoint).getOrElse {
@@ -46,57 +45,36 @@ internal class NetworkRepository(
             cache.set(endpoint, result)
             return Result.success(result)
         }
-        if (cached.isStale()) {
-            scheduleStaleRefresh(endpoint, syncDateTime)
-        }
+        scheduleRevalidate(endpoint, cached, syncDateTime)
         return Result.success(cached.data)
     }
 
-    /**
-     * Drops the in-memory entry and, when present, the matching OkHttp disk-cache entry.
-     * Used for definitive absences (404), not transient network failures.
-     */
-    fun invalidate(endpoint: String) {
-        cache.remove(endpoint)
-        evictHttpCache(endpoint)
-    }
-
-    private fun scheduleStaleRefresh(endpoint: String, syncDateTime: Boolean) {
-        val gate = refreshing.computeIfAbsent(endpoint) { AtomicBoolean(false) }
-        if (!gate.compareAndSet(false, true)) {
+    private fun scheduleRevalidate(
+        endpoint: String,
+        cached: CacheObject,
+        syncDateTime: Boolean,
+    ) {
+        val isRevalidating = revalidatingURLs.computeIfAbsent(endpoint) { AtomicBoolean(false) }
+        if (!isRevalidating.compareAndSet(false, true)) {
             return
         }
         scope.launch(Dispatchers.IO) {
             try {
-                getRequest(endpoint, syncDateTime, client, forceNetwork = true).fold(
+                getRequest(endpoint, syncDateTime, client).fold(
                     onSuccess = { body ->
                         cache.set(endpoint, body)
                     },
                     onFailure = { error ->
                         // Offline / timeouts / 5xx: keep the body we last fetched successfully.
-                        // 404: experiment/component is gone — drop caches.
+                        // 404: experiment/component is gone — drop the cache entry.
                         if (error is NotFoundException) {
-                            invalidate(endpoint)
+                            cache.remove(endpoint, cached)
                         }
                     },
                 )
             } finally {
-                refreshing.remove(endpoint, gate)
+                revalidatingURLs.remove(endpoint, isRevalidating)
             }
-        }
-    }
-
-    private fun evictHttpCache(endpoint: String) {
-        val httpCache = client.cache ?: return
-        try {
-            val iterator = httpCache.urls()
-            while (iterator.hasNext()) {
-                if (iterator.next() == endpoint) {
-                    iterator.remove()
-                }
-            }
-        } catch (_: Exception) {
-            // Best-effort eviction; memory invalidate already happened.
         }
     }
 }
@@ -146,18 +124,14 @@ internal suspend fun getRequest(
     endpoint: String,
     syncDateTime: Boolean = false,
     client: OkHttpClient,
-    forceNetwork: Boolean = false,
 ): Result<String> = requestWithRetry {
     try {
         val t0 = System.currentTimeMillis()
-        val builder = Request.Builder()
+        val request = Request.Builder()
             .url(endpoint)
             .get()
-        if (forceNetwork) {
-            // Stale refresh must observe origin 404/updates; do not satisfy from disk cache alone.
-            builder.cacheControl(CacheControl.FORCE_NETWORK)
-        }
-        executeRequest(client, builder.build(), syncDateTime, t0)
+            .build()
+        executeRequest(client, request, syncDateTime, t0)
     } catch (e: IllegalArgumentException) {
         Result.failure(e)
     }

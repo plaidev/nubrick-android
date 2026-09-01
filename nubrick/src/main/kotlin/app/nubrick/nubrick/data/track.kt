@@ -37,7 +37,6 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 private val CRASH_RECORD_KEY = "CRASH_RECORD_KEY"
 
@@ -322,7 +321,7 @@ internal class TrackRepositoryImpl(
     private val user: NubrickUser,
     private val scope: CoroutineScope,
     private val outbox: TrackOutbox,
-    private val client: OkHttpClient,
+    private val trackingClient: OkHttpClient,
 ) : TrackRepository {
     private val maxBatchSize = 50
     private val maxBatchPayloadBytes = 512 * 1024
@@ -336,12 +335,6 @@ internal class TrackRepositoryImpl(
     private var pendingDelayMs: Long? = null
     private var retryDelayMs = flushIntervalMs
     private var closed = false
-    private val trackingClient = client.newBuilder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(30, TimeUnit.SECONDS)
-        .build()
     private val processLifecycleObserver = LifecycleEventObserver { _, event ->
         when (event) {
             Lifecycle.Event.ON_START, Lifecycle.Event.ON_STOP -> requestFlush(0)
@@ -524,7 +517,7 @@ internal class TrackRepositoryImpl(
                 meta = currentMeta(),
             )
             val body = Json.encodeToString(request.encode())
-            postRequest(SdkConstants.endpoint.surveyResponses, body, client).onFailure {
+            postRequest(SdkConstants.endpoint.surveyResponses, body, trackingClient).onFailure {
                 Log.w("NubrickSDK", "Dropped survey response after send failure")
             }
         }

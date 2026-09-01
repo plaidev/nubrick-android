@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.event.eventDispatcher
@@ -44,7 +43,6 @@ import app.nubrick.nubrick.schema.Overflow
 import app.nubrick.nubrick.schema.UIBlock
 import app.nubrick.nubrick.schema.UIFlexContainerBlock
 import app.nubrick.nubrick.template.compile
-import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
 import app.nubrick.nubrick.schema.ColorValue
 import androidx.core.math.MathUtils
 
@@ -416,11 +414,8 @@ internal fun Flex(
         if (block.data?.frame?.backgroundSrc != null) {
             val src = compile(block.data.frame.backgroundSrc, data.data)
             val fallback = parseImageFallbackToBlurhash(src)
-            val decoded = BlurHashDecoder.decode(
-                blurHash = fallback.blurhash,
-                height = fallback.height,
-                width = fallback.width
-            )
+            val placeholder = rememberBlurHashPlaceholder(fallback)
+            val imageLoader = rememberNubrickImageLoader()
             AsyncImage(
                 modifier = Modifier
                     .zIndex(0f)
@@ -430,9 +425,10 @@ internal fun Flex(
                     .data(src)
                     .crossfade(true)
                     .build(),
+                imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                placeholder = rememberAsyncImagePainter(decoded),
+                placeholder = placeholder,
             )
         }
         if (direction == FlexDirection.ROW) {
