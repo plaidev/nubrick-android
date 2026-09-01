@@ -12,22 +12,18 @@ class CacheStoreTest {
 
     @Before
     fun setup() {
-        // Override getCurrentDate for testing
         app.nubrick.nubrick.data.user.DATETIME_OFFSET = 0
         cacheStore = CacheStore()
     }
 
     @Test
     fun `test basic set and get operations`() {
-        // Given
         val key = "test-key"
         val value = "test-value"
 
-        // When
         val setResult = cacheStore.set(key, value)
         val getResult = cacheStore.get(key)
 
-        // Then
         assertTrue(setResult.isSuccess)
         assertTrue(getResult.isSuccess)
         assertEquals(value, getResult.getOrNull()?.data)
@@ -35,61 +31,79 @@ class CacheStoreTest {
 
     @Test
     fun `test get non-existent key returns failure`() {
-        // When
         val result = cacheStore.get("non-existent-key")
 
-        // Then
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is NotFoundException)
     }
 
     @Test
-    fun `test cache object staleness`() {
-        // Given - stale time is 1 minute (60s), so 90s ago is stale
+    fun `entry within retention is served`() {
         val now = ZonedDateTime.now()
-        val staleTimestamp = now.minusSeconds(90)
         val cacheObject = CacheObject(
             data = "test-data",
-            timestamp = staleTimestamp,
+            timestamp = now.minusSeconds(30),
         )
 
-        // Then
-        assertTrue(cacheObject.isStale())
+        assertTrue(cacheObject.isWithinRetention(DEFAULT_CACHE_RETENTION_SECONDS))
     }
 
     @Test
-    fun `test cache object freshness`() {
-        // Given - stale time is 1 minute (60s), so 30s ago is fresh
+    fun `entry older than retention is not served`() {
         val now = ZonedDateTime.now()
-        val freshTimestamp = now.minusSeconds(30)
         val cacheObject = CacheObject(
             data = "test-data",
-            timestamp = freshTimestamp,
+            timestamp = now.minusSeconds(DEFAULT_CACHE_RETENTION_SECONDS + 1),
         )
 
-        // Then
-        assertFalse(cacheObject.isStale())
+        assertFalse(cacheObject.isWithinRetention(DEFAULT_CACHE_RETENTION_SECONDS))
     }
 
     @Test
-    fun `test expired cache returns failure`() {
-        // Given - cache time is 10 minutes (600s)
+    fun `zero retention never serves cached entries`() {
+        val cacheObject = CacheObject(
+            data = "test-data",
+            timestamp = ZonedDateTime.now(),
+        )
+
+        assertFalse(cacheObject.isWithinRetention(0))
+    }
+
+    @Test
+    fun `expired cache returns failure`() {
         val key = "test-key"
         val value = "test-value"
         cacheStore = CacheStore()
 
-        // When
         val setResult = cacheStore.set(key, value)
         assertTrue("Set operation should succeed", setResult.isSuccess)
 
-        // Simulate time passing beyond cache time (10 minutes = 600000ms)
-        app.nubrick.nubrick.data.user.DATETIME_OFFSET = 601000
+        app.nubrick.nubrick.data.user.DATETIME_OFFSET = (DEFAULT_CACHE_RETENTION_SECONDS + 1) * 1000
 
         val getResult = cacheStore.get(key)
 
-        // Then
         assertTrue("Cache should be expired", getResult.isFailure)
         assertTrue("Should throw NotFoundException", getResult.exceptionOrNull() is NotFoundException)
+    }
+
+    @Test
+    fun `custom retention cap expires earlier`() {
+        cacheStore = CacheStore(retentionSeconds = 30)
+        cacheStore.set("k", "v")
+
+        app.nubrick.nubrick.data.user.DATETIME_OFFSET = 31_000
+
+        assertTrue(cacheStore.get("k").isFailure)
+    }
+
+    @Test
+    fun `custom retention cap still serves within window`() {
+        cacheStore = CacheStore(retentionSeconds = 30)
+        cacheStore.set("k", "v")
+
+        app.nubrick.nubrick.data.user.DATETIME_OFFSET = 29_000
+
+        assertEquals("v", cacheStore.get("k").getOrNull()?.data)
     }
 
     @Test
@@ -101,13 +115,6 @@ class CacheStoreTest {
         cacheStore.set(key, "new")
         assertFalse(cacheStore.remove(key, staleSnapshot))
         assertEquals("new", cacheStore.get(key).getOrThrow().data)
-    }
-
-    @Test
-    fun `remove deletes cache entry`() {
-        cacheStore.set("k", "v")
-        cacheStore.remove("k")
-        assertTrue(cacheStore.get("k").isFailure)
     }
 
     @Test

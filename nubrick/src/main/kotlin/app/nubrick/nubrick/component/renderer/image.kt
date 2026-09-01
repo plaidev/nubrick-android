@@ -2,11 +2,14 @@ package app.nubrick.nubrick.component.renderer
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.event.eventDispatcher
@@ -38,6 +41,21 @@ internal fun parseImageFallbackToBlurhash(src: String): ImageFallback {
     }
 }
 
+@Composable
+internal fun rememberBlurHashPlaceholder(fallback: ImageFallback): Painter? {
+    val decoded = remember(fallback) {
+        BlurHashDecoder.decode(
+            blurHash = fallback.blurhash,
+            height = fallback.height,
+            width = fallback.width
+        )
+    }
+
+    return remember(decoded) {
+        decoded?.let { BitmapPainter(it.asImageBitmap()) }
+    }
+}
+
 internal fun parseContentModeToContentScale(contentMode: ImageContentMode?): ContentScale {
     return when (contentMode) {
         ImageContentMode.FILL -> ContentScale.Crop
@@ -63,12 +81,9 @@ internal fun Image(block: UIImageBlock, modifier: Modifier = Modifier) {
         .skeleton(skeleton)
 
     val fallback = parseImageFallbackToBlurhash(src)
-    val decoded = BlurHashDecoder.decode(
-        blurHash = fallback.blurhash,
-        height = fallback.height,
-        width = fallback.width
-    )
+    val placeholder = rememberBlurHashPlaceholder(fallback)
     val contentScale = parseContentModeToContentScale(block.data?.contentMode)
+    val imageLoader = rememberNubrickImageLoader()
 
     AsyncImage(
         modifier = modifier,
@@ -76,8 +91,9 @@ internal fun Image(block: UIImageBlock, modifier: Modifier = Modifier) {
             .data(src)
             .crossfade(true)
             .build(),
+        imageLoader = imageLoader,
         contentDescription = null,
-        placeholder = rememberAsyncImagePainter(decoded),
+        placeholder = placeholder,
         contentScale = contentScale,
     )
 }

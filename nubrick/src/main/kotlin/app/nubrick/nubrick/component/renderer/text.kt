@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import app.nubrick.nubrick.component.provider.data.DataContext
 import app.nubrick.nubrick.component.provider.event.eventDispatcher
@@ -34,7 +33,6 @@ import app.nubrick.nubrick.schema.UITextBlock
 import app.nubrick.nubrick.template.compile
 import app.nubrick.nubrick.template.hasDataPlaceholder
 import app.nubrick.nubrick.template.hasPlaceholder
-import app.nubrick.nubrick.vendor.blurhash.BlurHashDecoder
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color as PrimitiveColor
 import androidx.compose.ui.text.font.FontFamily as PrimitiveFontFamily
@@ -240,11 +238,8 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
         if (block.data?.frame?.backgroundSrc != null) {
             val src = compile(block.data.frame.backgroundSrc, data.data)
             val fallback = parseImageFallbackToBlurhash(src)
-            val decoded = BlurHashDecoder.decode(
-                blurHash = fallback.blurhash,
-                height = fallback.height,
-                width = fallback.width
-            )
+            val placeholder = rememberBlurHashPlaceholder(fallback)
+            val imageLoader = rememberNubrickImageLoader()
             AsyncImage(
                 modifier = Modifier
                     .zIndex(0f)
@@ -253,9 +248,10 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
                     .data(src)
                     .crossfade(true)
                     .build(),
+                imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                placeholder = rememberAsyncImagePainter(decoded),
+                placeholder = placeholder,
             )
         }
         BasicText(

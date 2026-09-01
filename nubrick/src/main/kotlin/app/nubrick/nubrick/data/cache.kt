@@ -1,15 +1,15 @@
 package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.data.user.getCurrentDate
-import java.time.ZonedDateTime
 import java.nio.charset.StandardCharsets
+import java.time.ZonedDateTime
 
-private const val CACHE_TIME_SECONDS = 10 * 60L // 10 minutes
-private const val STALE_TIME_SECONDS = 1 * 60L  // 1 minute
+internal const val DEFAULT_CACHE_RETENTION_SECONDS = 24 * 60 * 60L // 1 day
 private const val MAX_CACHE_ENTRY_COUNT = 128
 private const val MAX_CACHE_BYTES = 4 * 1024 * 1024
 
 internal class CacheStore(
+    private val retentionSeconds: Long = DEFAULT_CACHE_RETENTION_SECONDS,
     maxEntryCount: Int = MAX_CACHE_ENTRY_COUNT,
     maxBytes: Int = MAX_CACHE_BYTES,
 ) {
@@ -47,10 +47,6 @@ internal class CacheStore(
         Result.success(Unit)
     }
 
-    fun remove(key: String) = synchronized(lock) {
-        cache.remove(key)?.let { totalBytes -= it.byteCount }
-    }
-
     /**
      * Removes [key] only when the stored value is still [expected].
      * Returns true when the entry was removed.
@@ -66,7 +62,7 @@ internal class CacheStore(
         val iterator = cache.entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            if (now.toEpochSecond() - entry.value.timestamp.toEpochSecond() > CACHE_TIME_SECONDS) {
+            if (!entry.value.isWithinRetention(retentionSeconds, now)) {
                 totalBytes -= entry.value.byteCount
                 iterator.remove()
             }
@@ -79,9 +75,12 @@ internal data class CacheObject(
     internal val timestamp: ZonedDateTime,
     internal val byteCount: Int = data.toByteArray(StandardCharsets.UTF_8).size,
 ) {
-    fun isStale(): Boolean {
-        val now = getCurrentDate()
+    fun isWithinRetention(
+        retentionSeconds: Long,
+        now: ZonedDateTime = getCurrentDate(),
+    ): Boolean {
+        if (retentionSeconds <= 0L) return false
         val diff = now.toEpochSecond() - timestamp.toEpochSecond()
-        return diff > STALE_TIME_SECONDS
+        return diff <= retentionSeconds
     }
 }

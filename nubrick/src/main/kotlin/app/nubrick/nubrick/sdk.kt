@@ -26,6 +26,7 @@ import app.nubrick.nubrick.component.Trigger
 import app.nubrick.nubrick.component.TriggerStateHolder
 import app.nubrick.nubrick.component.NubrickTheme
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
+import app.nubrick.nubrick.component.renderer.NubrickImageLoader
 import app.nubrick.nubrick.data.CacheStore
 import app.nubrick.nubrick.data.CONNECT_TIMEOUT
 import app.nubrick.nubrick.data.ComponentRepositoryImpl
@@ -143,8 +144,9 @@ private class NubrickRuntime(
     private val user: NubrickUser
     private val databaseRepository: DatabaseRepositoryImpl
     private val sdkScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val uncachedHttpClient: OkHttpClient
-    private val cachedHttpClient: OkHttpClient
+    private val experimentContentClient: OkHttpClient
+    private val experimentHttpClient: OkHttpClient
+    private val trackingClient: OkHttpClient
     private val defaultExceptionHandler: Thread.UncaughtExceptionHandler?
     private val installedExceptionHandler: Thread.UncaughtExceptionHandler?
     private val trigger: TriggerStateHolder
@@ -159,14 +161,34 @@ private class NubrickRuntime(
 
         // Create all repositories at SDK level
         val cache = CacheStore()
-        this.uncachedHttpClient = OkHttpClient.Builder()
+        // Experiment config/content JSON uses in-memory SWR only; no OkHttp disk cache.
+        this.experimentContentClient = OkHttpClient.Builder()
             .connectTimeout(CONNECT_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(READ_TIMEOUT.toLong(), TimeUnit.MILLISECONDS)
+            .cache(null)
             .build()
-        this.cachedHttpClient = this.uncachedHttpClient.newBuilder()
-            .cache(Cache(File(appContext.cacheDir, "nubrick/http"), 10L * 1024 * 1024))
+        // Custom experiment HTTP follows Cache-Control so the endpoint decides freshness.
+        this.experimentHttpClient = this.experimentContentClient.newBuilder()
+            .cache(
+                appContext.cacheDir?.let { cacheDir ->
+                    val directory = File(cacheDir, "nubrick/http")
+                    if (!directory.isDirectory && !directory.mkdirs()) {
+                        null
+                    } else {
+                        Cache(directory, 10L * 1024 * 1024)
+                    }
+                }
+            )
             .build()
-        val networkRepository = NetworkRepository(this.sdkScope, cache, this.cachedHttpClient)
+        // Tracking has a longer deadline so a slow acknowledgement does not
+        // discard analytics batches with the SDK's other requests.
+        this.trackingClient = this.experimentContentClient.newBuilder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(30, TimeUnit.SECONDS)
+            .build()
+        val networkRepository = NetworkRepository(this.sdkScope, cache, this.experimentContentClient)
         val componentRepository = ComponentRepositoryImpl(config, networkRepository)
         val experimentRepository = ExperimentRepositoryImpl(config, networkRepository)
         val trackRepository = TrackRepositoryImpl(
@@ -174,9 +196,9 @@ private class NubrickRuntime(
             this.user,
             this.sdkScope,
             TrackOutbox(dbHelper),
-            this.uncachedHttpClient,
+            this.trackingClient,
         )
-        val httpRequestRepository = HttpRequestRepositoryImpl(this.uncachedHttpClient)
+        val httpRequestRepository = HttpRequestRepositoryImpl(this.experimentHttpClient)
         this.onEvent = config.onEvent
         this.onDispatch = config.onDispatch
         this.container = ContainerImpl(
@@ -225,9 +247,9 @@ private class NubrickRuntime(
         if (!this.sdkScope.isActive) return
         this.container.close()
         this.sdkScope.cancel()
-        this.cachedHttpClient.dispatcher.cancelAll()
-        this.uncachedHttpClient.dispatcher.cancelAll()
-        runCatching { this.cachedHttpClient.cache?.close() }
+        this.experimentContentClient.dispatcher.cancelAll()
+        runCatching { this.experimentHttpClient.cache?.close() }
+        NubrickImageLoader.shutdown()
         if (this.installedExceptionHandler != null &&
             Thread.getDefaultUncaughtExceptionHandler() === this.installedExceptionHandler
         ) {
