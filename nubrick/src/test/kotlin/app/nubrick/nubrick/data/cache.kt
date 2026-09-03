@@ -21,10 +21,9 @@ class CacheStoreTest {
         val key = "test-key"
         val value = "test-value"
 
-        val setResult = cacheStore.set(key, value)
+        cacheStore.set(key, value)
         val getResult = cacheStore.get(key)
 
-        assertTrue(setResult.isSuccess)
         assertTrue(getResult.isSuccess)
         assertEquals(value, getResult.getOrNull()?.data)
     }
@@ -75,8 +74,7 @@ class CacheStoreTest {
         val value = "test-value"
         cacheStore = CacheStore()
 
-        val setResult = cacheStore.set(key, value)
-        assertTrue("Set operation should succeed", setResult.isSuccess)
+        cacheStore.set(key, value)
 
         app.nubrick.nubrick.data.user.DATETIME_OFFSET = (DEFAULT_CACHE_RETENTION_SECONDS + 1) * 1000
 
@@ -114,6 +112,17 @@ class CacheStoreTest {
 
         cacheStore.set(key, "new")
         assertFalse(cacheStore.remove(key, staleSnapshot))
+        assertEquals("new", cacheStore.get(key).getOrThrow().data)
+    }
+
+    @Test
+    fun `conditional replace does not overwrite a newer entry`() {
+        val key = "test-key"
+        cacheStore.set(key, "old")
+        val staleSnapshot = cacheStore.get(key).getOrThrow()
+
+        cacheStore.set(key, "new")
+        assertFalse(cacheStore.replace(key, staleSnapshot, "stale"))
         assertEquals("new", cacheStore.get(key).getOrThrow().data)
     }
 
