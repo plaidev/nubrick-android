@@ -18,6 +18,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.NubrickSize
@@ -121,7 +122,11 @@ internal fun Embedding(
         )
         .then(modifier)
     
-    Box(modifier = modifierWithSize, contentAlignment = Alignment.Center) {
+    // Keep SDK content from drawing over host app UI.
+    Box(
+        modifier = modifierWithSize.clipToBounds(),
+        contentAlignment = Alignment.Center,
+    ) {
         when (state) {
             is EmbeddingLoadingState.Completed -> if (content != null) content(state) else state.view()
             is EmbeddingLoadingState.Loading -> if (content != null) content(state) else CircularProgressIndicator()

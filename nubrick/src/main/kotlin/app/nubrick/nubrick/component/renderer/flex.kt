@@ -3,16 +3,16 @@ package app.nubrick.nubrick.component.renderer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,8 +26,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -45,6 +49,10 @@ import app.nubrick.nubrick.schema.UIFlexContainerBlock
 import app.nubrick.nubrick.template.compile
 import app.nubrick.nubrick.schema.ColorValue
 import androidx.core.math.MathUtils
+import kotlin.math.roundToInt
+
+internal fun layoutTotal(value: Long): Int =
+    value.coerceIn(0L, Constraints.Infinity.toLong()).toInt()
 
 private fun calcWeight(frameData: FrameData?, flexDirection: FlexDirection): Float? {
     if (flexDirection == FlexDirection.ROW) {
@@ -69,6 +77,238 @@ private fun childFrameWeight(block: UIBlock, direction: FlexDirection): Float? {
         is UIBlock.UnionUISelectInputBlock -> calcWeight(block.data.data?.frame, direction)
         is UIBlock.UnionUITextInputBlock -> calcWeight(block.data.data?.frame, direction)
         else -> null
+    }
+}
+
+private data class FlexChildMetadata(
+    val weight: Float?,
+)
+
+private fun Placeable.mainAxisSize(direction: FlexDirection): Int =
+    if (direction == FlexDirection.ROW) width else height
+
+private fun Placeable.crossAxisSize(direction: FlexDirection): Int =
+    if (direction == FlexDirection.ROW) height else width
+
+private fun flexChildConstraints(
+    direction: FlexDirection,
+    mainAxisMin: Int,
+    mainAxisMax: Int,
+    crossAxisMax: Int,
+): Constraints = if (direction == FlexDirection.ROW) {
+    Constraints(
+        minWidth = mainAxisMin,
+        maxWidth = mainAxisMax,
+        minHeight = 0,
+        maxHeight = crossAxisMax,
+    )
+} else {
+    Constraints(
+        minWidth = 0,
+        maxWidth = crossAxisMax,
+        minHeight = mainAxisMin,
+        maxHeight = mainAxisMax,
+    )
+}
+
+@Composable
+private fun OverflowingFlex(
+    children: List<UIBlock>,
+    direction: FlexDirection,
+    gap: Dp,
+    justifyContent: JustifyContent?,
+    alignItems: AlignItems?,
+    modifier: Modifier,
+) {
+    Layout(
+        modifier = modifier,
+        content = {
+            children.forEach { child ->
+                Block(
+                    block = child,
+                    modifier = Modifier.layoutId(
+                        FlexChildMetadata(childFrameWeight(child, direction))
+                    ),
+                )
+            }
+        },
+    ) { measurables, constraints ->
+        val mainAxisMax = if (direction == FlexDirection.ROW) {
+            constraints.maxWidth
+        } else {
+            constraints.maxHeight
+        }
+        val mainAxisMin = if (direction == FlexDirection.ROW) {
+            constraints.minWidth
+        } else {
+            constraints.minHeight
+        }
+        val crossAxisMax = if (direction == FlexDirection.ROW) {
+            constraints.maxHeight
+        } else {
+            constraints.maxWidth
+        }
+        val gapPx = gap.toPx().roundToInt().coerceAtLeast(0)
+        val weights = measurables.map { measurable ->
+            (measurable.layoutId as? FlexChildMetadata)?.weight
+        }
+        val placeables = arrayOfNulls<Placeable>(measurables.size)
+
+        // Fixed and hug children retain their own main-axis size, even after
+        // the flex frame has run out of remaining room. They are still capped
+        // by the parent's maximum, matching the editor's max-size rule.
+        var fixedMainAxisSize = layoutTotal(
+            gapPx.toLong() * (measurables.size - 1).coerceAtLeast(0)
+        )
+        measurables.forEachIndexed { index, measurable ->
+            if (weights[index] == null) {
+                val placeable = measurable.measure(
+                    flexChildConstraints(
+                        direction = direction,
+                        mainAxisMin = 0,
+                        mainAxisMax = mainAxisMax,
+                        crossAxisMax = crossAxisMax,
+                    )
+                )
+                placeables[index] = placeable
+                fixedMainAxisSize = layoutTotal(
+                    fixedMainAxisSize.toLong() + placeable.mainAxisSize(direction)
+                )
+            }
+        }
+
+        val weightedIndices = weights.indices.filter { weights[it] != null }
+        val availableForFills = if (mainAxisMax == Constraints.Infinity) {
+            // A scroll container measures its content with an unbounded max
+            // constraint. Its minimum still represents the viewport, so fills
+            // use the viewport's free space until fixed children overflow it.
+            (mainAxisMin - fixedMainAxisSize).coerceAtLeast(0)
+        } else {
+            (mainAxisMax - fixedMainAxisSize).coerceAtLeast(0)
+        }
+        val totalWeight = weightedIndices.fold(0f) { total, index ->
+            total + (weights[index] ?: 0f)
+        }
+        var remainingForFills = availableForFills
+        weightedIndices.forEachIndexed { weightedIndex, childIndex ->
+            val weight = weights[childIndex] ?: 0f
+            val share = if (weightedIndex == weightedIndices.lastIndex) {
+                remainingForFills
+            } else {
+                (availableForFills * weight / totalWeight).toInt()
+            }
+            remainingForFills -= share
+            placeables[childIndex] = measurables[childIndex].measure(
+                flexChildConstraints(
+                    direction = direction,
+                    mainAxisMin = share,
+                    mainAxisMax = share,
+                    crossAxisMax = crossAxisMax,
+                )
+            )
+        }
+
+        val resolvedPlaceables = placeables.map { requireNotNull(it) }
+        val contentMainAxisSize = layoutTotal(
+            resolvedPlaceables.sumOf { it.mainAxisSize(direction).toLong() }
+                + gapPx.toLong() * (resolvedPlaceables.size - 1).coerceAtLeast(0)
+        )
+        val contentCrossAxisSize = resolvedPlaceables.maxOfOrNull {
+            it.crossAxisSize(direction)
+        } ?: 0
+        val layoutMainAxisSize = if (direction == FlexDirection.ROW) {
+            contentMainAxisSize.coerceIn(constraints.minWidth, constraints.maxWidth)
+        } else {
+            contentMainAxisSize.coerceIn(constraints.minHeight, constraints.maxHeight)
+        }
+        val layoutCrossAxisSize = if (direction == FlexDirection.ROW) {
+            contentCrossAxisSize.coerceIn(constraints.minHeight, constraints.maxHeight)
+        } else {
+            contentCrossAxisSize.coerceIn(constraints.minWidth, constraints.maxWidth)
+        }
+        val remainingMainAxisSpace = layoutMainAxisSize - contentMainAxisSize
+        val initialMainAxisPosition = when (justifyContent) {
+            JustifyContent.START -> 0
+            JustifyContent.END -> remainingMainAxisSpace
+            JustifyContent.SPACE_BETWEEN -> 0
+            else -> remainingMainAxisSpace / 2
+        }
+        val spacing = if (
+            justifyContent == JustifyContent.SPACE_BETWEEN
+                && resolvedPlaceables.size > 1
+                && remainingMainAxisSpace > 0
+        ) {
+            gapPx + remainingMainAxisSpace / (resolvedPlaceables.size - 1)
+        } else {
+            gapPx
+        }
+
+        val layoutWidth = if (direction == FlexDirection.ROW) {
+            layoutMainAxisSize
+        } else {
+            layoutCrossAxisSize
+        }
+        val layoutHeight = if (direction == FlexDirection.ROW) {
+            layoutCrossAxisSize
+        } else {
+            layoutMainAxisSize
+        }
+        layout(layoutWidth, layoutHeight) {
+            var mainAxisPosition = initialMainAxisPosition
+            resolvedPlaceables.forEach { placeable ->
+                val crossAxisPosition = when (alignItems) {
+                    AlignItems.START -> 0
+                    AlignItems.END -> layoutCrossAxisSize - placeable.crossAxisSize(direction)
+                    else -> (layoutCrossAxisSize - placeable.crossAxisSize(direction)) / 2
+                }
+                if (direction == FlexDirection.ROW) {
+                    placeable.place(mainAxisPosition, crossAxisPosition)
+                } else {
+                    placeable.place(crossAxisPosition, mainAxisPosition)
+                }
+                mainAxisPosition += placeable.mainAxisSize(direction) + spacing
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScrollableFlex(
+    children: List<UIBlock>,
+    direction: FlexDirection,
+    gap: Dp,
+    justifyContent: JustifyContent?,
+    alignItems: AlignItems?,
+    modifier: Modifier,
+) {
+    // horizontalScroll/verticalScroll measure their content with an unbounded
+    // main axis. Keep the viewport as a minimum size on that content so flex
+    // fills can consume free viewport space before scrolling is necessary.
+    BoxWithConstraints(
+        modifier = modifier,
+        propagateMinConstraints = true,
+    ) {
+        val contentModifier = if (direction == FlexDirection.ROW) {
+            Modifier
+                .horizontalScroll(rememberScrollState())
+                .then(
+                    if (maxWidth != Dp.Infinity) Modifier.widthIn(min = maxWidth) else Modifier
+                )
+        } else {
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .then(
+                    if (maxHeight != Dp.Infinity) Modifier.heightIn(min = maxHeight) else Modifier
+                )
+        }
+        OverflowingFlex(
+            children = children,
+            direction = direction,
+            gap = gap,
+            justifyContent = justifyContent,
+            alignItems = alignItems,
+            modifier = contentModifier,
+        )
     }
 }
 
@@ -228,7 +468,11 @@ internal fun Modifier.borderRadius(frame: FrameData?): Modifier {
 }
 
 @Composable
-internal fun Modifier.frameSize(frame: FrameData?, includeBorder: Boolean = true): Modifier {
+internal fun Modifier.frameSize(
+    frame: FrameData?,
+    includeBorder: Boolean = true,
+    clipsContent: Boolean = true,
+): Modifier {
     var mod = this
     // size should be set most lastly to make padding insets.
     // width should be content fit by default
@@ -262,10 +506,15 @@ internal fun Modifier.frameSize(frame: FrameData?, includeBorder: Boolean = true
     }
 
     val roundedShape = createRoundedShape(frame)
-    mod = mod.clip(roundedShape)
+    if (clipsContent) {
+        mod = mod.clip(roundedShape)
+    }
 
     if (frame?.background != null) {
-        mod = mod.background(parseColor(frame.background))
+        mod = mod.background(
+            color = parseColor(frame.background),
+            shape = roundedShape,
+        )
     }
 
     if (!includeBorder || frame?.borderWidth == 0 || frame?.borderWidth == null) {
@@ -363,34 +612,6 @@ internal fun parseVerticalAlignItems(alignItems: AlignItems?): Alignment.Vertica
     }
 }
 
-internal fun parseHorizontalJustifyContent(
-    gap: Int?,
-    justifyContent: JustifyContent?
-): Arrangement.Horizontal {
-    val gap = (gap ?: 0).coerceAtLeast(0).dp
-    return when (justifyContent) {
-        JustifyContent.START -> Arrangement.spacedBy(gap, Alignment.Start)
-        JustifyContent.CENTER -> Arrangement.spacedBy(gap, Alignment.CenterHorizontally)
-        JustifyContent.END -> Arrangement.spacedBy(gap, Alignment.End)
-        JustifyContent.SPACE_BETWEEN -> Arrangement.SpaceBetween
-        else -> Arrangement.spacedBy(gap, Alignment.CenterHorizontally)
-    }
-}
-
-internal fun parseVerticalJustifyContent(
-    gap: Int?,
-    justifyContent: JustifyContent?
-): Arrangement.Vertical {
-    val gap = (gap ?: 0).coerceAtLeast(0).dp
-    return when (justifyContent) {
-        JustifyContent.START -> Arrangement.spacedBy(gap, Alignment.Top)
-        JustifyContent.CENTER -> Arrangement.spacedBy(gap, Alignment.CenterVertically)
-        JustifyContent.END -> Arrangement.spacedBy(gap, Alignment.Bottom)
-        JustifyContent.SPACE_BETWEEN -> Arrangement.SpaceBetween
-        else -> Arrangement.spacedBy(gap, Alignment.CenterVertically)
-    }
-}
-
 @Composable
 internal fun Flex(
     block: UIFlexContainerBlock,
@@ -399,16 +620,24 @@ internal fun Flex(
 ) {
     val data = DataContext.state
     val direction: FlexDirection = block.data?.direction ?: FlexDirection.ROW
+    val overflow = when (block.data?.overflow) {
+        Overflow.VISIBLE -> Overflow.VISIBLE
+        Overflow.SCROLL -> Overflow.SCROLL
+        else -> Overflow.HIDDEN
+    }
     val flexModifier = modifier
         .eventDispatcher(block.data?.onClick)
-        .frameSize(block.data?.frame)
+        .frameSize(
+            block.data?.frame,
+            clipsContent = overflow == Overflow.HIDDEN || overflow == Overflow.SCROLL,
+        )
         .framePadding(block.data?.frame, insetTop)
-        .flexOverflow(direction, block.data?.overflow)
         .zIndex(1f)
 
-    val gap = block.data?.gap
+    val gap = (block.data?.gap ?: 0).coerceAtLeast(0)
     val justifyContent = block.data?.justifyContent
     val alignItems = block.data?.alignItems
+    val children = block.data?.children ?: emptyList()
 
     Box(modifier = modifier) {
         if (block.data?.frame?.backgroundSrc != null) {
@@ -431,28 +660,24 @@ internal fun Flex(
                 placeholder = placeholder,
             )
         }
-        if (direction == FlexDirection.ROW) {
-            Row(
+        if (overflow != Overflow.SCROLL) {
+            OverflowingFlex(
+                children = children,
+                direction = direction,
+                gap = gap.dp,
+                justifyContent = justifyContent,
+                alignItems = alignItems,
                 modifier = flexModifier,
-                horizontalArrangement = parseHorizontalJustifyContent(gap, justifyContent),
-                verticalAlignment = parseVerticalAlignItems(alignItems),
-            ) {
-                block.data?.children?.map {
-                    val weight = childFrameWeight(it, direction)
-                    Block(block = it, if (weight != null) Modifier.weight(weight) else Modifier)
-                }
-            }
+            )
         } else {
-            Column(
+            ScrollableFlex(
+                children = children,
+                direction = direction,
+                gap = gap.dp,
+                justifyContent = justifyContent,
+                alignItems = alignItems,
                 modifier = flexModifier,
-                horizontalAlignment = parseHorizontalAlignItems(alignItems),
-                verticalArrangement = parseVerticalJustifyContent(gap, justifyContent)
-            ) {
-                block.data?.children?.map {
-                    val weight = childFrameWeight(it, direction)
-                    Block(block = it, if (weight != null) Modifier.weight(weight) else Modifier)
-                }
-            }
+            )
         }
     }
 }
