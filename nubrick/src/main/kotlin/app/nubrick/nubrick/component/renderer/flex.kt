@@ -31,8 +31,10 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
@@ -198,15 +200,18 @@ private fun OverflowingFlex(
         val totalWeight = weightedIndices.fold(0f) { total, index ->
             total + (weights[index] ?: 0f)
         }
-        var remainingForFills = availableForFills
+        var allocatedForFills = 0
+        var cumulativeWeight = 0f
         weightedIndices.forEachIndexed { weightedIndex, childIndex ->
             val weight = weights[childIndex] ?: 0f
-            val share = if (weightedIndex == weightedIndices.lastIndex) {
-                remainingForFills
+            cumulativeWeight += weight
+            val allocated = if (weightedIndex == weightedIndices.lastIndex) {
+                availableForFills
             } else {
-                (availableForFills * weight / totalWeight).toInt()
+                (availableForFills * cumulativeWeight / totalWeight).roundToInt()
             }
-            remainingForFills -= share
+            val share = allocated - allocatedForFills
+            allocatedForFills = allocated
             placeables[childIndex] = measurables[childIndex].measure(
                 flexChildConstraints(
                     direction = direction,
@@ -242,15 +247,22 @@ private fun OverflowingFlex(
             JustifyContent.SPACE_BETWEEN -> 0
             else -> remainingMainAxisSpace / 2
         }
-        val spacing = if (
+        val extraSpaceBetween = if (
             justifyContent == JustifyContent.SPACE_BETWEEN
                 && resolvedPlaceables.size > 1
                 && remainingMainAxisSpace > 0
         ) {
-            gapPx + remainingMainAxisSpace / (resolvedPlaceables.size - 1)
+            remainingMainAxisSpace
+        } else {
+            0
+        }
+        val gapCount = resolvedPlaceables.size - 1
+        val spacing = if (gapCount > 0) {
+            gapPx + extraSpaceBetween / gapCount
         } else {
             gapPx
         }
+        val spacingRemainder = if (gapCount > 0) extraSpaceBetween % gapCount else 0
 
         val layoutWidth = if (direction == FlexDirection.ROW) {
             layoutMainAxisSize
@@ -264,7 +276,7 @@ private fun OverflowingFlex(
         }
         layout(layoutWidth, layoutHeight) {
             var mainAxisPosition = initialMainAxisPosition
-            resolvedPlaceables.forEach { placeable ->
+            resolvedPlaceables.forEachIndexed { index, placeable ->
                 val crossAxisPosition = when (alignItems) {
                     AlignItems.START -> 0
                     AlignItems.END -> layoutCrossAxisSize - placeable.crossAxisSize(direction)
@@ -275,7 +287,8 @@ private fun OverflowingFlex(
                 } else {
                     placeable.place(crossAxisPosition, mainAxisPosition)
                 }
-                mainAxisPosition += placeable.mainAxisSize(direction) + spacing
+                mainAxisPosition += placeable.mainAxisSize(direction) + spacing +
+                    if (index < spacingRemainder) 1 else 0
             }
         }
     }
@@ -291,6 +304,7 @@ private fun ScrollableFlex(
     alignItems: AlignItems?,
     modifier: Modifier,
 ) {
+    val reverseHorizontalScroll = LocalLayoutDirection.current == LayoutDirection.Rtl
     // horizontalScroll/verticalScroll measure their content with an unbounded
     // main axis. Explicitly sized frames need a viewport-sized content minimum
     // so fill children consume free space before scrolling. Hug frames must not
@@ -301,7 +315,10 @@ private fun ScrollableFlex(
     ) {
         val contentModifier = if (direction == FlexDirection.ROW) {
             Modifier
-                .horizontalScroll(rememberScrollState())
+                .horizontalScroll(
+                    state = rememberScrollState(),
+                    reverseScrolling = reverseHorizontalScroll,
+                )
                 .then(
                     if (
                         scrollContentUsesViewportMinimum(frame, direction)

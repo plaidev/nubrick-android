@@ -158,14 +158,18 @@ class FlexLayoutAndroidTest {
     }
 
     @Test
-    fun rtlHostLayout_keepsTheAuthoredFlexOrderAndOffsets() {
+    fun rtlScroll_startsAtTheFirstAuthoredChild() {
         val block = flex(
-            width = 120,
+            width = 100,
             height = 40,
+            overflow = Overflow.SCROLL,
             gap = 10,
             justifyContent = JustifyContent.START,
             alignItems = AlignItems.START,
-            children = listOf(text("first", 50, 20), text("second", 50, 20)),
+            children = listOf(
+                text("first", 80, 20, ComposeColor.Red.toSchemaColor()),
+                text("second", 80, 20, ComposeColor.Green.toSchemaColor()),
+            ),
         )
 
         composeRule.setContent {
@@ -174,8 +178,8 @@ class FlexLayoutAndroidTest {
             }
         }
 
-        assertPosition("first", x = 0, y = 0)
-        assertPosition("second", x = 60, y = 0)
+        assertEquals(ComposeColor.Red, pixelAt(x = 320, y = 1))
+        assertEquals(ComposeColor.Green, pixelAt(x = 395, y = 1))
     }
 
     @Test
@@ -192,14 +196,14 @@ class FlexLayoutAndroidTest {
             )
         )
 
-        assertPosition("top", x = 80, y = 140)
-        assertPosition("bottom", x = 80, y = 180)
+        assertPosition("top", x = 80, y = 130)
+        assertPosition("bottom", x = 80, y = 170)
     }
 
     @Test
     fun spaceBetween_preservesTheMinimumGapAndDistributesExtraSpace() {
         val block = flex(
-            width = 300,
+            width = 301,
             height = 40,
             justifyContent = JustifyContent.SPACE_BETWEEN,
             gap = 10,
@@ -223,6 +227,7 @@ class FlexLayoutAndroidTest {
         assertEquals(ComposeColor.Red, pixelAt(x = 25, y = 1))
         assertEquals(ComposeColor.Green, pixelAt(x = 150, y = 1))
         assertEquals(ComposeColor.Blue, pixelAt(x = 275, y = 1))
+        assertEquals(ComposeColor.Blue, pixelAt(x = 300, y = 1))
     }
 
     @Test
