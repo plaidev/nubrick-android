@@ -10,7 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -20,6 +22,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import app.nubrick.nubrick.component.provider.data.DataProvider
 import app.nubrick.nubrick.component.provider.data.DataState
@@ -320,6 +323,37 @@ class FlexLayoutAndroidTest {
     }
 
     @Test
+    fun scrollRows_hugTheirContentUntilItOverflowsTheViewport() {
+        val size = renderAndMeasureFlex(
+            flex(
+                width = null,
+                height = 40,
+                overflow = Overflow.SCROLL,
+                justifyContent = JustifyContent.START,
+                children = listOf(text("small", 20, 20)),
+            )
+        )
+
+        assertEquals(20f, size.width, 0.5f)
+    }
+
+    @Test
+    fun scrollColumns_hugTheirContentUntilItOverflowsTheViewport() {
+        val size = renderAndMeasureFlex(
+            flex(
+                width = 40,
+                height = null,
+                direction = FlexDirection.COLUMN,
+                overflow = Overflow.SCROLL,
+                justifyContent = JustifyContent.START,
+                children = listOf(text("small", 20, 20)),
+            )
+        )
+
+        assertEquals(20f, size.height, 0.5f)
+    }
+
+    @Test
     fun hiddenOverflow_preservesGeometryForChildrenWithinTheFrame() {
         val children = listOf(text("first", 80, 20))
         val visible = flex(
@@ -467,10 +501,28 @@ class FlexLayoutAndroidTest {
         }
     }
 
+    private fun renderAndMeasureFlex(block: UIFlexContainerBlock): MeasuredSize {
+        var size = IntSize.Zero
+        var density = 1f
+        composeRule.setContent {
+            density = LocalDensity.current.density
+            content(
+                block = block,
+                flexModifier = Modifier.onGloballyPositioned { size = it.size },
+            )
+        }
+        composeRule.waitForIdle()
+        return MeasuredSize(
+            width = size.width / density,
+            height = size.height / density,
+        )
+    }
+
     @Composable
     private fun content(
         block: UIFlexContainerBlock,
         background: ComposeColor = ComposeColor.Transparent,
+        flexModifier: Modifier = Modifier,
     ) {
         ContainerProvider(container) {
             EventListenerProvider(listener = { _, _ -> }) {
@@ -481,7 +533,7 @@ class FlexLayoutAndroidTest {
                             .background(background)
                             .testTag("flex-test-root")
                     ) {
-                        Flex(block = block, insetTop = 0.dp)
+                        Flex(block = block, modifier = flexModifier, insetTop = 0.dp)
                     }
                 }
             }
@@ -489,8 +541,8 @@ class FlexLayoutAndroidTest {
     }
 
     private fun flex(
-        width: Int,
-        height: Int,
+        width: Int?,
+        height: Int?,
         children: List<UIBlock>,
         direction: FlexDirection? = FlexDirection.ROW,
         justifyContent: JustifyContent? = null,
@@ -552,4 +604,9 @@ class FlexLayoutAndroidTest {
         assertEquals(expected.right.value, actual.right.value, 0.5f)
         assertEquals(expected.bottom.value, actual.bottom.value, 0.5f)
     }
+
+    private data class MeasuredSize(
+        val width: Float,
+        val height: Float,
+    )
 }

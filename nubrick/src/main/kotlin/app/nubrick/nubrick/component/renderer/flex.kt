@@ -54,6 +54,15 @@ import kotlin.math.roundToInt
 internal fun layoutTotal(value: Long): Int =
     value.coerceIn(0L, Constraints.Infinity.toLong()).toInt()
 
+internal fun scrollContentUsesViewportMinimum(
+    frame: FrameData?,
+    direction: FlexDirection,
+): Boolean = when (direction) {
+    FlexDirection.ROW -> (frame?.width ?: -1) >= 0
+    FlexDirection.COLUMN -> (frame?.height ?: -1) >= 0
+    else -> false
+}
+
 private fun calcWeight(frameData: FrameData?, flexDirection: FlexDirection): Float? {
     if (flexDirection == FlexDirection.ROW) {
         if (frameData?.width != null && frameData.width == 0) {
@@ -276,14 +285,16 @@ private fun OverflowingFlex(
 private fun ScrollableFlex(
     children: List<UIBlock>,
     direction: FlexDirection,
+    frame: FrameData?,
     gap: Dp,
     justifyContent: JustifyContent?,
     alignItems: AlignItems?,
     modifier: Modifier,
 ) {
     // horizontalScroll/verticalScroll measure their content with an unbounded
-    // main axis. Keep the viewport as a minimum size on that content so flex
-    // fills can consume free viewport space before scrolling is necessary.
+    // main axis. Explicitly sized frames need a viewport-sized content minimum
+    // so fill children consume free space before scrolling. Hug frames must not
+    // use the parent's maximum as a minimum: they size to their content first.
     BoxWithConstraints(
         modifier = modifier,
         propagateMinConstraints = true,
@@ -292,13 +303,27 @@ private fun ScrollableFlex(
             Modifier
                 .horizontalScroll(rememberScrollState())
                 .then(
-                    if (maxWidth != Dp.Infinity) Modifier.widthIn(min = maxWidth) else Modifier
+                    if (
+                        scrollContentUsesViewportMinimum(frame, direction)
+                            && maxWidth != Dp.Infinity
+                    ) {
+                        Modifier.widthIn(min = maxWidth)
+                    } else {
+                        Modifier
+                    }
                 )
         } else {
             Modifier
                 .verticalScroll(rememberScrollState())
                 .then(
-                    if (maxHeight != Dp.Infinity) Modifier.heightIn(min = maxHeight) else Modifier
+                    if (
+                        scrollContentUsesViewportMinimum(frame, direction)
+                            && maxHeight != Dp.Infinity
+                    ) {
+                        Modifier.heightIn(min = maxHeight)
+                    } else {
+                        Modifier
+                    }
                 )
         }
         OverflowingFlex(
@@ -673,6 +698,7 @@ internal fun Flex(
             ScrollableFlex(
                 children = children,
                 direction = direction,
+                frame = block.data?.frame,
                 gap = gap.dp,
                 justifyContent = justifyContent,
                 alignItems = alignItems,
