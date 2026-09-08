@@ -143,6 +143,15 @@ class ComparisonUnitTest {
     }
 
     @Test
+    fun regexCharSequenceToStringReturnsTheInput() {
+        // Android's Matcher copies the input with CharSequence.toString() before
+        // native ICU matching. Object.toString() would never match form regexes.
+        val seq = TimeLimitedCharSequence("user@example.com", Long.MAX_VALUE)
+        assertEquals("user@example.com", seq.toString())
+        assertEquals(true, containsPattern("user@example.com", """^\S+@\S+$"""))
+    }
+
+    @Test
     fun shouldCompareStringInNotInWithEmptyConditionValue() {
         // STRING keeps empty tokens from split ("" → [""]), unlike SEMVER/BOOLEAN.
         assertEquals(false, comparePropWithConditionValue(this.strProp, null, "", ConditionOperator.In))

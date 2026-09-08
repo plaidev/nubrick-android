@@ -525,8 +525,12 @@ internal fun containsPattern(input: String, pattern: String): Boolean {
 /**
  * Makes Java's regex engine check its deadline while reading the input. Java's
  * [Pattern] API does not provide a cancellable or timed matching operation.
+ *
+ * Android's [java.util.regex.Matcher] copies the input with [CharSequence.toString]
+ * before native ICU matching, so this class must return the wrapped characters from
+ * [toString] rather than Object's default.
  */
-private class TimeLimitedCharSequence(
+internal class TimeLimitedCharSequence(
     private val value: CharSequence,
     private val deadlineNanos: Long,
 ) : CharSequence {
@@ -543,6 +547,8 @@ private class TimeLimitedCharSequence(
     override fun subSequence(startIndex: Int, endIndex: Int): CharSequence {
         return TimeLimitedCharSequence(value.subSequence(startIndex, endIndex), deadlineNanos)
     }
+
+    override fun toString(): String = value.toString()
 }
 
 private class RegexMatchTimeoutException : RuntimeException()
