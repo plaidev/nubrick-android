@@ -20,12 +20,14 @@ internal fun TextInput(block: UITextInputBlock, modifier: Modifier = Modifier) {
         var value = block.data?.value ?: ""
         val key = block.data?.key
         if (key != null) {
+            val regex = block.data?.regex
             when (val v = container.getFormValue(key)) {
                 is FormValue.Str -> {
                     value = v.str
+                    container.setFormValue(key, FormValue.Str(v.str, regex = regex))
                 }
                 else -> {
-                    container.setFormValue(key, FormValue.Str(value))
+                    container.setFormValue(key, FormValue.Str(value, regex = regex))
                 }
             }
         }
@@ -49,7 +51,7 @@ internal fun TextInput(block: UITextInputBlock, modifier: Modifier = Modifier) {
 
             val key = block.data?.key
             if (key != null) {
-                container.setFormValue(key, FormValue.Str(it))
+                container.setFormValue(key, FormValue.Str(it, regex = block.data?.regex))
             }
         },
         modifier = modifier,

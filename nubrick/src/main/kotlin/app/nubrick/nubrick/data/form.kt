@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 internal sealed class FormValue {
     class Bool(val bool: Boolean) : FormValue()
     class StrList(val list: List<String>) : FormValue()
-    class Str(val str: String) : FormValue()
+    class Str(val str: String, val regex: String? = null) : FormValue()
 
     fun toJsonElement(): JsonElement {
         return when (this) {

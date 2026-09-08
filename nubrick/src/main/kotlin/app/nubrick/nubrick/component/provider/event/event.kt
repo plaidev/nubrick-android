@@ -30,13 +30,11 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import app.nubrick.nubrick.component.provider.container.ContainerContext
 import app.nubrick.nubrick.component.provider.data.DataContext
-import app.nubrick.nubrick.data.toFormData
+import app.nubrick.nubrick.data.FormValue
+import app.nubrick.nubrick.data.extraction.containsPattern
 import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonPrimitive
 
 internal val LocalEventListener = compositionLocalOf<EventListenerState> {
     error("LocalEventListener is not found")
@@ -74,13 +72,16 @@ internal fun EventListenerProvider(
 
 internal fun requiredFieldsAreInvalid(
     requiredFields: List<String>?,
-    values: Map<String, JsonElement>,
+    values: Map<String, FormValue>,
 ): Boolean = requiredFields?.any { key ->
     when (val value = values[key]) {
-        null, JsonNull -> true
-        is JsonPrimitive -> value.isString && value.content.isEmpty()
-        is JsonArray -> value.isEmpty()
-        else -> false
+        null -> true
+        is FormValue.Str -> {
+            val pattern = value.regex
+            value.str.isEmpty() || (!pattern.isNullOrEmpty() && !containsPattern(value.str, pattern))
+        }
+        is FormValue.Bool -> !value.bool
+        is FormValue.StrList -> value.list.isEmpty()
     }
 } ?: false
 
@@ -107,7 +108,7 @@ internal fun Modifier.eventDispatcher(
         emptyMap()
     } else {
         val formValues by container.formValuesFlow.collectAsStateWithLifecycle()
-        formValues.toFormData()
+        formValues
     }
     val hasInvalidRequiredFields = requiredFieldsAreInvalid(action.requiredFields, formValues)
     val enabled = !hasInvalidRequiredFields && !isRequestPending
