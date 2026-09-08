@@ -4,15 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,13 +20,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutModifier
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -53,17 +54,66 @@ import app.nubrick.nubrick.schema.ColorValue
 import androidx.core.math.MathUtils
 import kotlin.math.roundToInt
 
-internal fun layoutTotal(value: Long): Int =
-    value.coerceIn(0L, Constraints.Infinity.toLong()).toInt()
+// Compose's MeasureScope.layout accepts only 24-bit dimensions. Infinity is
+// a constraint sentinel, not a valid measured size.
+internal const val MaxFlexLayoutSize = 0xFFFFFF
+private const val MaxConstraintSize = 262142
 
-internal fun scrollContentUsesViewportMinimum(
-    frame: FrameData?,
-    direction: FlexDirection,
-): Boolean = when (direction) {
-    FlexDirection.ROW -> (frame?.width ?: -1) >= 0
-    FlexDirection.COLUMN -> (frame?.height ?: -1) >= 0
-    else -> false
+internal fun layoutTotal(value: Long): Int =
+    value.coerceIn(0L, MaxFlexLayoutSize.toLong()).toInt()
+
+internal fun frameConstraints(
+    constraints: Constraints,
+    width: Int?,
+    height: Int?,
+): Constraints {
+    fun fixedSize(size: Int?, min: Int, max: Int): Int? = when {
+        size == 0 && max != Constraints.Infinity -> max
+        size != null && size > 0 -> size.coerceAtMost(MaxConstraintSize).coerceIn(min, max)
+        else -> null
+    }
+    val fixedWidth = fixedSize(width, constraints.minWidth, constraints.maxWidth)
+    val fixedHeight = fixedSize(height, constraints.minHeight, constraints.maxHeight)
+    // Fit after applying the parent limits: constructing constraints from raw
+    // server dimensions can throw before Compose has a chance to constrain them.
+    return Constraints.fitPrioritizingWidth(
+        minWidth = fixedWidth ?: constraints.minWidth,
+        maxWidth = fixedWidth ?: constraints.maxWidth,
+        minHeight = fixedHeight ?: constraints.minHeight,
+        maxHeight = fixedHeight ?: constraints.maxHeight,
+    )
 }
+
+internal fun scrollViewportConstraints(
+    constraints: Constraints,
+    direction: FlexDirection,
+    fallbackMax: Int = MaxConstraintSize,
+): Constraints = when {
+    direction == FlexDirection.ROW && !constraints.hasBoundedWidth ->
+        Constraints.fitPrioritizingHeight(
+            minWidth = constraints.minWidth,
+            maxWidth = fallbackMax.coerceAtLeast(constraints.minWidth),
+            minHeight = constraints.minHeight,
+            maxHeight = constraints.maxHeight,
+        )
+    direction != FlexDirection.ROW && !constraints.hasBoundedHeight ->
+        Constraints.fitPrioritizingWidth(
+            minWidth = constraints.minWidth,
+            maxWidth = constraints.maxWidth,
+            minHeight = constraints.minHeight,
+            maxHeight = fallbackMax.coerceAtLeast(constraints.minHeight),
+        )
+    else -> constraints
+}
+
+private fun Modifier.scrollViewport(direction: FlexDirection): Modifier =
+    layout { measurable, constraints ->
+        // An outer scroll layout can leave this viewport unbounded. Allow it to
+        // hug its content up to the representable limit, without passing Infinity
+        // into Compose's scroll modifier (which rejects it).
+        val placeable = measurable.measure(scrollViewportConstraints(constraints, direction))
+        layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+    }
 
 private fun calcWeight(frameData: FrameData?, flexDirection: FlexDirection): Float? {
     if (flexDirection == FlexDirection.ROW) {
@@ -91,8 +141,22 @@ private fun childFrameWeight(block: UIBlock, direction: FlexDirection): Float? {
     }
 }
 
+private fun collectionViewportDirection(block: UIBlock): FlexDirection? {
+    val collection = (block as? UIBlock.UnionUICollectionBlock)?.data ?: return null
+    val direction = collection.data?.direction ?: FlexDirection.ROW
+    val mainAxisSize = if (direction == FlexDirection.ROW) {
+        collection.data?.frame?.width
+    } else {
+        collection.data?.frame?.height
+    }
+    // An explicit frame already supplies the lazy layout's finite viewport.
+    // Keep that frame free to exceed the surrounding scroll viewport.
+    return direction.takeUnless { mainAxisSize != null && mainAxisSize > 0 }
+}
+
 private data class FlexChildMetadata(
     val weight: Float?,
+    val collectionDirection: FlexDirection?,
 )
 
 private fun Placeable.mainAxisSize(direction: FlexDirection): Int =
@@ -138,7 +202,10 @@ private fun OverflowingFlex(
                 Block(
                     block = child,
                     modifier = Modifier.layoutId(
-                        FlexChildMetadata(childFrameWeight(child, direction))
+                        FlexChildMetadata(
+                            weight = childFrameWeight(child, direction),
+                            collectionDirection = collectionViewportDirection(child),
+                        )
                     ),
                 )
             }
@@ -160,8 +227,24 @@ private fun OverflowingFlex(
             constraints.maxWidth
         }
         val gapPx = gap.toPx().roundToInt().coerceAtLeast(0)
-        val weights = measurables.map { measurable ->
-            (measurable.layoutId as? FlexChildMetadata)?.weight
+        val metadata = measurables.map { it.layoutId as? FlexChildMetadata }
+        val weights = metadata.map { it?.weight }
+        fun childConstraints(index: Int, min: Int, max: Int): Constraints {
+            val childConstraints = flexChildConstraints(direction, min, max, crossAxisMax)
+            val collectionDirection = metadata[index]?.collectionDirection ?: return childConstraints
+            val viewportMinimum = if (collectionDirection == FlexDirection.ROW) {
+                constraints.minWidth
+            } else {
+                constraints.minHeight
+            }
+            // Lazy grids and pagers cannot measure an infinite scroll axis.
+            // Use the surrounding viewport when available; fills already have
+            // finite allocated constraints and are left unchanged.
+            return scrollViewportConstraints(
+                childConstraints,
+                collectionDirection,
+                fallbackMax = viewportMinimum.takeIf { it > 0 } ?: MaxConstraintSize,
+            )
         }
         val placeables = arrayOfNulls<Placeable>(measurables.size)
 
@@ -174,12 +257,7 @@ private fun OverflowingFlex(
         measurables.forEachIndexed { index, measurable ->
             if (weights[index] == null) {
                 val placeable = measurable.measure(
-                    flexChildConstraints(
-                        direction = direction,
-                        mainAxisMin = 0,
-                        mainAxisMax = mainAxisMax,
-                        crossAxisMax = crossAxisMax,
-                    )
+                    childConstraints(index, min = 0, max = mainAxisMax)
                 )
                 placeables[index] = placeable
                 fixedMainAxisSize = layoutTotal(
@@ -209,16 +287,12 @@ private fun OverflowingFlex(
                 availableForFills
             } else {
                 (availableForFills * cumulativeWeight / totalWeight).roundToInt()
+                    .coerceIn(allocatedForFills, availableForFills)
             }
             val share = allocated - allocatedForFills
             allocatedForFills = allocated
             placeables[childIndex] = measurables[childIndex].measure(
-                flexChildConstraints(
-                    direction = direction,
-                    mainAxisMin = share,
-                    mainAxisMax = share,
-                    crossAxisMax = crossAxisMax,
-                )
+                childConstraints(childIndex, min = share, max = share)
             )
         }
 
@@ -275,19 +349,22 @@ private fun OverflowingFlex(
             layoutMainAxisSize
         }
         layout(layoutWidth, layoutHeight) {
-            var mainAxisPosition = initialMainAxisPosition
+            var mainAxisPosition = initialMainAxisPosition.toLong()
             resolvedPlaceables.forEachIndexed { index, placeable ->
                 val crossAxisPosition = when (alignItems) {
                     AlignItems.START -> 0
                     AlignItems.END -> layoutCrossAxisSize - placeable.crossAxisSize(direction)
                     else -> (layoutCrossAxisSize - placeable.crossAxisSize(direction)) / 2
                 }
+                val position = mainAxisPosition.coerceIn(
+                    Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong(),
+                ).toInt()
                 if (direction == FlexDirection.ROW) {
-                    placeable.place(mainAxisPosition, crossAxisPosition)
+                    placeable.place(position, crossAxisPosition)
                 } else {
-                    placeable.place(crossAxisPosition, mainAxisPosition)
+                    placeable.place(crossAxisPosition, position)
                 }
-                mainAxisPosition += placeable.mainAxisSize(direction) + spacing +
+                mainAxisPosition += placeable.mainAxisSize(direction).toLong() + spacing +
                     if (index < spacingRemainder) 1 else 0
             }
         }
@@ -298,60 +375,31 @@ private fun OverflowingFlex(
 private fun ScrollableFlex(
     children: List<UIBlock>,
     direction: FlexDirection,
-    frame: FrameData?,
     gap: Dp,
     justifyContent: JustifyContent?,
     alignItems: AlignItems?,
     modifier: Modifier,
 ) {
     val reverseHorizontalScroll = LocalLayoutDirection.current == LayoutDirection.Rtl
-    // horizontalScroll/verticalScroll measure their content with an unbounded
-    // main axis. Explicitly sized frames need a viewport-sized content minimum
-    // so fill children consume free space before scrolling. Hug frames must not
-    // use the parent's maximum as a minimum: they size to their content first.
-    BoxWithConstraints(
-        modifier = modifier,
-        propagateMinConstraints = true,
-    ) {
-        val contentModifier = if (direction == FlexDirection.ROW) {
-            Modifier
-                .horizontalScroll(
-                    state = rememberScrollState(),
-                    reverseScrolling = reverseHorizontalScroll,
-                )
-                .then(
-                    if (
-                        scrollContentUsesViewportMinimum(frame, direction)
-                            && maxWidth != Dp.Infinity
-                    ) {
-                        Modifier.widthIn(min = maxWidth)
-                    } else {
-                        Modifier
-                    }
-                )
-        } else {
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .then(
-                    if (
-                        scrollContentUsesViewportMinimum(frame, direction)
-                            && maxHeight != Dp.Infinity
-                    ) {
-                        Modifier.heightIn(min = maxHeight)
-                    } else {
-                        Modifier
-                    }
-                )
-        }
-        OverflowingFlex(
-            children = children,
-            direction = direction,
-            gap = gap,
-            justifyContent = justifyContent,
-            alignItems = alignItems,
-            modifier = contentModifier,
+    // Scroll modifiers preserve the frame's minimum constraints while unbounding
+    // its main-axis maximum. This gives explicit frames a viewport-sized minimum
+    // for fill children, while hug frames remain free to size to their content.
+    val scrollModifier = if (direction == FlexDirection.ROW) {
+        modifier.scrollViewport(direction).horizontalScroll(
+            state = rememberScrollState(),
+            reverseScrolling = reverseHorizontalScroll,
         )
+    } else {
+        modifier.scrollViewport(direction).verticalScroll(rememberScrollState())
     }
+    OverflowingFlex(
+        children = children,
+        direction = direction,
+        gap = gap,
+        justifyContent = justifyContent,
+        alignItems = alignItems,
+        modifier = scrollModifier,
+    )
 }
 
 @Composable
@@ -509,43 +557,42 @@ internal fun Modifier.borderRadius(frame: FrameData?): Modifier {
     return mod
 }
 
+private fun Density.framePixels(size: Int?): Int? = size?.let {
+    if (it > 0) it.dp.roundToPx().coerceIn(1, MaxConstraintSize) else it
+}
+
+private data class FrameSizeModifier(val width: Int?, val height: Int?) : LayoutModifier {
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        val placeable = measurable.measure(frameConstraints(
+            constraints,
+            width = framePixels(width),
+            height = framePixels(height),
+        ))
+        return layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+    }
+
+    // Fixed frames answer without querying their contents, just like Compose's
+    // size modifiers. This also permits intrinsically sizing a fixed lazy child.
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
+        framePixels(width)?.takeIf { it > 0 } ?: measurable.minIntrinsicWidth(height)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
+        framePixels(width)?.takeIf { it > 0 } ?: measurable.maxIntrinsicWidth(height)
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int): Int =
+        framePixels(height)?.takeIf { it > 0 } ?: measurable.minIntrinsicHeight(width)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int): Int =
+        framePixels(height)?.takeIf { it > 0 } ?: measurable.maxIntrinsicHeight(width)
+}
+
 @Composable
 internal fun Modifier.frameSize(
     frame: FrameData?,
     includeBorder: Boolean = true,
     clipsContent: Boolean = true,
 ): Modifier {
-    var mod = this
-    // size should be set most lastly to make padding insets.
-    // width should be content fit by default
-    frame?.width?.let { width ->
-        mod = when {
-            width == 0 -> {
-            // parent fit
-            mod.fillMaxWidth()
-            }
-            width > 0 -> {
-            // fixed size
-                mod.width(width.dp)
-            }
-            else -> mod
-        }
-    }
-
-    // height should be content fit by default
-    frame?.height?.let { height ->
-        mod = when {
-            height == 0 -> {
-            // parent fit
-            mod.fillMaxHeight()
-            }
-            height > 0 -> {
-            // fixed size
-                mod.height(height.dp)
-            }
-            else -> mod
-        }
-    }
+    var mod = this.then(FrameSizeModifier(frame?.width, frame?.height))
 
     val roundedShape = createRoundedShape(frame)
     if (clipsContent) {
@@ -715,7 +762,6 @@ internal fun Flex(
             ScrollableFlex(
                 children = children,
                 direction = direction,
-                frame = block.data?.frame,
                 gap = gap.dp,
                 justifyContent = justifyContent,
                 alignItems = alignItems,

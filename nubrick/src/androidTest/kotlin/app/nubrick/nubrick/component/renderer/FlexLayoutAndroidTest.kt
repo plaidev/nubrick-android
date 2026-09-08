@@ -3,6 +3,9 @@ package app.nubrick.nubrick.component.renderer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -13,6 +16,9 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -29,6 +35,9 @@ import app.nubrick.nubrick.component.provider.data.DataState
 import app.nubrick.nubrick.component.provider.container.ContainerProvider
 import app.nubrick.nubrick.component.provider.event.EventListenerProvider
 import app.nubrick.nubrick.data.Container
+import app.nubrick.nubrick.schema.CollectionKind
+import app.nubrick.nubrick.schema.UICollectionBlock
+import app.nubrick.nubrick.schema.UICollectionBlockData
 import app.nubrick.nubrick.schema.AlignItems
 import app.nubrick.nubrick.schema.Color as SchemaColor
 import app.nubrick.nubrick.schema.ColorValue
@@ -498,6 +507,218 @@ class FlexLayoutAndroidTest {
         assertPosition("leading", x = 0, y = 0)
         assertPosition("nested-one", x = 100, y = 0)
         assertPosition("nested-two", x = 90, y = 25)
+    }
+
+    @Test
+    fun scrollRow_supportsIntrinsicHeight() {
+        composeRule.setContent {
+            content(
+                block = flex(
+                    width = 100,
+                    height = null,
+                    overflow = Overflow.SCROLL,
+                    children = listOf(text("intrinsic", 20, 20)),
+                ),
+                flexModifier = Modifier.height(IntrinsicSize.Min),
+            )
+        }
+        assertPosition("intrinsic", x = 40, y = 0)
+    }
+
+    @Test
+    fun scrollColumn_supportsIntrinsicWidth() {
+        composeRule.setContent {
+            content(
+                block = flex(
+                    width = null,
+                    height = 100,
+                    direction = FlexDirection.COLUMN,
+                    overflow = Overflow.SCROLL,
+                    children = listOf(text("intrinsic", 20, 20)),
+                ),
+                flexModifier = Modifier.width(IntrinsicSize.Max),
+            )
+        }
+        assertPosition("intrinsic", x = 0, y = 40)
+    }
+
+    @Test
+    fun scrollRow_extremeGapDoesNotOverflowTheMeasuredSize() {
+        render(flex(
+            width = 100,
+            height = 40,
+            overflow = Overflow.SCROLL,
+            gap = Int.MAX_VALUE,
+            justifyContent = JustifyContent.START,
+            alignItems = AlignItems.START,
+            children = listOf(text("first", 20, 20), text("last", 20, 20)),
+        ))
+        assertPosition("first", x = 0, y = 0)
+    }
+
+    @Test
+    fun oversizedFrame_isConstrainedToItsParent() {
+        val size = renderAndMeasureFlex(flex(
+            width = 1_000_000,
+            height = 1_000_000,
+            children = listOf(text("small", 20, 20)),
+        ))
+        assertEquals(400f, size.width, 0.5f)
+        assertEquals(400f, size.height, 0.5f)
+    }
+
+    @Test
+    fun nestedScrollRows_withHugWidthRemainMeasurable() {
+        render(flex(
+            width = 100,
+            height = 40,
+            overflow = Overflow.SCROLL,
+            justifyContent = JustifyContent.START,
+            alignItems = AlignItems.START,
+            children = listOf(UIBlock.UnionUIFlexContainerBlock(flex(
+                width = null,
+                height = 20,
+                overflow = Overflow.SCROLL,
+                justifyContent = JustifyContent.START,
+                children = listOf(text("nested", 20, 20)),
+            ))),
+        ))
+        assertPosition("nested", x = 0, y = 0)
+    }
+
+    @Test
+    fun scrollColumn_extremeGapDoesNotOverflowTheMeasuredSize() {
+        render(flex(
+            width = 40,
+            height = 100,
+            direction = FlexDirection.COLUMN,
+            overflow = Overflow.SCROLL,
+            gap = Int.MAX_VALUE,
+            justifyContent = JustifyContent.START,
+            alignItems = AlignItems.START,
+            children = listOf(text("first", 20, 20), text("last", 20, 20)),
+        ))
+        assertPosition("first", x = 0, y = 0)
+    }
+
+    @Test
+    fun nestedScrollColumns_withHugHeightRemainMeasurable() {
+        render(flex(
+            width = 40,
+            height = 100,
+            direction = FlexDirection.COLUMN,
+            overflow = Overflow.SCROLL,
+            justifyContent = JustifyContent.START,
+            alignItems = AlignItems.START,
+            children = listOf(UIBlock.UnionUIFlexContainerBlock(flex(
+                width = 20,
+                height = null,
+                direction = FlexDirection.COLUMN,
+                overflow = Overflow.SCROLL,
+                justifyContent = JustifyContent.START,
+                children = listOf(text("nested", 20, 20)),
+            ))),
+        ))
+        assertPosition("nested", x = 0, y = 0)
+    }
+
+    @Test
+    fun emptyScrollFlex_withExtremeGapKeepsItsFrameSize() {
+        val size = renderAndMeasureFlex(flex(
+            width = 100,
+            height = 40,
+            overflow = Overflow.SCROLL,
+            gap = Int.MAX_VALUE,
+            children = emptyList(),
+        ))
+        assertEquals(100f, size.width, 0.5f)
+        assertEquals(40f, size.height, 0.5f)
+    }
+
+    @Test
+    fun scrollRow_nestedGridWithoutWidthCanScroll() {
+        assertNestedCollectionCanScroll(CollectionKind.GRID, FlexDirection.ROW)
+    }
+
+    @Test
+    fun scrollColumn_nestedGridWithoutHeightCanScroll() {
+        assertNestedCollectionCanScroll(CollectionKind.GRID, FlexDirection.COLUMN)
+    }
+
+    @Test
+    fun scrollRow_nestedCarouselWithoutWidthCanScroll() {
+        assertNestedCollectionCanScroll(CollectionKind.CAROUSEL, FlexDirection.ROW)
+    }
+
+    @Test
+    fun scrollColumn_nestedCarouselWithoutHeightCanScroll() {
+        assertNestedCollectionCanScroll(CollectionKind.CAROUSEL, FlexDirection.COLUMN)
+    }
+
+    @Test
+    fun scrollRow_nestedGridPreservesAnExplicitWidthLargerThanTheViewport() {
+        assertNestedCollectionCanScroll(
+            CollectionKind.GRID,
+            FlexDirection.ROW,
+            frame = FrameData(width = 120),
+            expectedViewport = 120,
+        )
+    }
+
+    @Test
+    fun scrollColumn_nestedCarouselPreservesAnExplicitHeightLargerThanTheViewport() {
+        assertNestedCollectionCanScroll(
+            CollectionKind.CAROUSEL,
+            FlexDirection.COLUMN,
+            frame = FrameData(height = 120),
+            expectedViewport = 120,
+        )
+    }
+
+    @Test
+    fun scrollRow_nestedCarouselPreservesItsFillAllocation() {
+        assertNestedCollectionCanScroll(
+            CollectionKind.CAROUSEL,
+            FlexDirection.ROW,
+            frame = FrameData(width = 0),
+        )
+    }
+
+    private fun assertNestedCollectionCanScroll(
+        kind: CollectionKind,
+        direction: FlexDirection,
+        frame: FrameData? = null,
+        expectedViewport: Int = 100,
+    ) {
+        render(flex(
+            width = if (direction == FlexDirection.ROW) 100 else 40,
+            height = if (direction == FlexDirection.COLUMN) 100 else 40,
+            direction = direction,
+            overflow = Overflow.SCROLL,
+            justifyContent = JustifyContent.START,
+            alignItems = AlignItems.START,
+            children = listOf(UIBlock.UnionUICollectionBlock(UICollectionBlock(
+                data = UICollectionBlockData(
+                    kind = kind,
+                    direction = direction,
+                    frame = frame,
+                    itemWidth = 20,
+                    itemHeight = 20,
+                    gridSize = 1,
+                    children = List(10) { text("item-$it", 20, 20) },
+                ),
+            ))),
+        ))
+        val collection = composeRule.onNode(hasScrollToIndexAction())
+        val size = collection.fetchSemanticsNode().size
+        val mainAxisSize = if (direction == FlexDirection.ROW) size.width else size.height
+        assertEquals(with(composeRule.density) { expectedViewport.dp.roundToPx() }, mainAxisSize)
+        composeRule.onNodeWithText("item-0").assertIsDisplayed()
+        // For an explicitly oversized collection, its trailing edge is clipped
+        // by the outer viewport. Scroll to an item that can be visible in both.
+        val targetIndex = if (expectedViewport > 100) 7 else 9
+        collection.performScrollToIndex(targetIndex)
+        composeRule.onNodeWithText("item-$targetIndex").assertIsDisplayed()
     }
 
     private fun render(block: UIFlexContainerBlock) {
