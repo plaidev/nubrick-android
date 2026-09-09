@@ -1,6 +1,7 @@
 package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.Config
+import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.schema.ApiHttpHeader
@@ -22,11 +23,29 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito
 
 class ContainerSurveyResponseTest {
+    @Test
+    fun `actions forward the originating experiment through child containers`() {
+        val received = mutableListOf<Pair<Event, String?>>()
+        val callbacks = mutableListOf<Event>()
+        val container = newContainer(eventHandler = { event, experimentId ->
+            received.add(event to experimentId)
+        })
+        val source = container.makeContainer("source-exp", "source-var").makeContainer()
+
+        source.handleAction(UIBlockAction(eventName = "clicked")) { callbacks.add(it) }
+        container.handleAction(UIBlockAction(eventName = "unscoped"))
+
+        assertEquals(listOf("clicked", "unscoped"), received.map { it.first.name })
+        assertEquals(listOf("source-exp", null), received.map { it.second })
+        assertEquals(listOf(received.first().first), callbacks)
+    }
+
     @Test
     fun `sendSurveyResponse sends current form data with container experiment context`() {
         val trackRepository = FakeTrackRepository()
@@ -287,8 +306,11 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP)).getOrThrow()
+        container.fetchTriggerContent(
+            "open", listOf(ExperimentKind.POPUP), sourceExperimentId = "source-exp",
+        ).getOrThrow()
 
+        assertEquals("source-exp", trackRepository.userEvents.single().experimentId)
         assertEquals(listOf("open"), trackRepository.userEvents.map { it.name })
         assertEquals(listOf("open"), databaseRepository.userEvents)
         assertEquals(1, trackRepository.experimentEvents.size)
@@ -326,6 +348,7 @@ class ContainerSurveyResponseTest {
         ).getOrThrow()
 
         assertEquals(ExperimentKind.TOOLTIP, kind)
+        assertNull(trackRepository.userEvents.single().experimentId)
         assertEquals(1, trackRepository.experimentEvents.size)
         assertTrue(databaseRepository.experimentHistories.isEmpty())
         assertEquals(listOf("open"), databaseRepository.userEvents)
@@ -343,8 +366,11 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        val result = container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP))
+        val result = container.fetchTriggerContent(
+            "open", listOf(ExperimentKind.POPUP), sourceExperimentId = "source-exp",
+        )
 
+        assertEquals("source-exp", trackRepository.userEvents.single().experimentId)
         assertTrue(result.isFailure)
         assertEquals(listOf("open"), trackRepository.userEvents.map { it.name })
         assertEquals(listOf("open"), databaseRepository.userEvents)
@@ -471,6 +497,7 @@ class ContainerSurveyResponseTest {
         databaseRepository: FakeDatabaseRepository = FakeDatabaseRepository(),
         experimentId: String? = null,
         variantId: String? = null,
+        eventHandler: (Event, String?) -> Unit = { _, _ -> },
     ): ContainerImpl {
         return ContainerImpl(
             config = Config(projectId = "project-123"),
@@ -482,6 +509,7 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
             experimentId = experimentId,
             variantId = variantId,
+            eventHandler = eventHandler,
         )
     }
 

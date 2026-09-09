@@ -92,6 +92,7 @@ internal interface Container {
     suspend fun fetchTriggerContent(
         trigger: String,
         kinds: List<ExperimentKind>,
+        sourceExperimentId: String? = null,
     ): Result<Pair<ExperimentContent, ExperimentKind>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
     suspend fun appendExperimentHistory(experimentId: String)
@@ -112,6 +113,7 @@ internal class ContainerImpl(
     private val formRepository: FormRepository = FormRepositoryImpl(),
     override val experimentId: String? = null,
     override val variantId: String? = null,
+    private val eventHandler: (Event, String?) -> Unit,
 ) : Container {
     override fun makeContainer(): Container {
         return makeContainer(experimentId = this.experimentId, variantId = this.variantId)
@@ -128,11 +130,12 @@ internal class ContainerImpl(
             databaseRepository = this.databaseRepository,
             experimentId = experimentId,
             variantId = variantId,
+            eventHandler = this.eventHandler,
         )
     }
 
     override fun handleEvent(it: Event) {
-        this.config.onEvent?.let { it1 -> it1(it) }
+        this.eventHandler(it, this.experimentId)
     }
 
     override fun handleAction(action: UIBlockAction, onEvent: ((Event) -> Unit)?) {
@@ -262,9 +265,10 @@ internal class ContainerImpl(
     override suspend fun fetchTriggerContent(
         trigger: String,
         kinds: List<ExperimentKind>,
+        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> {
         // send the user track event and save it to database
-        this.trackRepository.trackEvent(TrackUserEvent(trigger))
+        this.trackRepository.trackEvent(TrackUserEvent(trigger, experimentId = sourceExperimentId))
         this.databaseRepository.appendUserEvent(trigger)
 
         // fetch config from cdn

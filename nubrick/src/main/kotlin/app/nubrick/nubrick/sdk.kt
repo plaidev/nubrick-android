@@ -203,13 +203,6 @@ private class NubrickRuntime(
         this.onDispatch = config.onDispatch
         this.container = ContainerImpl(
             config = config.copy(
-                onEvent = { event ->
-                    val name = event.name ?: ""
-                    if (name.isNotEmpty()) {
-                        this.dispatch(NubrickEvent(name))
-                    }
-                    this.onEvent?.invoke(event)
-                },
                 onDispatch = { event ->
                     this.onDispatch?.invoke(event)
                 },
@@ -221,6 +214,13 @@ private class NubrickRuntime(
             httpRequestRepository = httpRequestRepository,
             databaseRepository = this.databaseRepository,
             formRepository = FormRepositoryImpl(),
+            eventHandler = { event, experimentId ->
+                val name = event.name.orEmpty()
+                if (name.isNotEmpty()) {
+                    this.dispatch(NubrickEvent(name), sourceExperimentId = experimentId)
+                }
+                this.onEvent?.invoke(event)
+            },
         )
         this.trigger = TriggerStateHolder(this.container, this.user, this.sdkScope, onTooltip)
 
@@ -258,8 +258,8 @@ private class NubrickRuntime(
         this.databaseRepository.close()
     }
 
-    fun dispatch(event: NubrickEvent) {
-        this.trigger.dispatch(event)
+    fun dispatch(event: NubrickEvent, sourceExperimentId: String? = null) {
+        this.trigger.dispatch(event, sourceExperimentId)
     }
 
     fun storeNativeCrash(throwable: Throwable) {

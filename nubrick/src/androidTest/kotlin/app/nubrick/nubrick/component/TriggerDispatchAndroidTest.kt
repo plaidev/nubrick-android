@@ -68,17 +68,23 @@ class TriggerDispatchAndroidTest {
     fun dispatchCallsHandleNubrickEventOnMainThread() {
         val handled = CountDownLatch(1)
         val dispatchThread = AtomicReference<Thread>()
+        val fetched = CountDownLatch(1)
+        val sourceExperimentId = AtomicReference<String?>()
         val container = mock(
             Container::class.java,
             withSettings().defaultAnswer(Answer { invocation ->
-                when (invocation.method.name) {
+                when (invocation.method.name.substringBefore('-')) {
                     "handleNubrickEvent" -> {
                         dispatchThread.set(Thread.currentThread())
                         handled.countDown()
                         null
                     }
                     // Avoid NPE after the callback: production continues to fetchTriggerContent.
-                    "fetchTriggerContent" -> Result.failure<Any>(UnsupportedOperationException("unused"))
+                    "fetchTriggerContent" -> {
+                        sourceExperimentId.set(invocation.getArgument<String?>(2))
+                        fetched.countDown()
+                        Result.failure<Any>(UnsupportedOperationException("unused"))
+                    }
                     else -> null
                 }
             }),
@@ -91,9 +97,11 @@ class TriggerDispatchAndroidTest {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
         )
 
-        holder.dispatch(NubrickEvent("test"))
+        holder.dispatch(NubrickEvent("test"), sourceExperimentId = "source-exp")
 
         assertTrue(handled.await(2, TimeUnit.SECONDS))
+        assertTrue(fetched.await(2, TimeUnit.SECONDS))
         assertEquals(Looper.getMainLooper().thread, dispatchThread.get())
+        assertEquals("source-exp", sourceExperimentId.get())
     }
 }
