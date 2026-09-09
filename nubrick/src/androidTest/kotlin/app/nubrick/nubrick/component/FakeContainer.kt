@@ -78,6 +78,7 @@ internal class FakeContainer(
     override suspend fun fetchTriggerContent(
         trigger: String,
         kinds: List<ExperimentKind>,
+        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> =
         Result.failure(UnsupportedOperationException("not used in smoke test"))
 

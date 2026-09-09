@@ -15,6 +15,16 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
 class TrackEventEncodingTest {
+    @Test
+    fun `user event payload includes originating experiment context`() {
+        val event = TrackUserEvent(name = "clicked", experimentId = "source-exp")
+        val encoded = TrackEvent.UserEvent(event, eventUuid = "event-uuid").encode()
+
+        assertEquals("event", encoded["typename"]?.jsonPrimitive?.content)
+        assertEquals("clicked", encoded["name"]?.jsonPrimitive?.content)
+        assertEquals("source-exp", encoded["experimentId"]?.jsonPrimitive?.content)
+        assertEquals("event-uuid", encoded["eventUuid"]?.jsonPrimitive?.content)
+    }
 
     @Test
     fun `test user event encoding contains typename`() {
@@ -24,6 +34,7 @@ class TrackEventEncodingTest {
         assertEquals("event", encoded["typename"]?.toString()?.trim('"'))
         assertEquals("test_event", encoded["name"]?.toString()?.trim('"'))
         assertEquals("event-uuid", encoded["eventUuid"]?.toString()?.trim('"'))
+        assertFalse(encoded.containsKey("experimentId"))
     }
 
     @Test

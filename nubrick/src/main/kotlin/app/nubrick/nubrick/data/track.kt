@@ -175,13 +175,15 @@ enum class CrashSeverity {
 internal data class TrackUserEvent(
     val name: String,
     val timestamp: ZonedDateTime = getCurrentDate(),
+    val experimentId: String? = null,
 ) {
     fun encode(): JsonObject {
-        return JsonObject(mapOf(
-            "typename" to JsonPrimitive("event"),
-            "name" to JsonPrimitive(this.name),
-            "timestamp" to JsonPrimitive(formatISO8601(this.timestamp)),
-        ))
+        return JsonObject(buildMap {
+            put("typename", JsonPrimitive("event"))
+            put("name", JsonPrimitive(name))
+            put("timestamp", JsonPrimitive(formatISO8601(timestamp)))
+            experimentId?.let { put("experimentId", JsonPrimitive(it)) }
+        })
     }
 }
 

@@ -69,7 +69,7 @@ internal class TriggerStateHolder(
         }
     }
 
-    fun dispatch(event: NubrickEvent) {
+    fun dispatch(event: NubrickEvent, sourceExperimentId: String? = null) {
         val self = this
         // onTooltip is only set in the Flutter SDK. Tooltips are a Flutter-only feature,
         // so we fetch both popups and tooltips when running in Flutter, and popups only otherwise.
@@ -84,7 +84,7 @@ internal class TriggerStateHolder(
                 withContext(Dispatchers.Main) {
                     self.container.handleNubrickEvent(event)
                 }
-                val (content, kind) = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
+                val (content, kind) = self.container.fetchTriggerContent(event.name, kinds, sourceExperimentId).getOrNull()
                     ?: return@launch
                 if (kind == ExperimentKind.TOOLTIP) {
                     self.onTooltip?.let { callback ->
