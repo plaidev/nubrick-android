@@ -18,6 +18,8 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
@@ -51,6 +53,29 @@ private const val MAX_TEXT_LINE_HEIGHT = 1_024f
 
 internal fun resolveTextFontSize(size: Int?): Int =
     size?.takeIf { it in 1..MAX_TEXT_SIZE } ?: DEFAULT_TEXT_SIZE
+
+/** Returns [value] in sp, or in dp converted to sp when it must not follow the device font scale. */
+internal fun resolveTextUnit(value: Float, scaleWithDeviceFontSize: Boolean, density: Density): TextUnit =
+    if (scaleWithDeviceFontSize) value.sp else with(density) { value.dp.toSp() }
+
+/**
+ * Resolves line height while preserving its authored ratio to font size under non-linear scaling.
+ */
+internal fun resolveTextLineHeightUnit(
+    lineHeight: Float?,
+    size: Int?,
+    scaleWithDeviceFontSize: Boolean,
+    density: Density,
+): TextUnit {
+    val fontSize = resolveTextFontSize(size).toFloat()
+    val resolvedLineHeight = resolveTextLineHeight(lineHeight, size)
+    if (scaleWithDeviceFontSize) {
+        return resolvedLineHeight.sp
+    }
+
+    return resolveTextUnit(fontSize, scaleWithDeviceFontSize = false, density) *
+        (resolvedLineHeight / fontSize)
+}
 
 internal fun resolveTextLineHeight(lineHeight: Float?, size: Int?): Float {
     val fallback = resolveTextFontSize(size) * TEXT_LINE_HEIGHT_RATIO
@@ -166,11 +191,12 @@ internal fun parseFontWeight(fontWeight: FontWeight?): PrimitiveFontWeight {
 }
 
 @Composable
-internal fun parseFontStyle(size: Int? = null, color: ColorValue? = null, fontWeight: FontWeight? = null, fontDesign: FontDesign? = null, alignment: TextAlign? = null, transparent: Boolean = false): TextStyle {
+internal fun parseFontStyle(size: Int? = null, color: ColorValue? = null, fontWeight: FontWeight? = null, fontDesign: FontDesign? = null, alignment: TextAlign? = null, transparent: Boolean = false, scaleWithDeviceFontSize: Boolean = true): TextStyle {
     val textColor = parseColorForText(color) ?: MaterialTheme.colorScheme.onSurface
+    val density = LocalDensity.current
     return TextStyle.Default.copy(
         color = if (transparent) PrimitiveColor.Transparent else textColor,
-        fontSize = size?.sp ?: 16.sp,
+        fontSize = resolveTextUnit((size ?: 16).toFloat(), scaleWithDeviceFontSize, density),
         fontWeight = parseFontWeight(fontWeight = fontWeight),
         fontFamily = parseFontDesign(fontDesign = fontDesign),
         textAlign = parseTextAlign(alignment = alignment),
@@ -201,6 +227,8 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
         .styleByFrame(block.data?.frame)
         .skeleton(skeleton)
 
+    val density = LocalDensity.current
+    val scaleWithDeviceFontSize = block.data?.scaleWithDeviceFontSize ?: true
     val fontStyle = parseFontStyle(
         size = resolveTextFontSize(block.data?.size),
         color = block.data?.color,
@@ -208,8 +236,14 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
         fontDesign = block.data?.design,
         alignment = null,
         transparent = skeleton,
+        scaleWithDeviceFontSize = scaleWithDeviceFontSize,
     ).copy(
-        lineHeight = resolveTextLineHeight(block.data?.lineHeight, block.data?.size).sp,
+        lineHeight = resolveTextLineHeightUnit(
+            lineHeight = block.data?.lineHeight,
+            size = block.data?.size,
+            scaleWithDeviceFontSize = scaleWithDeviceFontSize,
+            density = density,
+        ),
         platformStyle = PlatformTextStyle(includeFontPadding = false),
         lineHeightStyle = LineHeightStyle(
             alignment = LineHeightStyle.Alignment.Center,
@@ -217,7 +251,6 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
         ),
     )
     val baselineFromCenter = rememberBaselineFromCenter(fontStyle)
-    val density = LocalDensity.current
     val lineHeightPx = resolveTextLineHeightPx(fontStyle, density)
     var maxLines = block.data?.maxLines ?: Int.MAX_VALUE
     if (maxLines <= 0) {
