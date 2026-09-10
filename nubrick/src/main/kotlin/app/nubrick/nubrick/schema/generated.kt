@@ -3467,6 +3467,7 @@ internal class UITextBlockData (
 	val design: FontDesign? = null,
 	val weight: FontWeight? = null,
 	val maxLines: Int? = null,
+	val scaleWithDeviceFontSize: Boolean? = null,
 	val frame: FrameData? = null,
 	val onClick: UIBlockAction? = null,
 ) {
@@ -3487,6 +3488,7 @@ internal class UITextBlockData (
 				design = FontDesign.decode(element.jsonObject["design"]),
 				weight = FontWeight.decode(element.jsonObject["weight"]),
 				maxLines = IntDecoder.decode(element.jsonObject["maxLines"]),
+				scaleWithDeviceFontSize = BooleanDecoder.decode(element.jsonObject["scaleWithDeviceFontSize"]),
 				frame = FrameData.decode(element.jsonObject["frame"]),
 				onClick = UIBlockAction.decode(element.jsonObject["onClick"]),
 			)
@@ -3519,6 +3521,9 @@ internal class UITextBlockData (
 			}
 			data.maxLines?.let { value ->
 				IntEncoder.encode(value)?.let { map["maxLines"] = it }
+			}
+			data.scaleWithDeviceFontSize?.let { value ->
+				BooleanEncoder.encode(value)?.let { map["scaleWithDeviceFontSize"] = it }
 			}
 			data.frame?.let { value ->
 				FrameData.encode(value)?.let { map["frame"] = it }

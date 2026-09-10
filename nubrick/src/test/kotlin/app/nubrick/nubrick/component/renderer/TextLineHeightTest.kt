@@ -1,6 +1,7 @@
 package app.nubrick.nubrick.component.renderer
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Density
@@ -59,5 +60,71 @@ class TextLineHeightTest {
         val style = TextStyle(fontSize = 13.sp, lineHeight = 15.6.sp)
 
         assertEquals(30f, resolveTextLineHeightPx(style, nonLinearDensity), 0.01f)
+    }
+
+    @Test
+    fun textUnitScalesWithFontScaleByDefault() {
+        val density = Density(density = 1f, fontScale = 2f)
+
+        val fontSize = resolveTextUnit(13f, scaleWithDeviceFontSize = true, density)
+
+        // Same as a plain 13.sp under this density.
+        assertEquals(with(density) { 13.sp.toPx() }, with(density) { fontSize.toPx() }, 0.01f)
+        assertTrue(with(density) { fontSize.toPx() } > 13f)
+    }
+
+    @Test
+    fun textUnitIgnoresFontScaleWhenOptedOut() {
+        val density = Density(density = 1f, fontScale = 2f)
+
+        val fontSize = resolveTextUnit(13f, scaleWithDeviceFontSize = false, density)
+
+        assertEquals(13f, with(density) { fontSize.toPx() }, 0.01f)
+    }
+
+    @Test
+    fun lineHeightPxIgnoresFontScaleWhenOptedOut() {
+        val density = Density(density = 2f, fontScale = 3f)
+        val style = TextStyle(
+            fontSize = resolveTextUnit(13f, scaleWithDeviceFontSize = false, density),
+            lineHeight = resolveTextLineHeightUnit(
+                lineHeight = 15.6f,
+                size = 13,
+                scaleWithDeviceFontSize = false,
+                density = density,
+            ),
+        )
+
+        assertEquals(15.6f * 2f, resolveTextLineHeightPx(style, density), 0.01f)
+    }
+
+    @Test
+    fun lineHeightPxPreservesItsAuthoredSizeUnderNonLinearFontScalingWhenOptedOut() {
+        val nonLinearDensity = object : Density {
+            override val density = 1f
+            override val fontScale = 2f
+
+            override fun TextUnit.toDp(): Dp = when (value) {
+                8f -> 13.dp
+                9.6f -> 16.9.dp
+                else -> value.dp
+            }
+
+            override fun Dp.toSp(): TextUnit = when (value) {
+                13f -> 8.sp
+                else -> value.sp
+            }
+        }
+        val style = TextStyle(
+            fontSize = resolveTextUnit(13f, scaleWithDeviceFontSize = false, nonLinearDensity),
+            lineHeight = resolveTextLineHeightUnit(
+                lineHeight = 15.6f,
+                size = 13,
+                scaleWithDeviceFontSize = false,
+                density = nonLinearDensity,
+            ),
+        )
+
+        assertEquals(15.6f, resolveTextLineHeightPx(style, nonLinearDensity), 0.01f)
     }
 }
