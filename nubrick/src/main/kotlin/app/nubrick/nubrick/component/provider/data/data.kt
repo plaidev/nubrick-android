@@ -25,6 +25,16 @@ internal data class DataState(
     val data: JsonElement
 )
 
+@Composable
+internal fun DataProvider(
+    state: DataState,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(LocalData provides state) {
+        content()
+    }
+}
+
 internal object DataContext {
     /**
      * Retrieves the current [DataState] at the call site's position in the hierarchy.
