@@ -4,9 +4,13 @@ import app.nubrick.nubrick.data.user.DATETIME_OFFSET
 import app.nubrick.nubrick.schema.ApiHttpRequestMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -276,6 +280,91 @@ class NetworkTest {
             releaseRevalidation.countDown()
             serverSocket.close()
             executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `revalidate success does not overwrite a newer cache entry`() {
+        val memory = CacheStore()
+        val revalidationStarted = CountDownLatch(1)
+        val releaseRevalidation = CountDownLatch(1)
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                revalidationStarted.countDown()
+                releaseRevalidation.await(5, TimeUnit.SECONDS)
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body("stale".toResponseBody())
+                    .build()
+            }
+            .build()
+        val repo = NetworkRepository(CoroutineScope(Dispatchers.IO), memory, client)
+        val endpoint = "http://127.0.0.1/test"
+
+        try {
+            memory.set(endpoint, "old")
+            runBlocking {
+                assertEquals("old", repo.getWithCache(endpoint).getOrNull())
+                assertTrue(revalidationStarted.await(5, TimeUnit.SECONDS))
+
+                memory.set(endpoint, "new")
+                releaseRevalidation.countDown()
+
+                repeat(50) {
+                    delay(50)
+                    if (memory.get(endpoint).getOrNull()?.data == "new") return@repeat
+                }
+                assertEquals("new", memory.get(endpoint).getOrNull()?.data)
+            }
+        } finally {
+            releaseRevalidation.countDown()
+        }
+    }
+
+    @Test
+    fun `newer cold-cache request wins when responses finish out of order`() {
+        val memory = CacheStore()
+        val firstRequestStarted = CountDownLatch(1)
+        val releaseFirstRequest = CountDownLatch(1)
+        val requestCount = AtomicInteger()
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val body = if (requestCount.getAndIncrement() == 0) {
+                    firstRequestStarted.countDown()
+                    releaseFirstRequest.await(5, TimeUnit.SECONDS)
+                    "old"
+                } else {
+                    "new"
+                }
+                Response.Builder()
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(200)
+                    .message("OK")
+                    .body(body.toResponseBody())
+                    .build()
+            }
+            .build()
+        val repo = NetworkRepository(CoroutineScope(Dispatchers.IO), memory, client)
+        val endpoint = "http://127.0.0.1/test"
+
+        try {
+            runBlocking {
+                val first = async(Dispatchers.IO) { repo.getWithCache(endpoint) }
+                assertTrue(firstRequestStarted.await(5, TimeUnit.SECONDS))
+
+                val second = async(Dispatchers.IO) { repo.getWithCache(endpoint) }
+                assertEquals("new", second.await().getOrNull())
+                releaseFirstRequest.countDown()
+                assertEquals("old", first.await().getOrNull())
+
+                assertEquals("new", memory.get(endpoint).getOrNull()?.data)
+            }
+        } finally {
+            releaseFirstRequest.countDown()
         }
     }
 

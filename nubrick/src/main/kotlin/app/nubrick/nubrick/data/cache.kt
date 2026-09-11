@@ -26,11 +26,26 @@ internal class CacheStore(
         Result.success(cached)
     }
 
-    fun set(key: String, value: String): Result<Unit> = synchronized(lock) {
+    fun set(key: String, value: String): Unit = synchronized(lock) {
+        setLocked(key, value)
+    }
+
+    /**
+     * Replaces [key] only when the stored value is still [expected].
+     * Returns false if another request has already updated or removed the entry.
+     */
+    fun replace(key: String, expected: CacheObject, value: String): Boolean = synchronized(lock) {
+        if (cache[key] != expected) return@synchronized false
+        setLocked(key, value)
+        true
+    }
+
+    /** Caller must hold [lock]. */
+    private fun setLocked(key: String, value: String) {
         val now = getCurrentDate()
         removeExpiredEntries(now)
         val byteCount = value.toByteArray(StandardCharsets.UTF_8).size
-        if (byteCount > byteBudget) return@synchronized Result.success(Unit)
+        if (byteCount > byteBudget) return
         cache.remove(key)?.let { totalBytes -= it.byteCount }
 
         while (cache.size >= entryLimit || totalBytes > byteBudget - byteCount) {
@@ -44,7 +59,6 @@ internal class CacheStore(
         )
         cache[key] = cacheObject
         totalBytes += byteCount
-        Result.success(Unit)
     }
 
     /**

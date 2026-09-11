@@ -16,7 +16,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 internal const val CONNECT_TIMEOUT = 10 * 1000
 internal const val READ_TIMEOUT = 5 * 1000
@@ -35,18 +35,28 @@ internal class NetworkRepository(
     private val cache: CacheStore,
     private val client: OkHttpClient,
 ) {
-    private val revalidatingURLs = ConcurrentHashMap<String, AtomicBoolean>()
+    private val activeCacheRequests = ConcurrentHashMap<String, Long>()
+    private val nextCacheRequestId = AtomicLong()
 
     suspend fun getWithCache(endpoint: String, syncDateTime: Boolean = false): Result<String> {
-        val cached = cache.get(endpoint).getOrElse {
-            val result = getRequest(endpoint, syncDateTime, client).getOrElse { error ->
-                return Result.failure(error)
-            }
-            cache.set(endpoint, result)
-            return Result.success(result)
+        val cached = cache.get(endpoint).getOrNull()
+        if (cached != null) {
+            scheduleRevalidate(endpoint, cached, syncDateTime)
+            return Result.success(cached.data)
         }
-        scheduleRevalidate(endpoint, cached, syncDateTime)
-        return Result.success(cached.data)
+
+        val requestId = beginCacheRequest(endpoint)
+        return try {
+            val result = getRequest(endpoint, syncDateTime, client)
+            completeCacheRequest(endpoint, requestId) {
+                result.getOrNull()?.let { body ->
+                    cache.set(endpoint, body)
+                }
+            }
+            result
+        } finally {
+            activeCacheRequests.remove(endpoint, requestId)
+        }
     }
 
     private fun scheduleRevalidate(
@@ -54,26 +64,60 @@ internal class NetworkRepository(
         cached: CacheObject,
         syncDateTime: Boolean,
     ) {
-        val isRevalidating = revalidatingURLs.computeIfAbsent(endpoint) { AtomicBoolean(false) }
-        if (!isRevalidating.compareAndSet(false, true)) {
-            return
-        }
+        val requestId = beginRevalidation(endpoint) ?: return
         scope.launch(Dispatchers.IO) {
             try {
                 getRequest(endpoint, syncDateTime, client).fold(
                     onSuccess = { body ->
-                        cache.set(endpoint, body)
+                        completeCacheRequest(endpoint, requestId) {
+                            cache.replace(endpoint, cached, body)
+                        }
                     },
                     onFailure = { error ->
                         // Offline / timeouts / 5xx: keep the body we last fetched successfully.
                         // 404: experiment/component is gone — drop the cache entry.
                         if (error is NotFoundException) {
-                            cache.remove(endpoint, cached)
+                            completeCacheRequest(endpoint, requestId) {
+                                cache.remove(endpoint, cached)
+                            }
                         }
                     },
                 )
             } finally {
-                revalidatingURLs.remove(endpoint, isRevalidating)
+                completeCacheRequest(endpoint, requestId) {}
+            }
+        }
+    }
+
+    private fun beginCacheRequest(endpoint: String): Long {
+        val requestId = nextCacheRequestId.incrementAndGet()
+        activeCacheRequests[endpoint] = requestId
+        return requestId
+    }
+
+    /** Starts a revalidation only when no request for [endpoint] is already active. */
+    private fun beginRevalidation(endpoint: String): Long? {
+        val requestId = nextCacheRequestId.incrementAndGet()
+        var started = false
+        activeCacheRequests.compute(endpoint) { _, currentRequestId ->
+            if (currentRequestId == null) {
+                started = true
+                requestId
+            } else {
+                currentRequestId
+            }
+        }
+        return requestId.takeIf { started }
+    }
+
+    /** Writes only when this is still the latest request for [endpoint]. */
+    private fun completeCacheRequest(endpoint: String, requestId: Long, write: () -> Unit) {
+        activeCacheRequests.compute(endpoint) { _, currentRequestId ->
+            if (currentRequestId == requestId) {
+                write()
+                null
+            } else {
+                currentRequestId
             }
         }
     }
