@@ -16,6 +16,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
@@ -252,6 +253,7 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
     )
     val baselineFromCenter = rememberBaselineFromCenter(fontStyle)
     val lineHeightPx = resolveTextLineHeightPx(fontStyle, density)
+    val shouldEllipsize = block.data?.maxLines?.let { it > 0 } ?: false
     var maxLines = block.data?.maxLines ?: Int.MAX_VALUE
     if (maxLines <= 0) {
         maxLines = Int.MAX_VALUE
@@ -292,6 +294,7 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
             modifier = textModifier,
             style = fontStyle,
             maxLines = maxLines,
+            overflow = if (shouldEllipsize) TextOverflow.Ellipsis else TextOverflow.Clip,
             onTextLayout = onTextLayout,
         )
     }
