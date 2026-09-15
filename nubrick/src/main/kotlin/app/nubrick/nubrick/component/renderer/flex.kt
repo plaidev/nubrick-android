@@ -147,7 +147,9 @@ private fun childFrameWeight(block: UIBlock, direction: FlexDirection): Float? {
  */
 private fun textShrinksInRow(block: UIBlock, direction: FlexDirection): Boolean =
     direction == FlexDirection.ROW &&
-        (block as? UIBlock.UnionUITextBlock)?.data?.data?.frame?.width == null
+        (block as? UIBlock.UnionUITextBlock)?.data?.data?.frame?.width.let {
+            it == null || it < 0
+        }
 
 private fun collectionViewportDirection(block: UIBlock): FlexDirection? {
     val collection = (block as? UIBlock.UnionUICollectionBlock)?.data ?: return null

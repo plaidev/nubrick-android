@@ -57,13 +57,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito
-import kotlin.math.roundToInt
 
 class FlexLayoutAndroidTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     private val container = Mockito.mock(Container::class.java)
+    // The CI emulator's viewport is 320dp wide; keep the test canvas inside it.
+    private val rootSize = 300.dp
 
     @Test
     fun visibleOverflow_keepsFixedChildrenAtTheirDeclaredPositions() {
@@ -122,6 +123,29 @@ class FlexLayoutAndroidTest {
         )
 
         assertPosition("fixed", x = 0, y = 0)
+        val textBounds = bounds(longText)
+        assertEquals(50f, textBounds.left.value, 0.5f)
+        assertTrue(textBounds.right.value <= 200.5f)
+        assertTrue((textBounds.bottom - textBounds.top).value > 20f)
+    }
+
+    @Test
+    fun negativeWidthText_wrapsWithinTheSpaceLeftByFixedRowSiblings() {
+        val longText = "A negative width is treated as Hug and must wrap in a horizontal flex row."
+        render(
+            flex(
+                width = 200,
+                height = 160,
+                gap = 10,
+                justifyContent = JustifyContent.START,
+                alignItems = AlignItems.START,
+                children = listOf(
+                    text("fixed-negative", 40, 20),
+                    unframedText(longText, width = -1),
+                ),
+            )
+        )
+
         val textBounds = bounds(longText)
         assertEquals(50f, textBounds.left.value, 0.5f)
         assertTrue(textBounds.right.value <= 200.5f)
@@ -238,8 +262,8 @@ class FlexLayoutAndroidTest {
             }
         }
 
-        assertEquals(ComposeColor.Red, pixelAt(x = 320, y = 1))
-        assertEquals(ComposeColor.Green, pixelAt(x = 395, y = 1))
+        assertEquals(ComposeColor.Red, pixelAt(x = 225, y = 1))
+        assertEquals(ComposeColor.Green, pixelAt(x = 295, y = 1))
     }
 
     @Test
@@ -263,7 +287,7 @@ class FlexLayoutAndroidTest {
     @Test
     fun spaceBetween_preservesTheMinimumGapAndDistributesExtraSpace() {
         val block = flex(
-            width = 301,
+            width = 299,
             height = 40,
             justifyContent = JustifyContent.SPACE_BETWEEN,
             gap = 10,
@@ -287,7 +311,7 @@ class FlexLayoutAndroidTest {
         assertEquals(ComposeColor.Red, pixelAt(x = 25, y = 1))
         assertEquals(ComposeColor.Green, pixelAt(x = 150, y = 1))
         assertEquals(ComposeColor.Blue, pixelAt(x = 275, y = 1))
-        assertEquals(ComposeColor.Blue, pixelAt(x = 300, y = 1))
+        assertEquals(ComposeColor.Blue, pixelAt(x = 298, y = 1))
     }
 
     @Test
@@ -614,8 +638,8 @@ class FlexLayoutAndroidTest {
             height = 1_000_000,
             children = listOf(text("small", 20, 20)),
         ))
-        assertEquals(400f, size.width, 0.5f)
-        assertEquals(400f, size.height, 0.5f)
+        assertEquals(rootSize.value, size.width, 0.5f)
+        assertEquals(rootSize.value, size.height, 0.5f)
     }
 
     @Test
@@ -806,7 +830,7 @@ class FlexLayoutAndroidTest {
                 DataProvider(DataState(loading = false, data = JsonObject(emptyMap()))) {
                     Box(
                         Modifier
-                            .size(400.dp)
+                            .size(rootSize)
                             .background(background)
                             .testTag("flex-test-root")
                     ) {
@@ -852,8 +876,11 @@ class FlexLayoutAndroidTest {
         )
     )
 
-    private fun unframedText(value: String) = UIBlock.UnionUITextBlock(
-        UITextBlock(data = UITextBlockData(value = value))
+    private fun unframedText(value: String, width: Int? = null) = UIBlock.UnionUITextBlock(
+        UITextBlock(data = UITextBlockData(
+            value = value,
+            frame = width?.let { FrameData(width = it) },
+        ))
     )
 
     private fun ComposeColor.toSchemaColor() = ColorValue.UnionColor(
@@ -866,7 +893,16 @@ class FlexLayoutAndroidTest {
         assertEquals(y.toFloat(), bounds.top.value, 0.5f)
     }
 
-    private fun bounds(value: String): DpRect = composeRule.onNodeWithText(value).getBoundsInRoot()
+    private fun bounds(value: String): DpRect {
+        val bounds = composeRule.onNodeWithText(value).getBoundsInRoot()
+        val rootBounds = composeRule.onNodeWithTag("flex-test-root").getBoundsInRoot()
+        return DpRect(
+            left = bounds.left - rootBounds.left,
+            top = bounds.top - rootBounds.top,
+            right = bounds.right - rootBounds.left,
+            bottom = bounds.bottom - rootBounds.top,
+        )
+    }
 
     private fun pixelAt(x: Int, y: Int): ComposeColor {
         val image = composeRule
@@ -874,8 +910,8 @@ class FlexLayoutAndroidTest {
             .captureToImage()
             .toPixelMap()
         return image[
-            (x / 400f * image.width).roundToInt(),
-            (y / 400f * image.height).roundToInt(),
+            with(composeRule.density) { x.dp.roundToPx() },
+            with(composeRule.density) { y.dp.roundToPx() },
         ]
     }
 
