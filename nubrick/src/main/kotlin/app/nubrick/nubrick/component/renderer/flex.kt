@@ -145,11 +145,12 @@ private fun childFrameWeight(block: UIBlock, direction: FlexDirection): Float? {
  * Text is normally Hug-sized. In a bounded horizontal Flex it follows the
  * editor/iOS exception: it may shrink to the remaining row width and wrap.
  */
-private fun textShrinksInRow(block: UIBlock, direction: FlexDirection): Boolean =
-    direction == FlexDirection.ROW &&
-        (block as? UIBlock.UnionUITextBlock)?.data?.data?.frame?.width.let {
-            it == null || it < 0
-        }
+private fun textShrinksInRow(block: UIBlock, direction: FlexDirection): Boolean {
+    if (direction != FlexDirection.ROW) return false
+    val text = block as? UIBlock.UnionUITextBlock ?: return false
+    val width = text.data.data?.frame?.width
+    return width == null || width < 0
+}
 
 private fun collectionViewportDirection(block: UIBlock): FlexDirection? {
     val collection = (block as? UIBlock.UnionUICollectionBlock)?.data ?: return null

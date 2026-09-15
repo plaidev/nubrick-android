@@ -84,6 +84,34 @@ class FlexLayoutAndroidTest {
     }
 
     @Test
+    fun visibleOverflow_keepsFixedNonTextChildrenAtTheirDeclaredPositions() {
+        fun nestedFlex(label: String) = UIBlock.UnionUIFlexContainerBlock(
+            flex(
+                width = 80,
+                height = 40,
+                justifyContent = JustifyContent.START,
+                alignItems = AlignItems.START,
+                children = listOf(text(label, 20, 20)),
+            )
+        )
+
+        render(
+            flex(
+                width = 100,
+                height = 40,
+                overflow = Overflow.VISIBLE,
+                gap = 10,
+                justifyContent = JustifyContent.START,
+                alignItems = AlignItems.START,
+                children = listOf(nestedFlex("first-nested"), nestedFlex("second-nested")),
+            )
+        )
+
+        assertPosition("first-nested", x = 0, y = 0)
+        assertPosition("second-nested", x = 90, y = 0)
+    }
+
+    @Test
     fun rowFillChildren_splitSpaceRemainingAfterFixedChildrenAndGaps() {
         render(
             flex(
