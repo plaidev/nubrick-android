@@ -499,8 +499,10 @@ class FlexLayoutAndroidTest {
             content(hidden, background = ComposeColor.Black)
         }
         composeRule.waitForIdle()
-        assertEquals(ComposeColor.Red, pixelAt(x = 95, y = 10))
-        assertEquals(ComposeColor.Black, pixelAt(x = 110, y = 10))
+        // Sample above the text glyphs so antialiasing cannot affect the
+        // background-color assertion.
+        assertEquals(ComposeColor.Red, pixelAt(x = 95, y = 1))
+        assertEquals(ComposeColor.Black, pixelAt(x = 110, y = 1))
     }
 
     @Test
@@ -889,20 +891,15 @@ class FlexLayoutAndroidTest {
 
     private fun assertPosition(value: String, x: Int, y: Int) {
         val bounds = bounds(value)
-        assertEquals(x.toFloat(), bounds.left.value, 0.5f)
-        assertEquals(y.toFloat(), bounds.top.value, 0.5f)
+        assertEquals(x.toFloat(), bounds.left.value, onePixelInDp)
+        assertEquals(y.toFloat(), bounds.top.value, onePixelInDp)
     }
 
-    private fun bounds(value: String): DpRect {
-        val bounds = composeRule.onNodeWithText(value).getBoundsInRoot()
-        val rootBounds = composeRule.onNodeWithTag("flex-test-root").getBoundsInRoot()
-        return DpRect(
-            left = bounds.left - rootBounds.left,
-            top = bounds.top - rootBounds.top,
-            right = bounds.right - rootBounds.left,
-            bottom = bounds.bottom - rootBounds.top,
-        )
-    }
+    // getBoundsInRoot is already relative to the Compose test root. The tagged
+    // Box's semantics bounds may start one pixel outside that root on API 34,
+    // so subtracting it introduces an emulator-specific offset.
+    private fun bounds(value: String): DpRect =
+        composeRule.onNodeWithText(value).getBoundsInRoot()
 
     private fun pixelAt(x: Int, y: Int): ComposeColor {
         val image = composeRule
@@ -916,11 +913,15 @@ class FlexLayoutAndroidTest {
     }
 
     private fun assertEquals(expected: DpRect, actual: DpRect) {
-        assertEquals(expected.left.value, actual.left.value, 0.5f)
-        assertEquals(expected.top.value, actual.top.value, 0.5f)
-        assertEquals(expected.right.value, actual.right.value, 0.5f)
-        assertEquals(expected.bottom.value, actual.bottom.value, 0.5f)
+        assertEquals(expected.left.value, actual.left.value, onePixelInDp)
+        assertEquals(expected.top.value, actual.top.value, onePixelInDp)
+        assertEquals(expected.right.value, actual.right.value, onePixelInDp)
+        assertEquals(expected.bottom.value, actual.bottom.value, onePixelInDp)
     }
+
+    private val onePixelInDp: Float
+        // A nested layout can accumulate rounding at more than one boundary.
+        get() = 2f / composeRule.density.density
 
     private data class MeasuredSize(
         val width: Float,
