@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -11,6 +12,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 class TextLineHeightTest {
+    @Test
+    fun textUsesGreedyWrapping() {
+        assertEquals(LineBreak.Simple, resolveTextLineBreak())
+    }
+
     @Test
     fun invalidLineHeightFallsBackToTheLegacyDefault() {
         assertEquals(19.2f, resolveTextLineHeight(-1f, 16), 0f)
