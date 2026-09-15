@@ -141,6 +141,14 @@ private fun childFrameWeight(block: UIBlock, direction: FlexDirection): Float? {
     }
 }
 
+/**
+ * Text is normally Hug-sized. In a bounded horizontal Flex it follows the
+ * editor/iOS exception: it may shrink to the remaining row width and wrap.
+ */
+private fun textShrinksInRow(block: UIBlock, direction: FlexDirection): Boolean =
+    direction == FlexDirection.ROW &&
+        (block as? UIBlock.UnionUITextBlock)?.data?.data?.frame?.width == null
+
 private fun collectionViewportDirection(block: UIBlock): FlexDirection? {
     val collection = (block as? UIBlock.UnionUICollectionBlock)?.data ?: return null
     val direction = collection.data?.direction ?: FlexDirection.ROW
@@ -156,8 +164,40 @@ private fun collectionViewportDirection(block: UIBlock): FlexDirection? {
 
 private data class FlexChildMetadata(
     val weight: Float?,
+    val shrinkInRow: Boolean,
     val collectionDirection: FlexDirection?,
 )
+
+/**
+ * Split a finite flex remainder by each item's intrinsic main-axis size.
+ * Cumulative rounding ensures the shares add up to [availableSpace] exactly.
+ */
+internal fun allocateProportionalFlexSpace(
+    availableSpace: Int,
+    intrinsicSizes: List<Int>,
+): List<Int> {
+    val available = availableSpace.coerceAtLeast(0)
+    val normalizedSizes = intrinsicSizes.map { it.coerceAtLeast(0) }
+    val totalIntrinsicSize = normalizedSizes.sumOf { it.toLong() }
+    if (available == 0 || totalIntrinsicSize == 0L) {
+        return List(normalizedSizes.size) { 0 }
+    }
+
+    var allocated = 0
+    var cumulativeIntrinsicSize = 0L
+    return normalizedSizes.mapIndexed { index, size ->
+        cumulativeIntrinsicSize += size
+        val cumulativeAllocation = if (index == normalizedSizes.lastIndex) {
+            available
+        } else {
+            ((available.toLong() * cumulativeIntrinsicSize + totalIntrinsicSize / 2) /
+                totalIntrinsicSize)
+                .coerceIn(allocated.toLong(), available.toLong())
+                .toInt()
+        }
+        (cumulativeAllocation - allocated).also { allocated = cumulativeAllocation }
+    }
+}
 
 private fun Placeable.mainAxisSize(direction: FlexDirection): Int =
     if (direction == FlexDirection.ROW) width else height
@@ -204,6 +244,7 @@ private fun OverflowingFlex(
                     modifier = Modifier.layoutId(
                         FlexChildMetadata(
                             weight = childFrameWeight(child, direction),
+                            shrinkInRow = textShrinksInRow(child, direction),
                             collectionDirection = collectionViewportDirection(child),
                         )
                     ),
@@ -247,21 +288,68 @@ private fun OverflowingFlex(
             )
         }
         val placeables = arrayOfNulls<Placeable>(measurables.size)
+        val shrinkableTextIndices = weights.indices.filter { index ->
+            weights[index] == null && metadata[index]?.shrinkInRow == true
+        }
 
-        // Fixed and hug children retain their own main-axis size, even after
-        // the flex frame has run out of remaining room. They are still capped
-        // by the parent's maximum, matching the editor's max-size rule.
-        var fixedMainAxisSize = layoutTotal(
+        // Fixed and ordinary Hug children retain their main-axis size, even
+        // after the flex frame has run out of remaining room. They are still
+        // capped by the parent's maximum, matching the editor's max-size rule.
+        var nonFillMainAxisSize = layoutTotal(
             gapPx.toLong() * (measurables.size - 1).coerceAtLeast(0)
         )
         measurables.forEachIndexed { index, measurable ->
-            if (weights[index] == null) {
+            if (weights[index] == null && index !in shrinkableTextIndices) {
                 val placeable = measurable.measure(
                     childConstraints(index, min = 0, max = mainAxisMax)
                 )
                 placeables[index] = placeable
-                fixedMainAxisSize = layoutTotal(
-                    fixedMainAxisSize.toLong() + placeable.mainAxisSize(direction)
+                nonFillMainAxisSize = layoutTotal(
+                    nonFillMainAxisSize.toLong() + placeable.mainAxisSize(direction)
+                )
+            }
+        }
+
+        if (mainAxisMax == Constraints.Infinity) {
+            // A scrollable row has no finite edge to shrink against, so Text
+            // keeps ordinary Hug sizing and may extend the scrollable content.
+            shrinkableTextIndices.forEach { index ->
+                val placeable = measurables[index].measure(
+                    childConstraints(index, min = 0, max = mainAxisMax)
+                )
+                placeables[index] = placeable
+                nonFillMainAxisSize = layoutTotal(
+                    nonFillMainAxisSize.toLong() + placeable.mainAxisSize(direction)
+                )
+            }
+        } else {
+            val availableForText = (mainAxisMax - nonFillMainAxisSize).coerceAtLeast(0)
+            // Use intrinsics for the first phase: Compose allows a measurable
+            // to be measured only once in a Layout pass.
+            val intrinsicTextWidths = shrinkableTextIndices.map { index ->
+                measurables[index].maxIntrinsicWidth(crossAxisMax)
+                    .coerceIn(0, MaxConstraintSize)
+            }
+            val totalIntrinsicTextWidth = intrinsicTextWidths.sumOf { it.toLong() }
+            val textOverflows = totalIntrinsicTextWidth > availableForText
+            val allocatedTextWidths = if (textOverflows) {
+                allocateProportionalFlexSpace(availableForText, intrinsicTextWidths)
+            } else {
+                intrinsicTextWidths
+            }
+
+            shrinkableTextIndices.forEachIndexed { textIndex, childIndex ->
+                val allocatedWidth = allocatedTextWidths[textIndex]
+                // Once the Texts overflow, their allocated share is their
+                // actual flex size. This is Hug with flex-shrink: 1 and a
+                // zero minimum width, not Fill behavior.
+                val minimumWidth = if (textOverflows) allocatedWidth else 0
+                val placeable = measurables[childIndex].measure(
+                    childConstraints(childIndex, min = minimumWidth, max = allocatedWidth)
+                )
+                placeables[childIndex] = placeable
+                nonFillMainAxisSize = layoutTotal(
+                    nonFillMainAxisSize.toLong() + placeable.mainAxisSize(direction)
                 )
             }
         }
@@ -271,9 +359,9 @@ private fun OverflowingFlex(
             // A scroll container measures its content with an unbounded max
             // constraint. Its minimum still represents the viewport, so fills
             // use the viewport's free space until fixed children overflow it.
-            (mainAxisMin - fixedMainAxisSize).coerceAtLeast(0)
+            (mainAxisMin - nonFillMainAxisSize).coerceAtLeast(0)
         } else {
-            (mainAxisMax - fixedMainAxisSize).coerceAtLeast(0)
+            (mainAxisMax - nonFillMainAxisSize).coerceAtLeast(0)
         }
         val totalWeight = weightedIndices.fold(0f) { total, index ->
             total + (weights[index] ?: 0f)

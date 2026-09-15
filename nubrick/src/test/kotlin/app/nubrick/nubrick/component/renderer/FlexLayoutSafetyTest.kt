@@ -15,6 +15,22 @@ class FlexLayoutSafetyTest {
     }
 
     @Test
+    fun proportionalTextShares_preserveTheAvailableWidthExactly() {
+        assertEquals(
+            listOf(147, 73),
+            allocateProportionalFlexSpace(220, listOf(440, 220)),
+        )
+        assertEquals(
+            listOf(1, 1, 1),
+            allocateProportionalFlexSpace(3, listOf(1, 1, 1)),
+        )
+        assertEquals(
+            listOf(0, 0),
+            allocateProportionalFlexSpace(0, listOf(20, 10)),
+        )
+    }
+
+    @Test
     fun frameConstraints_constrainOversizedDimensionsBeforePacking() {
         val parent = Constraints(maxWidth = 400, maxHeight = 300)
         assertEquals(

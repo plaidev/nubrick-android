@@ -53,6 +53,7 @@ import app.nubrick.nubrick.schema.UITextBlock
 import app.nubrick.nubrick.schema.UITextBlockData
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito
@@ -101,6 +102,56 @@ class FlexLayoutAndroidTest {
         assertPosition("fixed", x = 0, y = 0)
         assertPosition("fill-one", x = 60, y = 0)
         assertPosition("fill-two", x = 155, y = 0)
+    }
+
+    @Test
+    fun unframedText_wrapsWithinTheSpaceLeftByFixedRowSiblings() {
+        val longText = "Text must wrap inside the width remaining in this horizontal flex row."
+        render(
+            flex(
+                width = 200,
+                height = 160,
+                gap = 10,
+                justifyContent = JustifyContent.START,
+                alignItems = AlignItems.START,
+                children = listOf(
+                    text("fixed", 40, 20),
+                    unframedText(longText),
+                ),
+            )
+        )
+
+        assertPosition("fixed", x = 0, y = 0)
+        val textBounds = bounds(longText)
+        assertEquals(50f, textBounds.left.value, 0.5f)
+        assertTrue(textBounds.right.value <= 200.5f)
+        assertTrue((textBounds.bottom - textBounds.top).value > 20f)
+    }
+
+    @Test
+    fun overflowingUnframedTexts_shareTheRemainingRowWidth() {
+        val firstText = "First long text should receive only its proportional share."
+        val secondText = "Second long text should receive only its proportional share."
+        render(
+            flex(
+                width = 260,
+                height = 160,
+                gap = 10,
+                justifyContent = JustifyContent.START,
+                alignItems = AlignItems.START,
+                children = listOf(
+                    text("fixed", 40, 20),
+                    unframedText(firstText),
+                    unframedText(secondText),
+                ),
+            )
+        )
+
+        val firstBounds = bounds(firstText)
+        val secondBounds = bounds(secondText)
+        assertTrue(firstBounds.right.value < secondBounds.left.value)
+        assertTrue(secondBounds.left.value < 200f)
+        assertTrue(secondBounds.right.value <= 260.5f)
     }
 
     @Test
@@ -799,6 +850,10 @@ class FlexLayoutAndroidTest {
                 frame = FrameData(width = width, height = height, background = background),
             )
         )
+    )
+
+    private fun unframedText(value: String) = UIBlock.UnionUITextBlock(
+        UITextBlock(data = UITextBlockData(value = value))
     )
 
     private fun ComposeColor.toSchemaColor() = ColorValue.UnionColor(
