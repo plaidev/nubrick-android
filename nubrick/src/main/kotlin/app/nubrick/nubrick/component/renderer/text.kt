@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -54,6 +56,8 @@ private const val MAX_TEXT_LINE_HEIGHT = 1_024f
 
 internal fun resolveTextFontSize(size: Int?): Int =
     size?.takeIf { it in 1..MAX_TEXT_SIZE } ?: DEFAULT_TEXT_SIZE
+
+internal fun resolveTextLineBreak(): LineBreak = LineBreak.Simple
 
 /** Returns [value] in sp, or in dp converted to sp when it must not follow the device font scale. */
 internal fun resolveTextUnit(value: Float, scaleWithDeviceFontSize: Boolean, density: Density): TextUnit =
@@ -246,6 +250,8 @@ internal fun Text(block: UITextBlock, modifier: Modifier = Modifier) {
             density = density,
         ),
         platformStyle = PlatformTextStyle(includeFontPadding = false),
+        lineBreak = resolveTextLineBreak(),
+        hyphens = Hyphens.None,
         lineHeightStyle = LineHeightStyle(
             alignment = LineHeightStyle.Alignment.Center,
             trim = LineHeightStyle.Trim.None,
