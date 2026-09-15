@@ -2,8 +2,9 @@
 
 ## Requirements
 
-- Android `minSdk 26+`
-- Android Gradle Plugin `8.0+`
+- Runtime: Android `minSdk 26+`
+- Build: Android `compileSdk 36+`
+- Android Gradle Plugin `8.9.1+`
 
 ## Samples
 

@@ -26,7 +26,7 @@ android {
         buildConfigField("String", "VERSION_NAME", "\"${project.version}\"")
 
         aarMetadata {
-            minCompileSdk = libs.versions.androidMinSdk.get().toInt()
+            minCompileSdk = libs.versions.androidMinCompileSdk.get().toInt()
         }
     }
 
