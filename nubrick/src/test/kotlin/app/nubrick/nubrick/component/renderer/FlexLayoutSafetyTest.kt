@@ -76,6 +76,14 @@ class FlexLayoutSafetyTest {
             Constraints(maxWidth = 40, maxHeight = 100),
             scrollViewportConstraints(Constraints(maxWidth = 40), FlexDirection.COLUMN, fallbackMax = 100),
         )
+        assertEquals(
+            Constraints(maxWidth = 0, maxHeight = 40),
+            scrollViewportConstraints(Constraints(maxHeight = 40), FlexDirection.ROW, fallbackMax = 0),
+        )
+        assertEquals(
+            Constraints(maxWidth = 40, maxHeight = 0),
+            scrollViewportConstraints(Constraints(maxWidth = 40), FlexDirection.COLUMN, fallbackMax = 0),
+        )
         val allocated = Constraints.fixed(50, 20)
         assertEquals(allocated, scrollViewportConstraints(allocated, FlexDirection.ROW, fallbackMax = 100))
     }

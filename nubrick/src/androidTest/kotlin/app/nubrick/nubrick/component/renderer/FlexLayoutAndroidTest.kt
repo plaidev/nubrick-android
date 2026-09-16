@@ -789,15 +789,47 @@ class FlexLayoutAndroidTest {
         )
     }
 
+    @Test
+    fun hugScrollRow_nestedGridWithoutWidthHasNoViewport() {
+        assertNestedCollectionCanScroll(
+            CollectionKind.GRID,
+            FlexDirection.ROW,
+            parentMainAxisSize = null,
+            expectedViewport = 0,
+        )
+    }
+
+    @Test
+    fun hugScrollColumn_nestedCarouselWithoutHeightHasNoViewport() {
+        assertNestedCollectionCanScroll(
+            CollectionKind.CAROUSEL,
+            FlexDirection.COLUMN,
+            parentMainAxisSize = null,
+            expectedViewport = 0,
+        )
+    }
+
+    @Test
+    fun hugScrollRow_legacyFillGridHasNoViewport() {
+        assertNestedCollectionCanScroll(
+            CollectionKind.GRID,
+            FlexDirection.ROW,
+            frame = FrameData(width = 0),
+            parentMainAxisSize = null,
+            expectedViewport = 0,
+        )
+    }
+
     private fun assertNestedCollectionCanScroll(
         kind: CollectionKind,
         direction: FlexDirection,
         frame: FrameData? = null,
+        parentMainAxisSize: Int? = 100,
         expectedViewport: Int = 100,
     ) {
         render(flex(
-            width = if (direction == FlexDirection.ROW) 100 else 40,
-            height = if (direction == FlexDirection.COLUMN) 100 else 40,
+            width = if (direction == FlexDirection.ROW) parentMainAxisSize else 40,
+            height = if (direction == FlexDirection.COLUMN) parentMainAxisSize else 40,
             direction = direction,
             overflow = Overflow.SCROLL,
             justifyContent = JustifyContent.START,
@@ -818,6 +850,7 @@ class FlexLayoutAndroidTest {
         val size = collection.fetchSemanticsNode().size
         val mainAxisSize = if (direction == FlexDirection.ROW) size.width else size.height
         assertEquals(with(composeRule.density) { expectedViewport.dp.roundToPx() }, mainAxisSize)
+        if (expectedViewport == 0) return
         composeRule.onNodeWithText("item-0").assertIsDisplayed()
         // For an explicitly oversized collection, its trailing edge is clipped
         // by the outer viewport. Scroll to an item that can be visible in both.

@@ -287,7 +287,7 @@ private fun OverflowingFlex(
             return scrollViewportConstraints(
                 childConstraints,
                 collectionDirection,
-                fallbackMax = viewportMinimum.takeIf { it > 0 } ?: MaxConstraintSize,
+                fallbackMax = viewportMinimum,
             )
         }
         val placeables = arrayOfNulls<Placeable>(measurables.size)
