@@ -248,7 +248,9 @@ internal class ContainerImpl(
         // Tooltip is a Flutter-only flow. Persist tooltip history only after
         // Flutter confirms the tooltip actually started rendering.
         if (extracted.kind != ExperimentKind.TOOLTIP) {
-            this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+            if (!this.databaseRepository.appendExperimentHistory(extracted.experimentId)) {
+                return Result.failure(IllegalStateException("Couldn't save experiment history"))
+            }
         }
         val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
@@ -269,7 +271,9 @@ internal class ContainerImpl(
     ): Result<Pair<ExperimentContent, ExperimentKind>> {
         // send the user track event and save it to database
         this.trackRepository.trackEvent(TrackUserEvent(trigger, experimentId = sourceExperimentId))
-        this.databaseRepository.appendUserEvent(trigger)
+        if (!this.databaseRepository.appendUserEvent(trigger)) {
+            return Result.failure(IllegalStateException("Couldn't save user event"))
+        }
 
         // fetch config from cdn
         val configs = this.experimentRepository.fetchTriggerExperimentConfigs(trigger).getOrElse {
@@ -291,7 +295,9 @@ internal class ContainerImpl(
         // Tooltip is a Flutter-only flow. Persist tooltip history only after
         // Flutter confirms the tooltip actually started rendering.
         if (extracted.kind != ExperimentKind.TOOLTIP) {
-            this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+            if (!this.databaseRepository.appendExperimentHistory(extracted.experimentId)) {
+                return Result.failure(IllegalStateException("Couldn't save experiment history"))
+            }
         }
         val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
@@ -322,12 +328,16 @@ internal class ContainerImpl(
                 variantId = variantId
             )
         )
-        this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        if (!this.databaseRepository.appendExperimentHistory(extracted.experimentId)) {
+            return Result.failure(IllegalStateException("Couldn't save experiment history"))
+        }
         return Result.success(extracted.variant)
     }
 
     override suspend fun appendExperimentHistory(experimentId: String) {
-        this.databaseRepository.appendExperimentHistory(experimentId)
+        check(this.databaseRepository.appendExperimentHistory(experimentId)) {
+            "Couldn't save experiment history"
+        }
     }
 
     override fun sendSurveyResponse() {

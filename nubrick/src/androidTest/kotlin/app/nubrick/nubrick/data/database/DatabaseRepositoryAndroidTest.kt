@@ -2,6 +2,7 @@ package app.nubrick.nubrick.data.database
 
 import android.database.sqlite.SQLiteDatabase
 import app.nubrick.nubrick.data.user.DATETIME_OFFSET
+import app.nubrick.nubrick.data.user.formatISO8601
 import app.nubrick.nubrick.data.user.getCurrentDate
 import app.nubrick.nubrick.schema.ConditionOperator
 import app.nubrick.nubrick.schema.ExperimentFrequency
@@ -19,9 +20,11 @@ import kotlinx.coroutines.runBlocking
 class DatabaseRepositoryAndroidTest {
     private lateinit var db: SQLiteDatabase
     private lateinit var repository: DatabaseRepositoryImpl
+    private var originalDateTimeOffset = 0L
 
     @Before
     fun setUp() {
+        originalDateTimeOffset = DATETIME_OFFSET
         db = SQLiteDatabase.create(null)
         db.execSQL(SQL_CREATE_EXPERIMENT_HISTORY_TABLE)
         db.execSQL(SQL_CREATE_USER_EVENT_TABLE)
@@ -31,6 +34,7 @@ class DatabaseRepositoryAndroidTest {
 
     @After
     fun tearDown() {
+        DATETIME_OFFSET = originalDateTimeOffset
         db.close()
     }
 
@@ -351,6 +355,73 @@ class DatabaseRepositoryAndroidTest {
         outbox.remove(listOf("a1"))
         Assert.assertEquals(listOf("b1"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
     }
+
+    @Test
+    fun futureFrequencyHistoryIsIgnored() = runBlocking {
+        val now = getCurrentDate()
+        setCurrentDate(now.plusHours(1))
+        repository.appendUserEvent("future-event")
+        repository.appendExperimentHistory("future-experiment")
+        setCurrentDate(now)
+
+        Assert.assertFalse(repository.isMatchedToUserEventFrequencyCondition(eventCondition("future-event")))
+        Assert.assertTrue(repository.isNotInFrequency("future-experiment", ExperimentFrequency()))
+    }
+
+    @Test
+    fun lowerFrequencyBoundsAreInclusive() = runBlocking {
+        val now = getCurrentDate().withHour(12).withMinute(0).withSecond(0).withNano(0)
+        val eventBoundary = now.minusHours(2)
+        val dayBoundary = now.truncatedTo(java.time.temporal.ChronoUnit.DAYS)
+        db.execSQL(
+            "INSERT INTO event (name, timestamp) VALUES (?, ?)",
+            arrayOf("boundary-event", formatISO8601(eventBoundary)),
+        )
+        db.execSQL(
+            "INSERT INTO experiment_history (experiment_id, timestamp) VALUES (?, ?)",
+            arrayOf("boundary-experiment", formatISO8601(dayBoundary)),
+        )
+        setCurrentDate(now)
+
+        Assert.assertTrue(
+            repository.isMatchedToUserEventFrequencyCondition(
+                eventCondition("boundary-event", since = eventBoundary)
+            )
+        )
+        Assert.assertFalse(
+            repository.isNotInFrequency(
+                "boundary-experiment",
+                ExperimentFrequency(period = 1, unit = FrequencyUnit.DAY),
+            )
+        )
+    }
+
+    @Test
+    fun databaseReadFailuresFailClosed() = runBlocking {
+        db.close()
+
+        Assert.assertFalse(
+            repository.isMatchedToUserEventFrequencyCondition(
+                eventCondition("event", threshold = 0, comparison = ConditionOperator.Equal)
+            )
+        )
+        Assert.assertFalse(repository.isNotInFrequency("experiment", ExperimentFrequency()))
+    }
+
+    @Test
+    fun databaseInsertFailuresAreReported() = runBlocking {
+        db.execSQL(
+            "CREATE TRIGGER fail_event_insert BEFORE INSERT ON event " +
+                "BEGIN SELECT RAISE(FAIL, 'forced failure'); END"
+        )
+        db.execSQL(
+            "CREATE TRIGGER fail_history_insert BEFORE INSERT ON experiment_history " +
+                "BEGIN SELECT RAISE(FAIL, 'forced failure'); END"
+        )
+
+        Assert.assertFalse(repository.appendUserEvent("event"))
+        Assert.assertFalse(repository.appendExperimentHistory("experiment"))
+    }
 }
 
 private const val TEST_META = """{"platform":"android"}"""
@@ -358,6 +429,19 @@ private const val TEST_META = """{"platform":"android"}"""
 private fun setCurrentDate(date: ZonedDateTime) {
     DATETIME_OFFSET = date.toInstant().toEpochMilli() - System.currentTimeMillis()
 }
+
+private fun eventCondition(
+    name: String,
+    threshold: Int = 1,
+    comparison: ConditionOperator = ConditionOperator.GreaterThanOrEqual,
+    since: ZonedDateTime? = null,
+) = UserEventFrequencyCondition(
+    eventName = name,
+    unit = FrequencyUnit.HOUR,
+    comparison = comparison,
+    since = since,
+    threshold = threshold,
+)
 
 private suspend fun TrackOutbox.insertEvent(
     eventId: String,
