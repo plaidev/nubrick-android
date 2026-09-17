@@ -76,6 +76,8 @@ class ComparisonUnitTest {
         assertEquals(true, comparePropWithConditionValue(this.intProp, null, "99, 101", ConditionOperator.Between))
         assertEquals(false, comparePropWithConditionValue(this.intProp, null, "98, 99", ConditionOperator.Between))
         assertEquals(false, comparePropWithConditionValue(this.intProp, null, "98", ConditionOperator.Between))
+        assertEquals(false, compareInteger(a = 100, b = listOf<Int>(100), op = ConditionOperator.UNKNOWN))
+        assertEquals(false, compareInteger(a = 100, b = listOf<Int>(100), op = ConditionOperator.Regex))
     }
 
     @Test
@@ -276,6 +278,8 @@ class ComparisonUnitTest {
         assertEquals(false, comparePropWithConditionValue(trueProp, null, "true,", ConditionOperator.In))
         assertEquals(false, comparePropWithConditionValue(this.boolProp, null, "true,,false", ConditionOperator.In))
         assertEquals(false, comparePropWithConditionValue(this.boolProp, null, "", ConditionOperator.Equal))
+        assertEquals(false, compareBoolean(true, listOf(true), ConditionOperator.GreaterThan))
+        assertEquals(false, compareBoolean(true, listOf(true), ConditionOperator.UNKNOWN))
     }
 
     @Test

@@ -158,12 +158,7 @@ internal fun compareLong(a: Long, b: List<Long>, op: ConditionOperator): Boolean
             }
             return b[0] <= a && a <= b[1]
         }
-        else -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a == b[0]
-        }
+        ConditionOperator.Regex, ConditionOperator.UNKNOWN -> return false
     }
 }
 
@@ -217,12 +212,7 @@ internal fun compareDouble(a: Double, b: List<Double>, op: ConditionOperator): B
             }
             return b[0] <= a && a <= b[1]
         }
-        else -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a == b[0]
-        }
+        ConditionOperator.Regex, ConditionOperator.UNKNOWN -> return false
     }
 }
 
@@ -283,12 +273,7 @@ internal fun compareString(a: String, b: List<String>, op: ConditionOperator): B
             }
             return b[0] <= a && a <= b[1]
         }
-        else -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a == b[0]
-        }
+        ConditionOperator.UNKNOWN -> return false
     }
 }
 
@@ -312,12 +297,13 @@ internal fun compareBoolean(a: Boolean, b: List<Boolean>, op: ConditionOperator)
         ConditionOperator.NotIn -> {
             return !b.contains(a)
         }
-        else -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return a == b[0]
-        }
+        ConditionOperator.Regex,
+        ConditionOperator.GreaterThan,
+        ConditionOperator.GreaterThanOrEqual,
+        ConditionOperator.LessThan,
+        ConditionOperator.LessThanOrEqual,
+        ConditionOperator.Between,
+        ConditionOperator.UNKNOWN -> return false
     }
 }
 
@@ -378,12 +364,7 @@ internal fun compareSemver(a: String, b: List<String>, op: ConditionOperator): B
             val right = compareSemverAsComparisonResult(a, b[1])
             return left >= 0 && right <= 0
         }
-        else -> {
-            if (b.isEmpty()) {
-                return false
-            }
-            return compareSemverAsComparisonResult(a, b[0]) == 0
-        }
+        ConditionOperator.Regex, ConditionOperator.UNKNOWN -> return false
     }
 }
 
