@@ -539,7 +539,7 @@ internal fun parseStringToBoolean(str: String): Boolean {
         .trim()                 // 前後の空白・改行を除去
         .uppercase(Locale.US)
     return when (normalized) {
-        "FALSE", "NO", "0", "NIL", "OFF", "" -> false
+        "FALSE", "NO", "0", "NIL", "OFF", "NULL", "UNDEFINED", "ZERO", "" -> false
         else -> true
     }
 }
