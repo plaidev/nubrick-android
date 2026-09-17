@@ -34,24 +34,24 @@ internal class ExperimentHistory(private val db: SQLiteDatabase) {
         return db.insert(ExperimentHistoryTable.Name, null, values)
     }
 
-    fun countAfter(
+    fun count(
         experimentId: String,
-        after: ZonedDateTime
+        after: ZonedDateTime?,
     ): Long {
-        val deleteSelection = "${ExperimentHistoryTable.Columns.Timestamp} < ?"
-        val deleteSelectionArgs = arrayOf(formatISO8601(getCurrentDate().minusDays(365 * 4)))
-        this.db.delete(ExperimentHistoryTable.Name, deleteSelection, deleteSelectionArgs)
-
         val projection = arrayOf("count(${ExperimentHistoryTable.Columns.Timestamp}) as count",)
-        val selection = """
-            ${ExperimentHistoryTable.Columns.ExperimentId} = ?
-            AND
-            ${ExperimentHistoryTable.Columns.Timestamp} >= ?
-        """.trimIndent()
-        val selectionArgs = arrayOf(
-            experimentId,
-            formatISO8601(after),
-        )
+        val selection: String
+        val selectionArgs: Array<String>
+        if (after == null) {
+            selection = "${ExperimentHistoryTable.Columns.ExperimentId} = ?"
+            selectionArgs = arrayOf(experimentId)
+        } else {
+            selection = """
+                ${ExperimentHistoryTable.Columns.ExperimentId} = ?
+                AND
+                ${ExperimentHistoryTable.Columns.Timestamp} >= ?
+            """.trimIndent()
+            selectionArgs = arrayOf(experimentId, formatISO8601(after))
+        }
         val cursor = this.db.query(
             ExperimentHistoryTable.Name,
             projection,

@@ -80,27 +80,31 @@ internal class DatabaseRepositoryImpl private constructor(
     override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean = withDatabase {
         if (frequency == null) return@withDatabase true
 
-        val period = frequency.period ?: (365 * 50)
-        if (period <= 0) return@withDatabase true
         val unit = frequency.unit ?: FrequencyUnit.DAY
 
-        // Minute/hour frequencies are rolling windows. Longer units are calendar periods.
-        val baseDate = when (unit) {
-            FrequencyUnit.MINUTE, FrequencyUnit.HOUR -> getCurrentDate()
-            FrequencyUnit.DAY, FrequencyUnit.UNKNOWN -> getToday()
-            FrequencyUnit.WEEK -> getToday().with(DayOfWeek.MONDAY)
-            FrequencyUnit.MONTH -> getToday().withDayOfMonth(1)
-        }
+        // A missing period means "only once", so include the experiment's
+        // complete display history instead of approximating it with a cutoff.
+        val after = frequency.period?.let { period ->
+            if (period <= 0) return@withDatabase true
 
-        // The current calendar unit is included in the frequency interval.
-        val unitsToSubtract = when (unit) {
-            FrequencyUnit.DAY, FrequencyUnit.WEEK, FrequencyUnit.MONTH, FrequencyUnit.UNKNOWN ->
-                (period - 1).coerceAtLeast(0)
-            else -> period
+            // Minute/hour frequencies are rolling windows. Longer units are calendar periods.
+            val baseDate = when (unit) {
+                FrequencyUnit.MINUTE, FrequencyUnit.HOUR -> getCurrentDate()
+                FrequencyUnit.DAY, FrequencyUnit.UNKNOWN -> getToday()
+                FrequencyUnit.WEEK -> getToday().with(DayOfWeek.MONDAY)
+                FrequencyUnit.MONTH -> getToday().withDayOfMonth(1)
+            }
+
+            // The current calendar unit is included in the frequency interval.
+            val unitsToSubtract = when (unit) {
+                FrequencyUnit.DAY, FrequencyUnit.WEEK, FrequencyUnit.MONTH, FrequencyUnit.UNKNOWN ->
+                    (period - 1).coerceAtLeast(0)
+                else -> period
+            }
+            unit.subtract(unitsToSubtract, baseDate)
         }
-        val after = unit.subtract(unitsToSubtract, baseDate)
-        val count = history.countAfter(experimentId, after)
-        count.toInt() == 0
+        val count = history.count(experimentId, after)
+        count == 0L
     }
 
     override suspend fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean = withDatabase {
