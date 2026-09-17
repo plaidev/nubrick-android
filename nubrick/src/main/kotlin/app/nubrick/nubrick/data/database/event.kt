@@ -46,12 +46,12 @@ internal class UserEvent(private val db: SQLiteDatabase) {
      * number of events that fall into that bucket.
      *
      * The effective lower bound is the later of (now − lookback) and [since].
+     * Missing bounds are unbounded.
      *
      * @param name           Event name to aggregate.
      * @param unit           Time unit used as aggregation bucket and lookback unit.
-     * @param lookbackPeriod Number of [unit]s to look back from now. If null, defaults to 50 years.
+     * @param lookbackPeriod Number of [unit]s to look back from now.
      * @param since          Lower-bound timestamp; events before this instant are excluded.
-     *                       If null, defaults to 50 years ago.
      */
     fun counts(
         name: String,
@@ -59,21 +59,11 @@ internal class UserEvent(private val db: SQLiteDatabase) {
         lookbackPeriod: Int?,
         since: DateTime?
     ): Map<ZonedDateTime, Int> {
-        // House-keeping: delete very old records (> 4 years)
-        val deleteSelection = "${UserEventTable.Columns.Timestamp} < ?"
-        val deleteSelectionArgs = arrayOf(formatISO8601(getCurrentDate().minusDays((365 * 4).toLong())))
-        db.delete(UserEventTable.Name, deleteSelection, deleteSelectionArgs)
-
-        // Determine reference dates
-        val fiftyYearsDays = 365 * 50
         val today = getCurrentDate()
-        val sinceDate: ZonedDateTime = since ?: today.minusDays(fiftyYearsDays.toLong())
-        val period = lookbackPeriod ?: fiftyYearsDays
-        val startDate = unit.subtract(period, today)
-        val lowerBound = if (startDate.isAfter(sinceDate)) startDate else sinceDate
+        val startDate = lookbackPeriod?.let { unit.subtract(it.coerceAtLeast(0), today) }
+        val lowerBound = listOfNotNull(startDate, since).maxOrNull()
 
-        // Fetch timestamps from DB after the lowerBound
-        val timestamps = fetchTimestampsAfter(name, lowerBound)
+        val timestamps = fetchTimestamps(name, lowerBound)
 
         // Aggregate counts per bucket
         val counts: MutableMap<ZonedDateTime, Int> = mutableMapOf()
@@ -85,15 +75,24 @@ internal class UserEvent(private val db: SQLiteDatabase) {
     }
 
     /**
-     * Fetch timestamps of events whose name matches and occurred after [after].
+     * Fetch timestamps of events whose name matches and, when provided, occurred after [after].
      * Returned timestamps are converted to UTC ZonedDateTime.
      */
-    private fun fetchTimestampsAfter(name: String, after: ZonedDateTime): List<ZonedDateTime> {
+    private fun fetchTimestamps(name: String, after: ZonedDateTime?): List<ZonedDateTime> {
+        val selection: String
+        val selectionArgs: Array<String>
+        if (after == null) {
+            selection = "${UserEventTable.Columns.Name} = ?"
+            selectionArgs = arrayOf(name)
+        } else {
+            selection = "${UserEventTable.Columns.Name} = ? AND ${UserEventTable.Columns.Timestamp} >= ?"
+            selectionArgs = arrayOf(name, formatISO8601(after))
+        }
         val cursor = this.db.query(
             UserEventTable.Name,
             arrayOf(UserEventTable.Columns.Timestamp),
-            "${UserEventTable.Columns.Name} = ? AND ${UserEventTable.Columns.Timestamp} >= ?",
-            arrayOf(name, formatISO8601(after)),
+            selection,
+            selectionArgs,
             null,
             null,
             null,

@@ -166,6 +166,71 @@ class DatabaseRepositoryAndroidTest {
     }
 
     @Test
+    fun missingPeriodBlocksDisplaysAcrossAllHistory() = runBlocking {
+        val originalOffset = DATETIME_OFFSET
+        try {
+            val displayedAt = getCurrentDate()
+            setCurrentDate(displayedAt)
+            repository.appendExperimentHistory("once-only-experiment")
+
+            setCurrentDate(displayedAt.plusYears(60))
+
+            listOf(FrequencyUnit.MINUTE, FrequencyUnit.HOUR).forEach { unit ->
+                val allowed = repository.isNotInFrequency(
+                    "once-only-experiment",
+                    ExperimentFrequency(unit = unit),
+                )
+                Assert.assertFalse("unit=$unit", allowed)
+            }
+
+            val allowedWithExplicitHourPeriod = repository.isNotInFrequency(
+                "once-only-experiment",
+                ExperimentFrequency(period = 1, unit = FrequencyUnit.HOUR),
+            )
+            Assert.assertTrue(allowedWithExplicitHourPeriod)
+        } finally {
+            DATETIME_OFFSET = originalOffset
+        }
+    }
+
+    @Test
+    fun missingLookbackPeriodCountsEventsAcrossAllHistory() = runBlocking {
+        val originalOffset = DATETIME_OFFSET
+        try {
+            val recordedAt = getCurrentDate()
+            setCurrentDate(recordedAt)
+            repository.appendUserEvent("purchase")
+
+            setCurrentDate(recordedAt.plusYears(60))
+
+            listOf(FrequencyUnit.MINUTE, FrequencyUnit.HOUR).forEach { unit ->
+                val matched = repository.isMatchedToUserEventFrequencyCondition(
+                    UserEventFrequencyCondition(
+                        eventName = "purchase",
+                        unit = unit,
+                        comparison = ConditionOperator.GreaterThanOrEqual,
+                        threshold = 1,
+                    )
+                )
+                Assert.assertTrue("unit=$unit", matched)
+            }
+
+            val explicitHourLookbackMisses = repository.isMatchedToUserEventFrequencyCondition(
+                UserEventFrequencyCondition(
+                    eventName = "purchase",
+                    lookbackPeriod = 1,
+                    unit = FrequencyUnit.HOUR,
+                    comparison = ConditionOperator.GreaterThanOrEqual,
+                    threshold = 1,
+                )
+            )
+            Assert.assertFalse(explicitHourLookbackMisses)
+        } finally {
+            DATETIME_OFFSET = originalOffset
+        }
+    }
+
+    @Test
     fun trackOutboxKeepsFifoRecordsUntilAcknowledged() = runBlocking {
         val outbox = TrackOutbox(databaseProvider = { db })
         Assert.assertNotNull(outbox.insertEvent("old", createdAt = 1))
