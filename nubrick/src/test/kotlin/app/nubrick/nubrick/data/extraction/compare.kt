@@ -290,7 +290,10 @@ class ComparisonUnitTest {
         assertEquals(false, parseStringToBoolean("No"))
         assertEquals(false, parseStringToBoolean("nil"))
         assertEquals(false, parseStringToBoolean("off"))
-        assertEquals(false, parseStringToBoolean("off"))
+        assertEquals(false, parseStringToBoolean(""))
+        assertEquals(false, parseStringToBoolean("null"))
+        assertEquals(false, parseStringToBoolean("undefined"))
+        assertEquals(false, parseStringToBoolean("zero"))
     }
 }
 
