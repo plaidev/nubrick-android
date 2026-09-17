@@ -7,6 +7,7 @@ import app.nubrick.nubrick.data.user.formatISO8601
 import app.nubrick.nubrick.data.user.getCurrentDate
 import app.nubrick.nubrick.schema.DateTime
 import app.nubrick.nubrick.schema.FrequencyUnit
+import java.time.DateTimeException
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneOffset
@@ -118,13 +119,21 @@ internal class UserEvent(private val db: SQLiteDatabase) {
 // the original enum definition generated elsewhere.
 // -----------------------------------------------------------------------------
 
-internal fun FrequencyUnit.subtract(value: Int, from: ZonedDateTime): ZonedDateTime = when (this) {
-    FrequencyUnit.MINUTE -> from.minusMinutes(value.toLong())
-    FrequencyUnit.HOUR -> from.minusHours(value.toLong())
-    FrequencyUnit.DAY -> from.minusDays(value.toLong())
-    FrequencyUnit.WEEK -> from.minusWeeks(value.toLong())
-    FrequencyUnit.MONTH -> from.minusMonths(value.toLong())
-    else -> from.minusDays(value.toLong())
+internal fun FrequencyUnit.subtract(value: Int, from: ZonedDateTime): ZonedDateTime {
+    val amount = value.coerceAtLeast(0)
+    if (amount == 0) return from
+    return try {
+        when (this) {
+            FrequencyUnit.MINUTE -> from.minusMinutes(amount.toLong())
+            FrequencyUnit.HOUR -> from.minusHours(amount.toLong())
+            FrequencyUnit.DAY -> from.minusDays(amount.toLong())
+            FrequencyUnit.WEEK -> from.minusWeeks(amount.toLong())
+            FrequencyUnit.MONTH -> from.minusMonths(amount.toLong())
+            FrequencyUnit.UNKNOWN -> from
+        }
+    } catch (_: DateTimeException) {
+        from
+    }
 }
 
 internal fun FrequencyUnit.bucketStart(date: ZonedDateTime): ZonedDateTime = when (this) {
