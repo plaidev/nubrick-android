@@ -357,6 +357,75 @@ class DatabaseRepositoryAndroidTest {
     }
 
     @Test
+    fun missingEventFrequencyFieldsFailClosed() = runBlocking {
+        val missingEventName = repository.isMatchedToUserEventFrequencyCondition(
+            UserEventFrequencyCondition(
+                unit = FrequencyUnit.DAY,
+                comparison = ConditionOperator.Equal,
+                threshold = 0,
+            )
+        )
+        val missingThreshold = repository.isMatchedToUserEventFrequencyCondition(
+            UserEventFrequencyCondition(
+                eventName = "purchase",
+                unit = FrequencyUnit.DAY,
+                comparison = ConditionOperator.Equal,
+            )
+        )
+        val missingComparison = repository.isMatchedToUserEventFrequencyCondition(
+            UserEventFrequencyCondition(
+                eventName = "purchase",
+                unit = FrequencyUnit.DAY,
+                threshold = 0,
+            )
+        )
+
+        Assert.assertFalse(missingEventName)
+        Assert.assertFalse(missingThreshold)
+        Assert.assertFalse(missingComparison)
+    }
+
+    @Test
+    fun unsupportedEventFrequencyComparisonsFailClosed() = runBlocking {
+        listOf(
+            ConditionOperator.Regex,
+            ConditionOperator.In,
+            ConditionOperator.NotIn,
+            ConditionOperator.Between,
+            ConditionOperator.UNKNOWN,
+        ).forEach { comparison ->
+            val matches = repository.isMatchedToUserEventFrequencyCondition(
+                UserEventFrequencyCondition(
+                    eventName = "purchase",
+                    unit = FrequencyUnit.DAY,
+                    comparison = comparison,
+                    threshold = 0,
+                )
+            )
+            Assert.assertFalse("comparison=$comparison", matches)
+        }
+    }
+
+    @Test
+    fun unknownFrequencyUnitFailsClosed() = runBlocking {
+        val eventFrequencyMatches = repository.isMatchedToUserEventFrequencyCondition(
+            UserEventFrequencyCondition(
+                eventName = "purchase",
+                unit = FrequencyUnit.UNKNOWN,
+                comparison = ConditionOperator.Equal,
+                threshold = 0,
+            )
+        )
+        val experimentAllowed = repository.isNotInFrequency(
+            "never-shown",
+            ExperimentFrequency(period = 1, unit = FrequencyUnit.UNKNOWN),
+        )
+
+        Assert.assertFalse(eventFrequencyMatches)
+        Assert.assertFalse(experimentAllowed)
+    }
+
+    @Test
     fun futureFrequencyHistoryIsIgnored() = runBlocking {
         val now = getCurrentDate()
         setCurrentDate(now.plusHours(1))

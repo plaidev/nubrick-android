@@ -78,6 +78,7 @@ internal class DatabaseRepositoryImpl private constructor(
         if (frequency == null) return@withDatabase true
 
         val unit = frequency.unit ?: FrequencyUnit.DAY
+        if (unit == FrequencyUnit.UNKNOWN) return@withDatabase false
 
         // A missing period means "only once", so include the experiment's
         // complete display history instead of approximating it with a cutoff.
@@ -87,14 +88,15 @@ internal class DatabaseRepositoryImpl private constructor(
             // Minute/hour frequencies are rolling windows. Longer units are calendar periods.
             val baseDate = when (unit) {
                 FrequencyUnit.MINUTE, FrequencyUnit.HOUR -> getCurrentDate()
-                FrequencyUnit.DAY, FrequencyUnit.UNKNOWN -> getToday()
+                FrequencyUnit.DAY -> getToday()
                 FrequencyUnit.WEEK -> getToday().with(DayOfWeek.MONDAY)
                 FrequencyUnit.MONTH -> getToday().withDayOfMonth(1)
+                FrequencyUnit.UNKNOWN -> return@withDatabase false
             }
 
             // The current calendar unit is included in the frequency interval.
             val unitsToSubtract = when (unit) {
-                FrequencyUnit.DAY, FrequencyUnit.WEEK, FrequencyUnit.MONTH, FrequencyUnit.UNKNOWN ->
+                FrequencyUnit.DAY, FrequencyUnit.WEEK, FrequencyUnit.MONTH ->
                     (period - 1).coerceAtLeast(0)
                 else -> period
             }
@@ -111,10 +113,14 @@ internal class DatabaseRepositoryImpl private constructor(
 
     override suspend fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean = withDatabase {
         if (condition == null) return@withDatabase true
-        val eventName = condition.eventName ?: return@withDatabase true
-        val threshold = condition.threshold ?: return@withDatabase true
+        val eventName = condition.eventName
+        if (eventName.isNullOrEmpty()) return@withDatabase false
+        val threshold = condition.threshold ?: return@withDatabase false
+        val comparison = condition.comparison ?: return@withDatabase false
+        if (!isSupportedUserEventFrequencyComparison(comparison)) return@withDatabase false
         val unit = condition.unit ?: FrequencyUnit.DAY
-        val comparison = condition.comparison ?: ConditionOperator.Equal
+        if (unit == FrequencyUnit.UNKNOWN) return@withDatabase false
+
         val counts = try {
             userEvent.counts(
                 name = eventName,
@@ -138,4 +144,18 @@ internal class DatabaseRepositoryImpl private constructor(
         withContext(Dispatchers.IO) {
             block()
         }
+}
+
+internal fun isSupportedUserEventFrequencyComparison(op: ConditionOperator): Boolean = when (op) {
+    ConditionOperator.Equal,
+    ConditionOperator.NotEqual,
+    ConditionOperator.GreaterThan,
+    ConditionOperator.GreaterThanOrEqual,
+    ConditionOperator.LessThan,
+    ConditionOperator.LessThanOrEqual -> true
+    ConditionOperator.Regex,
+    ConditionOperator.In,
+    ConditionOperator.NotIn,
+    ConditionOperator.Between,
+    ConditionOperator.UNKNOWN -> false
 }
