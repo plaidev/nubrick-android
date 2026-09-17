@@ -3,6 +3,7 @@ package app.nubrick.nubrick.data.database
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import android.util.Log
 import app.nubrick.nubrick.data.extraction.compareInteger
 import app.nubrick.nubrick.data.user.getToday
 import app.nubrick.nubrick.data.user.getCurrentDate
@@ -15,8 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal interface DatabaseRepository {
-    suspend fun appendUserEvent(name: String)
-    suspend fun appendExperimentHistory(experimentId: String)
+    suspend fun appendUserEvent(name: String): Boolean
+    suspend fun appendExperimentHistory(experimentId: String): Boolean
     suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean
     suspend fun isMatchedToUserEventFrequencyCondition(condition: UserEventFrequencyCondition?): Boolean
     suspend fun close() {}
@@ -65,16 +66,12 @@ internal class DatabaseRepositoryImpl private constructor(
     private val history: ExperimentHistory by lazy { ExperimentHistory(db) }
     private val userEvent: UserEvent by lazy { UserEvent(db) }
 
-    override suspend fun appendUserEvent(name: String) {
-        withDatabase {
-            userEvent.append(name)
-        }
+    override suspend fun appendUserEvent(name: String): Boolean = withDatabase {
+        userEvent.append(name) != -1L
     }
 
-    override suspend fun appendExperimentHistory(experimentId: String) {
-        withDatabase {
-            history.append(experimentId)
-        }
+    override suspend fun appendExperimentHistory(experimentId: String): Boolean = withDatabase {
+        history.append(experimentId) != -1L
     }
 
     override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean = withDatabase {
@@ -103,7 +100,12 @@ internal class DatabaseRepositoryImpl private constructor(
             }
             unit.subtract(unitsToSubtract, baseDate)
         }
-        val count = history.count(experimentId, after)
+        val count = try {
+            history.count(experimentId, after, getCurrentDate())
+        } catch (error: Exception) {
+            Log.e("NubrickSDK", "Couldn't read experiment frequency history", error)
+            return@withDatabase false
+        }
         count == 0L
     }
 
@@ -113,12 +115,17 @@ internal class DatabaseRepositoryImpl private constructor(
         val threshold = condition.threshold ?: return@withDatabase true
         val unit = condition.unit ?: FrequencyUnit.DAY
         val comparison = condition.comparison ?: ConditionOperator.Equal
-        val counts = userEvent.counts(
-            name = eventName,
-            unit = unit,
-            lookbackPeriod = condition.lookbackPeriod,
-            since = condition.since
-        )
+        val counts = try {
+            userEvent.counts(
+                name = eventName,
+                unit = unit,
+                lookbackPeriod = condition.lookbackPeriod,
+                since = condition.since
+            )
+        } catch (error: Exception) {
+            Log.e("NubrickSDK", "Couldn't read user event frequency history", error)
+            return@withDatabase false
+        }
         val total = counts.values.sum()
         compareInteger(total, listOf(threshold), comparison)
     }

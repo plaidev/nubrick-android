@@ -585,18 +585,21 @@ private class FakeHttpRequestRepository(
 private class FakeDatabaseRepository(
     private val notInFrequency: Boolean = true,
     private val matchedEventFrequency: Boolean = true,
+    private val writesSucceed: Boolean = true,
 ) : DatabaseRepository {
     val userEvents = mutableListOf<String>()
     val experimentHistories = mutableListOf<String>()
     val frequencyChecks = mutableListOf<Pair<String, ExperimentFrequency?>>()
     val frequencyCheckThreads = mutableListOf<Thread>()
 
-    override suspend fun appendUserEvent(name: String) {
+    override suspend fun appendUserEvent(name: String): Boolean {
         userEvents.add(name)
+        return writesSucceed
     }
 
-    override suspend fun appendExperimentHistory(experimentId: String) {
+    override suspend fun appendExperimentHistory(experimentId: String): Boolean {
         experimentHistories.add(experimentId)
+        return writesSucceed
     }
 
     override suspend fun isNotInFrequency(experimentId: String, frequency: ExperimentFrequency?): Boolean {

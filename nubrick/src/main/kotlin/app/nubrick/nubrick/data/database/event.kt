@@ -60,11 +60,11 @@ internal class UserEvent(private val db: SQLiteDatabase) {
         lookbackPeriod: Int?,
         since: DateTime?
     ): Map<ZonedDateTime, Int> {
-        val today = getCurrentDate()
-        val startDate = lookbackPeriod?.let { unit.subtract(it.coerceAtLeast(0), today) }
+        val now = getCurrentDate()
+        val startDate = lookbackPeriod?.let { unit.subtract(it.coerceAtLeast(0), now) }
         val lowerBound = listOfNotNull(startDate, since).maxOrNull()
 
-        val timestamps = fetchTimestamps(name, lowerBound)
+        val timestamps = fetchTimestamps(name, lowerBound, now)
 
         // Aggregate counts per bucket
         val counts: MutableMap<ZonedDateTime, Int> = mutableMapOf()
@@ -76,20 +76,31 @@ internal class UserEvent(private val db: SQLiteDatabase) {
     }
 
     /**
-     * Fetch timestamps of events whose name matches and, when provided, occurred after [after].
-     * Returned timestamps are converted to UTC ZonedDateTime.
+     * Fetch timestamps of events whose name matches and occurred in `[after, now]`.
+     * Rows SQLite cannot interpret as dates are ignored.
      */
-    private fun fetchTimestamps(name: String, after: ZonedDateTime?): List<ZonedDateTime> {
+    private fun fetchTimestamps(
+        name: String,
+        after: ZonedDateTime?,
+        now: ZonedDateTime,
+    ): List<ZonedDateTime> {
         val selection: String
         val selectionArgs: Array<String>
         if (after == null) {
-            selection = "${UserEventTable.Columns.Name} = ?"
-            selectionArgs = arrayOf(name)
+            selection = """
+                ${UserEventTable.Columns.Name} = ?
+                AND julianday(${UserEventTable.Columns.Timestamp}) <= julianday(?)
+            """.trimIndent()
+            selectionArgs = arrayOf(name, formatISO8601(now))
         } else {
-            selection = "${UserEventTable.Columns.Name} = ? AND ${UserEventTable.Columns.Timestamp} >= ?"
-            selectionArgs = arrayOf(name, formatISO8601(after))
+            selection = """
+                ${UserEventTable.Columns.Name} = ?
+                AND julianday(${UserEventTable.Columns.Timestamp}) >= julianday(?)
+                AND julianday(${UserEventTable.Columns.Timestamp}) <= julianday(?)
+            """.trimIndent()
+            selectionArgs = arrayOf(name, formatISO8601(after), formatISO8601(now))
         }
-        val cursor = this.db.query(
+        return db.query(
             UserEventTable.Name,
             arrayOf(UserEventTable.Columns.Timestamp),
             selection,
@@ -97,20 +108,15 @@ internal class UserEvent(private val db: SQLiteDatabase) {
             null,
             null,
             null,
-        )
-
-        val timeIdx = cursor.getColumnIndexOrThrow(UserEventTable.Columns.Timestamp)
-        val list = mutableListOf<ZonedDateTime>()
-        while (cursor.moveToNext()) {
-            val tsStr = cursor.getString(timeIdx) ?: continue
-            try {
-                val instant = Instant.parse(tsStr)
-                list.add(instant.atZone(ZoneOffset.UTC))
-            } catch (_: Exception) {
+        ).use { cursor ->
+            val timeIdx = cursor.getColumnIndexOrThrow(UserEventTable.Columns.Timestamp)
+            buildList {
+                while (cursor.moveToNext()) {
+                    val instant = Instant.parse(cursor.getString(timeIdx))
+                    add(instant.atZone(ZoneOffset.UTC))
+                }
             }
         }
-        cursor.close()
-        return list
     }
 }
 

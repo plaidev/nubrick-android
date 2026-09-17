@@ -37,39 +37,37 @@ internal class ExperimentHistory(private val db: SQLiteDatabase) {
     fun count(
         experimentId: String,
         after: ZonedDateTime?,
+        now: ZonedDateTime,
     ): Long {
-        val projection = arrayOf("count(${ExperimentHistoryTable.Columns.Timestamp}) as count",)
+        val timestamp = ExperimentHistoryTable.Columns.Timestamp
+        val projection = arrayOf("count($timestamp) AS count")
         val selection: String
         val selectionArgs: Array<String>
         if (after == null) {
-            selection = "${ExperimentHistoryTable.Columns.ExperimentId} = ?"
-            selectionArgs = arrayOf(experimentId)
+            selection = """
+                ${ExperimentHistoryTable.Columns.ExperimentId} = ?
+                AND julianday($timestamp) <= julianday(?)
+            """.trimIndent()
+            selectionArgs = arrayOf(experimentId, formatISO8601(now))
         } else {
             selection = """
                 ${ExperimentHistoryTable.Columns.ExperimentId} = ?
-                AND
-                ${ExperimentHistoryTable.Columns.Timestamp} >= ?
+                AND julianday($timestamp) >= julianday(?)
+                AND julianday($timestamp) <= julianday(?)
             """.trimIndent()
-            selectionArgs = arrayOf(experimentId, formatISO8601(after))
+            selectionArgs = arrayOf(experimentId, formatISO8601(after), formatISO8601(now))
         }
-        val cursor = this.db.query(
+        return db.query(
             ExperimentHistoryTable.Name,
             projection,
             selection,
             selectionArgs,
             null,
             null,
-            null
-        )
-        var count: Long = 0
-        with(cursor) {
-            if (moveToNext()) {
-                try {
-                    count = getLong(getColumnIndexOrThrow("count"))
-                } catch (_: Exception) {}
-            }
+            null,
+        ).use { cursor ->
+            if (!cursor.moveToNext()) return@use 0L
+            cursor.getLong(cursor.getColumnIndexOrThrow("count"))
         }
-        cursor.close()
-        return count
     }
 }
