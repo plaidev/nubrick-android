@@ -86,21 +86,30 @@ internal suspend fun extractExperimentConfig(
         matched.add(config)
     }
 
-    // Pick the highest-priority config. If tied, prefer the latest start date.
-    // Configs without a priority are ranked lowest; without a start date, earliest.
-    return matched.maxWithOrNull(
-        compareBy<ExperimentConfig> { it.priority ?: Int.MIN_VALUE }
-            .thenComparing { a, b ->
-                val aDate = a.startedAt
-                val bDate = b.startedAt
-                when {
-                    aDate == null && bDate == null -> 0
-                    aDate == null -> -1
-                    bDate == null -> 1
-                    else -> aDate.compareTo(bDate)
-                }
-            }
-    )
+    return matched.maxWithOrNull { current, candidate ->
+        when {
+            isExperimentConfigPreferred(current, over = candidate) -> 1
+            isExperimentConfigPreferred(candidate, over = current) -> -1
+            else -> 0
+        }
+    }
+}
+
+// Pick the highest-priority config. If tied, prefer the latest start date.
+// Configs without a priority are ranked lowest; without a start date, earliest.
+internal fun isExperimentConfigPreferred(candidate: ExperimentConfig, over: ExperimentConfig): Boolean {
+    val candidatePriority = candidate.priority ?: Int.MIN_VALUE
+    val currentPriority = over.priority ?: Int.MIN_VALUE
+    if (candidatePriority != currentPriority) {
+        return candidatePriority > currentPriority
+    }
+    val candidateDate = candidate.startedAt
+    val currentDate = over.startedAt
+    return when {
+        candidateDate == null -> false
+        currentDate == null -> true
+        else -> candidateDate.isAfter(currentDate)
+    }
 }
 
 internal fun isInDistributionTarget(distribution: List<ExperimentCondition>?, properties: List<UserProperty>): Boolean {

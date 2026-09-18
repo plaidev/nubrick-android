@@ -4,6 +4,7 @@ import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.user.NubrickUser
+import app.nubrick.nubrick.data.user.getCurrentDate
 import app.nubrick.nubrick.schema.ApiHttpHeader
 import app.nubrick.nubrick.schema.ApiHttpRequest
 import app.nubrick.nubrick.schema.ApiHttpRequestMethod
@@ -379,6 +380,58 @@ class ContainerSurveyResponseTest {
     }
 
     @Test
+    fun `fetchTriggerContent selects the latest config across trigger paths with equal priority`() = runBlocking {
+        val now = getCurrentDate()
+        val componentRepository = FakeComponentRepository(
+            mapOf(
+                ("older" to "older-component") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "older-root")),
+                ("newer" to "newer-component") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "newer-root")),
+            )
+        )
+        val experimentRepository = FakeExperimentRepository(
+            triggerConfigsByName = mapOf(
+                "boot" to ExperimentConfigs(configs = listOf(
+                    ExperimentConfig(
+                        id = "older",
+                        kind = ExperimentKind.POPUP,
+                        baseline = ExperimentVariant(
+                            id = "older-variant",
+                            configs = listOf(VariantConfig(value = "older-component")),
+                        ),
+                        startedAt = now.minusSeconds(2000),
+                        priority = 5,
+                    )
+                )),
+                "return" to ExperimentConfigs(configs = listOf(
+                    ExperimentConfig(
+                        id = "newer",
+                        kind = ExperimentKind.POPUP,
+                        baseline = ExperimentVariant(
+                            id = "newer-variant",
+                            configs = listOf(VariantConfig(value = "newer-component")),
+                        ),
+                        startedAt = now.minusSeconds(1000),
+                        priority = 5,
+                    )
+                )),
+            )
+        )
+        val container = newContainer(
+            componentRepository = componentRepository,
+            experimentRepository = experimentRepository,
+        )
+
+        val (content, kind) = container.fetchTriggerContent(
+            triggers = listOf("boot", "return"),
+            kinds = listOf(ExperimentKind.POPUP),
+        ).getOrThrow()
+
+        assertEquals(ExperimentKind.POPUP, kind)
+        assertEquals("newer", content.experimentId)
+        assertEquals("newer-variant", content.variantId)
+    }
+
+    @Test
     fun `fetchRemoteConfig tracks experiment and appends history`() = runBlocking {
         val trackRepository = FakeTrackRepository()
         val databaseRepository = FakeDatabaseRepository()
@@ -533,6 +586,7 @@ private class FakeComponentRepository(
 private class FakeExperimentRepository(
     private val experimentConfigs: ExperimentConfigs = ExperimentConfigs(configs = emptyList()),
     private val triggerConfigs: ExperimentConfigs = ExperimentConfigs(configs = emptyList()),
+    private val triggerConfigsByName: Map<String, ExperimentConfigs> = emptyMap(),
     private val triggerResult: Result<ExperimentConfigs>? = null,
 ) : ExperimentRepository {
     override suspend fun fetchExperimentConfigs(id: String): Result<ExperimentConfigs> {
@@ -540,7 +594,7 @@ private class FakeExperimentRepository(
     }
 
     override suspend fun fetchTriggerExperimentConfigs(name: String): Result<ExperimentConfigs> {
-        return triggerResult ?: Result.success(triggerConfigs)
+        return triggerResult ?: Result.success(triggerConfigsByName[name] ?: triggerConfigs)
     }
 }
 

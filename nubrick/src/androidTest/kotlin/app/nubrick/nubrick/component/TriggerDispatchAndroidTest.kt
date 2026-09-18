@@ -104,4 +104,50 @@ class TriggerDispatchAndroidTest {
         assertEquals(Looper.getMainLooper().thread, dispatchThread.get())
         assertEquals("source-exp", sourceExperimentId.get())
     }
+
+    @Test
+    fun predefinedDispatchContinuesAfterOneCallbackFails() {
+        val laterEventHandled = CountDownLatch(1)
+        val fetched = CountDownLatch(1)
+        val container = mock(
+            Container::class.java,
+            withSettings().defaultAnswer(Answer { invocation ->
+                when (invocation.method.name.substringBefore('-')) {
+                    "handleNubrickEvent" -> {
+                        val event = invocation.getArgument<NubrickEvent>(0)
+                        if (event.name == "first") {
+                            throw RuntimeException("boom")
+                        }
+                        if (event.name == "second") {
+                            laterEventHandled.countDown()
+                        }
+                        null
+                    }
+                    "fetchTriggerContent" -> {
+                        fetched.countDown()
+                        Result.failure<Any>(UnsupportedOperationException("unused"))
+                    }
+                    else -> null
+                }
+            }),
+        )
+        val holder = TriggerStateHolder(
+            container = container,
+            user = NubrickUser(InstrumentationRegistry.getInstrumentation().targetContext),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+        )
+        val dispatchPredefinedEvents = TriggerStateHolder::class.java.getDeclaredMethod(
+            "dispatchPredefinedEvents",
+            List::class.java,
+        )
+        dispatchPredefinedEvents.isAccessible = true
+
+        dispatchPredefinedEvents.invoke(
+            holder,
+            listOf(NubrickEvent("first"), NubrickEvent("second")),
+        )
+
+        assertTrue(laterEventHandled.await(2, TimeUnit.SECONDS))
+        assertTrue(fetched.await(2, TimeUnit.SECONDS))
+    }
 }
