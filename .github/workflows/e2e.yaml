@@ -28,7 +28,7 @@ jobs:
           java-version: '21'
 
       - name: Build e2e app
-        run: ./gradlew assembleRelease
+        run: ./gradlew :e2e:assembleRelease
 
       - name: Upload e2e app
         run: |
