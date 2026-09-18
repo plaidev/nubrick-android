@@ -68,6 +68,8 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(gap),
             verticalArrangement = Arrangement.spacedBy(gap),
             modifier = collectionModifier
+                // No finite main-axis viewport can be inferred here, so collapse intentionally.
+                .boundScrollableAxis(FlexDirection.ROW, 0.dp)
                 .fillMaxWidth()
                 .height(gridHeight.dp)
         ) {
@@ -92,6 +94,8 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(gap),
             horizontalArrangement = Arrangement.spacedBy(gap),
             modifier = collectionModifier
+                // No finite main-axis viewport can be inferred here, so collapse intentionally.
+                .boundScrollableAxis(FlexDirection.COLUMN, 0.dp)
                 .fillMaxHeight()
                 .width(gridWidth.dp)
         ) {
