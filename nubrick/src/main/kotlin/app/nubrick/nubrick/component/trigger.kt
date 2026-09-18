@@ -1,17 +1,18 @@
 package app.nubrick.nubrick.component
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.ProcessLifecycleOwner
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.ExperimentContent
@@ -29,6 +30,37 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+internal class LifecycleObserverRegistration(
+    private val observer: LifecycleObserver,
+) {
+    private var lifecycle: Lifecycle? = null
+
+    @Synchronized
+    fun attach(lifecycle: Lifecycle) {
+        if (this.lifecycle != null) return
+
+        this.lifecycle = lifecycle
+        try {
+            lifecycle.addObserver(observer)
+        } catch (error: Throwable) {
+            this.lifecycle = null
+            throw error
+        }
+    }
+
+    @Synchronized
+    fun detach() {
+        val lifecycle = this.lifecycle ?: return
+        this.lifecycle = null
+        try {
+            lifecycle.removeObserver(observer)
+        } catch (error: Throwable) {
+            this.lifecycle = lifecycle
+            throw error
+        }
+    }
+}
+
 internal class TriggerStateHolder(
     internal val container: Container,
     internal val user: NubrickUser,
@@ -39,6 +71,17 @@ internal class TriggerStateHolder(
     private var onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = onTooltip
 
     private val isFirstStart = AtomicBoolean(true)
+    private val isProcessLifecycleObservationClosed = AtomicBoolean(false)
+    @Volatile
+    private var triggerContext: Context? = null
+    private val processLifecycleObserver = LifecycleEventObserver { _, event ->
+        if (!isProcessLifecycleObservationClosed.get() && event == Lifecycle.Event.ON_START) {
+            handleProcessStart()
+        }
+    }
+    // The holder is process-scoped, so this registration survives Activity recreation. Re-adding
+    // an observer while the process is already started would synchronously replay ON_START.
+    private val processLifecycleRegistration = LifecycleObserverRegistration(processLifecycleObserver)
     internal val modalContents = mutableStateListOf<ExperimentContent>()
 
     fun updateOnTooltip(onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?) {
@@ -47,6 +90,47 @@ internal class TriggerStateHolder(
 
     internal fun ignoreFirstCall(): Boolean {
         return isFirstStart.compareAndSet(true, false)
+    }
+
+    internal fun startObservingProcessLifecycle(context: Context) {
+        if (isProcessLifecycleObservationClosed.get()) return
+
+        triggerContext = context.applicationContext
+        runCatching {
+            processLifecycleRegistration.attach(ProcessLifecycleOwner.get().lifecycle)
+        }.onFailure { error ->
+            Log.w("NubrickSDK", "Could not observe the process lifecycle for trigger events", error)
+        }
+    }
+
+    internal suspend fun stopObservingProcessLifecycle() {
+        withContext(Dispatchers.Main.immediate) {
+            isProcessLifecycleObservationClosed.set(true)
+            triggerContext = null
+            runCatching {
+                processLifecycleRegistration.detach()
+            }.onFailure { error ->
+                Log.w("NubrickSDK", "Could not remove the process lifecycle observer for trigger events", error)
+            }
+        }
+    }
+
+    private fun handleProcessStart() {
+        val context = triggerContext ?: return
+        if (ignoreFirstCall()) {
+            dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
+
+            val preferences = getNubrickUserSharedPreferences(context)
+            val countKey = "NATIVEBRIK_SDK_INITIALIZED_COUNT"
+            val count: Int = preferences?.getInt(countKey, 0) ?: 0
+            preferences?.edit()?.putInt(countKey, count + 1)?.apply()
+            if (count == 0) {
+                dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
+            }
+        } else {
+            dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
+        }
+        callWhenUserComesBack()
     }
 
     internal fun callWhenUserComesBack() {
@@ -122,36 +206,9 @@ internal class TriggerStateHolder(
 internal fun Trigger(trigger: TriggerStateHolder) {
     val context = LocalContext.current
 
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val observer = remember {
-        LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> {
-                    if (trigger.ignoreFirstCall()) {
-                        trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
-
-                        val preferences = getNubrickUserSharedPreferences(context)
-                        val countKey = "NATIVEBRIK_SDK_INITIALIZED_COUNT"
-                        val count: Int = preferences?.getInt(countKey, 0) ?: 0
-                        preferences?.edit()?.putInt(countKey, count + 1)?.apply()
-                        if (count == 0) {
-                            trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
-                        }
-                    } else {
-                        trigger.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
-                    }
-                    trigger.callWhenUserComesBack()
-                }
-                else -> {}
-            }
-        }
-    }
-    DisposableEffect(lifecycleOwner) {
-        val lifecycle = lifecycleOwner.lifecycle
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-        }
+    LaunchedEffect(trigger) {
+        // Deliberately not tied to this composition's disposal; NubrickRuntime closes it.
+        trigger.startObservingProcessLifecycle(context)
     }
 
     if (trigger.modalContents.isNotEmpty()) {
