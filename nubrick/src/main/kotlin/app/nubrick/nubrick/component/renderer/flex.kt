@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -308,11 +309,14 @@ internal fun parseFramePadding(frame: FrameData?): PaddingValues {
 internal fun Modifier.flexOverflow(direction: FlexDirection, overflow: Overflow?): Modifier {
     val overflow = overflow ?: return this
     if (overflow != Overflow.SCROLL) return this
+    val configuration = LocalConfiguration.current
     return if (direction == FlexDirection.ROW) {
         this
+            .boundScrollableAxis(direction, configuration.screenWidthDp.dp)
             .horizontalScroll(rememberScrollState())
     } else {
         this
+            .boundScrollableAxis(direction, configuration.screenHeightDp.dp)
             .verticalScroll(rememberScrollState())
     }
 }

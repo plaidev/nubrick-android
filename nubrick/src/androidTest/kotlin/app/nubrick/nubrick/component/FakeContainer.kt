@@ -17,7 +17,7 @@ import app.nubrick.nubrick.schema.UIBlockAction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Minimal [Container] for Compose Embedding smoke tests.
@@ -38,7 +38,7 @@ internal class FakeContainer(
         data: JsonElement?,
         pageProperties: List<Property>?,
         arguments: Any?,
-    ): JsonElement = JsonNull
+    ): JsonElement = JsonObject(emptyMap())
 
     override val formValuesFlow: StateFlow<Map<String, FormValue>> =
         MutableStateFlow(emptyMap())

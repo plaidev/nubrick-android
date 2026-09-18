@@ -108,6 +108,8 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
             state = state,
             pageSize = if (fillsMainAxis) PageSize.Fill else PageSize.Fixed(size.width.coerceAtLeast(1.dp)),
             modifier = collectionModifier
+                // No finite main-axis viewport can be inferred here, so collapse intentionally.
+                .boundScrollableAxis(FlexDirection.ROW, 0.dp)
                 .fillMaxWidth()
                 .height(crossHeight.dp)
         ) {
@@ -132,6 +134,8 @@ internal fun Carousel(block: UICollectionBlock, modifier: Modifier = Modifier) {
             state = state,
             pageSize = if (fillsMainAxis) PageSize.Fill else PageSize.Fixed(size.height.coerceAtLeast(1.dp)),
             modifier = collectionModifier
+                // No finite main-axis viewport can be inferred here, so collapse intentionally.
+                .boundScrollableAxis(FlexDirection.COLUMN, 0.dp)
                 .fillMaxHeight()
                 .width(crossWidth.dp)
         ) {
