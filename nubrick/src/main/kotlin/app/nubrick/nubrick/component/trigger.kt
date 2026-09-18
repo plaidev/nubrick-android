@@ -117,40 +117,41 @@ internal class TriggerStateHolder(
 
     private fun handleProcessStart() {
         val context = triggerContext ?: return
+        val events = mutableListOf<NubrickEvent>()
         if (ignoreFirstCall()) {
-            dispatch(NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name))
+            events += NubrickEvent(TriggerEventNameDefs.USER_BOOT_APP.name)
 
             val preferences = getNubrickUserSharedPreferences(context)
             val countKey = "NATIVEBRIK_SDK_INITIALIZED_COUNT"
             val count: Int = preferences?.getInt(countKey, 0) ?: 0
             preferences?.edit()?.putInt(countKey, count + 1)?.apply()
             if (count == 0) {
-                dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name))
+                events += NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP_FIRSTLY.name)
             }
         } else {
-            dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name))
+            events += NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_FOREGROUND.name)
         }
-        callWhenUserComesBack()
+        events += userReturnEvents()
+        dispatchPredefinedEvents(events)
     }
 
-    internal fun callWhenUserComesBack() {
+    private fun userReturnEvents(): List<NubrickEvent> {
         this.user.comeBack()
-
-        // dispatch the event when every time the user is activated
-        this.dispatch(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP.name))
+        val events = mutableListOf(NubrickEvent(TriggerEventNameDefs.USER_ENTER_TO_APP.name))
 
         val retention = this.user.retention
         if (retention == 1) {
-            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_1.name))
+            events += NubrickEvent(TriggerEventNameDefs.RETENTION_1.name)
         } else if (retention in 2..3) {
-            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_2_3.name))
+            events += NubrickEvent(TriggerEventNameDefs.RETENTION_2_3.name)
         } else if (retention in 4..7) {
-            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_4_7.name))
+            events += NubrickEvent(TriggerEventNameDefs.RETENTION_4_7.name)
         } else if (retention in 8..14) {
-            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_8_14.name))
+            events += NubrickEvent(TriggerEventNameDefs.RETENTION_8_14.name)
         } else if (retention > 14) {
-            this.dispatch(NubrickEvent(TriggerEventNameDefs.RETENTION_15.name))
+            events += NubrickEvent(TriggerEventNameDefs.RETENTION_15.name)
         }
+        return events
     }
 
     fun dispatch(event: NubrickEvent, sourceExperimentId: String? = null) {
@@ -170,26 +171,64 @@ internal class TriggerStateHolder(
                 }
                 val (content, kind) = self.container.fetchTriggerContent(event.name, kinds, sourceExperimentId).getOrNull()
                     ?: return@launch
-                if (kind == ExperimentKind.TOOLTIP) {
-                    self.onTooltip?.let { callback ->
-                        val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
-                        // Flutter MethodChannel requires calls on the main thread
-                        withContext(Dispatchers.Main) {
-                            callback(jsonString, content.experimentId, content.variantId)
-                        }
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        if (self.modalContents.indexOfFirst { it.root.id == content.root.id } < 0) {
-                            self.modalContents.add(content)
-                        }
-                    }
-                }
+                self.presentTriggerContent(content, kind)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 // Public boundary: never let trigger/dispatch failures crash the host app.
                 Log.w("NubrickSDK", "Failed to dispatch trigger event: ${event.name}", e)
+            }
+        }
+    }
+
+    private fun dispatchPredefinedEvents(events: List<NubrickEvent>) {
+        val self = this
+        val kinds: List<ExperimentKind> = if (self.onTooltip != null) {
+            listOf(ExperimentKind.POPUP, ExperimentKind.TOOLTIP)
+        } else {
+            listOf(ExperimentKind.POPUP)
+        }
+        scope.launch {
+            try {
+                for (event in events) {
+                    try {
+                        withContext(Dispatchers.Main) {
+                            self.container.handleNubrickEvent(event)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        Log.w("NubrickSDK", "Failed to dispatch predefined trigger event: ${event.name}", e)
+                    }
+                }
+                val (content, kind) = self.container.fetchTriggerContent(
+                    triggers = events.map { it.name },
+                    kinds = kinds,
+                ).getOrNull() ?: return@launch
+                self.presentTriggerContent(content, kind)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Log.w("NubrickSDK", "Failed to dispatch predefined trigger events", e)
+            }
+        }
+    }
+
+    private suspend fun presentTriggerContent(content: ExperimentContent, kind: ExperimentKind) {
+        val self = this
+        if (kind == ExperimentKind.TOOLTIP) {
+            self.onTooltip?.let { callback ->
+                val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
+                // Flutter MethodChannel requires calls on the main thread
+                withContext(Dispatchers.Main) {
+                    callback(jsonString, content.experimentId, content.variantId)
+                }
+            }
+        } else {
+            withContext(Dispatchers.Main) {
+                if (self.modalContents.indexOfFirst { it.root.id == content.root.id } < 0) {
+                    self.modalContents.add(content)
+                }
             }
         }
     }

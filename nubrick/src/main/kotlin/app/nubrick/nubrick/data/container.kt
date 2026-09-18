@@ -10,12 +10,14 @@ import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.extraction.extractComponentId
 import app.nubrick.nubrick.data.extraction.extractExperimentConfig
 import app.nubrick.nubrick.data.extraction.extractExperimentVariant
+import app.nubrick.nubrick.data.extraction.isExperimentConfigPreferred
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.schema.ApiHttpRequest
+import app.nubrick.nubrick.schema.ExperimentConfig
 import app.nubrick.nubrick.schema.ExperimentConfigs
 import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.ExperimentVariant
@@ -35,6 +37,7 @@ internal data class ExtractedVariant(
     val experimentId: String,
     val kind: ExperimentKind,
     val variant: ExperimentVariant,
+    val config: ExperimentConfig,
 )
 
 @FlutterBridgeApi
@@ -91,6 +94,11 @@ internal interface Container {
     ): Result<ExperimentContent>
     suspend fun fetchTriggerContent(
         trigger: String,
+        kinds: List<ExperimentKind>,
+        sourceExperimentId: String? = null,
+    ): Result<Pair<ExperimentContent, ExperimentKind>>
+    suspend fun fetchTriggerContent(
+        triggers: List<String>,
         kinds: List<ExperimentKind>,
         sourceExperimentId: String? = null,
     ): Result<Pair<ExperimentContent, ExperimentKind>>
@@ -268,36 +276,43 @@ internal class ContainerImpl(
         trigger: String,
         kinds: List<ExperimentKind>,
         sourceExperimentId: String?,
+    ): Result<Pair<ExperimentContent, ExperimentKind>> = fetchTriggerContent(
+        triggers = listOf(trigger),
+        kinds = kinds,
+        sourceExperimentId = sourceExperimentId,
+    )
+
+    override suspend fun fetchTriggerContent(
+        triggers: List<String>,
+        kinds: List<ExperimentKind>,
+        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> {
-        // send the user track event and save it to database
-        this.trackRepository.trackEvent(TrackUserEvent(trigger, experimentId = sourceExperimentId))
-        if (!this.databaseRepository.appendUserEvent(trigger)) {
-            return Result.failure(IllegalStateException("Couldn't save user event"))
-        }
+        var selected: ExtractedVariant? = null
+        for (trigger in triggers) {
+            this.trackRepository.trackEvent(TrackUserEvent(trigger, experimentId = sourceExperimentId))
+            if (!this.databaseRepository.appendUserEvent(trigger)) continue
 
-        // fetch config from cdn
-        val configs = this.experimentRepository.fetchTriggerExperimentConfigs(trigger).getOrElse {
-            return Result.failure(it)
-        }
-
-        // select the best matching config for the specified kinds
-        val extracted = this.extractVariant(configs = configs, kinds)
-            .getOrElse {
-                return Result.failure(it)
+            val configs = this.experimentRepository.fetchTriggerExperimentConfigs(trigger).getOrNull()
+                ?: continue
+            val extracted = this.extractVariant(configs = configs, kinds).getOrNull() ?: continue
+            if (selected == null || isExperimentConfigPreferred(extracted.config, over = selected!!.config)) {
+                selected = extracted
             }
+        }
+        val extracted = selected ?: return Result.failure(NotFoundException())
         val variantId = extracted.variant.id ?: return Result.failure(NotFoundException())
         this.trackRepository.trackExperimentEvent(
             TrackExperimentEvent(
                 experimentId = extracted.experimentId,
-                variantId = variantId
+                variantId = variantId,
             )
         )
         // Tooltip is a Flutter-only flow. Persist tooltip history only after
         // Flutter confirms the tooltip actually started rendering.
-        if (extracted.kind != ExperimentKind.TOOLTIP) {
-            if (!this.databaseRepository.appendExperimentHistory(extracted.experimentId)) {
-                return Result.failure(IllegalStateException("Couldn't save experiment history"))
-            }
+        if (extracted.kind != ExperimentKind.TOOLTIP &&
+            !this.databaseRepository.appendExperimentHistory(extracted.experimentId)
+        ) {
+            return Result.failure(IllegalStateException("Couldn't save experiment history"))
         }
         val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
@@ -393,7 +408,7 @@ internal class ContainerImpl(
             normalizedUserRnd = normalizedUserRnd
         ) ?: return Result.failure(NotFoundException())
 
-        return Result.success(ExtractedVariant(experimentId, kind, variant))
+        return Result.success(ExtractedVariant(experimentId, kind, variant, config))
     }
 
     override fun storeNativeCrash(throwable: Throwable) {
