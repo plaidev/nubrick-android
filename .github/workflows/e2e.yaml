@@ -12,7 +12,6 @@ on:
 
 jobs:
   publish-e2e-app:
-    if: ${{ !startsWith(github.event.head_commit.message, '[bot] Release') }}
     runs-on: ubuntu-latest
     environment:
       name: Only Main

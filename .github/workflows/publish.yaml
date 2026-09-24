@@ -84,7 +84,7 @@ jobs:
           echo "Updated version to $VERSION_NUMBER"
 
           git add gradle/libs.versions.toml
-          git commit -m "[bot] Release ${TAG}: update version"
+          git commit -m "[bot] Release ${TAG}: update version [skip ci]"
 
       - name: Push release branch and create PR
         id: create_pr
