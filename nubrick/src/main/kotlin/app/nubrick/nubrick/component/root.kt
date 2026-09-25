@@ -302,23 +302,9 @@ internal fun ModalPage(
     blockData: PageBlockData,
     eventBridge: UIBlockActionBridge?,
     currentPageBlock: UIPageBlock?,
-    isFullscreen: Boolean,
     modifier: Modifier = Modifier,
     onDataChange: (JsonElement) -> Unit = {},
 ) {
-    val insetTop = if (blockData.block.data?.modalRespectSafeArea == true) {
-        if (isFullscreen) {
-            with(LocalDensity.current) {
-                WindowInsets.statusBars.getTop(this)
-                    .toDp() + 38.dp // status bar + nav header height
-            }
-        } else {
-            60.dp // nav header height
-        }
-    } else {
-        0.dp
-    }
-
     PageBlockProvider(
         blockData,
     ) {
@@ -331,7 +317,7 @@ internal fun ModalPage(
                 events = eventBridge?.events,
                 isCurrentPage = blockData.block.id == currentPageBlock?.id
             )
-            Page(block = blockData.block, modifier, insetTop)
+            Page(block = blockData.block, modifier = modifier, isModal = true)
         }
     }
 }
@@ -492,7 +478,8 @@ internal fun Root(
                         },
                         properties = bottomSheetProps,
                         dragHandle = {},
-                        contentWindowInsets = { WindowInsets(0)},
+                        // Each page opts into content insets without shrinking its background.
+                        contentWindowInsets = { WindowInsets(0) },
                         shape = RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp),
                         containerColor = sheetContainerColor,
                         tonalElevation = 0.dp, // to have the right background color as set in theme
@@ -525,21 +512,17 @@ internal fun Root(
                                 label = "Bottom Sheet"
                             ) {
                                 val stack = modalState.modalStack.getOrNull(it) ?: return@AnimatedContent
-                                val isFullscreen =
-                                    modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
                                 NavigationHeader(
                                     it,
                                     stack.block,
                                     onClose = { modalStateHolder.close() },
                                     onBack = { modalStateHolder.back(currentModalData()) },
-                                    isFullscreen,
                                 )
                                 ModalPage(
                                     arguments = arguments,
                                     blockData = stack,
                                     eventBridge = eventBridge,
                                     currentPageBlock = currentPageBlock,
-                                    isFullscreen = isFullscreen,
                                     onDataChange = { data -> modalDataByIndex[it] = data },
                                 )
                             }

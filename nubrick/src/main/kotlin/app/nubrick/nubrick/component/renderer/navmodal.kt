@@ -5,8 +5,13 @@ import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
@@ -17,11 +22,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.nubrick.nubrick.schema.UIPageBlock
+
+internal val ModalNavigationHeaderHeight = 60.dp
 
 @Composable
 internal fun ModalBottomSheetBackHandler(handler: () -> Unit) {
@@ -56,30 +62,29 @@ internal fun NavigationHeader(
     block: UIPageBlock,
     onClose: () -> Unit,
     onBack: () -> Unit,
-    isFullscreen: Boolean,
 ) {
     val visibility = block.data?.modalNavigationBackButton?.visible ?: true
-    val insetTop = with(LocalDensity.current) {
-        WindowInsets.statusBars.getTop(this).toDp() - 8.dp
-    }
+    if (!visibility) return
 
     Box(
         modifier = Modifier
             .zIndex(10f)
-            .offset(y = if (isFullscreen) insetTop else 8.dp)
+            .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+            )
+            .height(ModalNavigationHeaderHeight)
+            .padding(top = 8.dp)
     ) {
-        if (visibility) {
-            if (index > 0) {
-                IconButton(onClick = { onBack() }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-            } else {
-                IconButton(onClick = { onClose() }) {
-                    Icon(imageVector = Icons.Outlined.Close, contentDescription = "Close")
-                }
+        if (index > 0) {
+            IconButton(onClick = { onBack() }, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+        } else {
+            IconButton(onClick = { onClose() }, modifier = Modifier.size(48.dp)) {
+                Icon(imageVector = Icons.Outlined.Close, contentDescription = "Close")
             }
         }
     }

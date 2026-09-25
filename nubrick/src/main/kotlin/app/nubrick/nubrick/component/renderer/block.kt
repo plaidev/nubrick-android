@@ -2,8 +2,6 @@ package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import app.nubrick.nubrick.schema.CollectionKind
 import app.nubrick.nubrick.schema.UIBlock
 
@@ -11,10 +9,10 @@ import app.nubrick.nubrick.schema.UIBlock
 internal fun Block(
     block: UIBlock,
     modifier: Modifier = Modifier,
-    modalInsetTop: Dp = 0.dp
+    flexContentModifier: Modifier = Modifier,
 ) {
     return when (block) {
-        is UIBlock.UnionUIFlexContainerBlock -> Flex(block = block.data, modifier, modalInsetTop)
+        is UIBlock.UnionUIFlexContainerBlock -> Flex(block = block.data, modifier, flexContentModifier)
         is UIBlock.UnionUIImageBlock -> Image(block = block.data, modifier)
         is UIBlock.UnionUITextBlock -> Text(block = block.data, modifier)
         is UIBlock.UnionUICollectionBlock -> {
