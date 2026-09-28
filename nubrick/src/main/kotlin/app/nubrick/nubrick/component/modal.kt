@@ -14,15 +14,20 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 
+internal data class ModalEntry(val id: Long, val page: PageBlockData)
+
 internal data class ModalState(
-    val modalStack: List<PageBlockData> = emptyList(),
+    val modalStack: List<ModalEntry> = emptyList(),
     val displayedModalIndex: Int = -1,
     val modalVisibility: Boolean = false,
     val modalPresentationStyle: ModalPresentationStyle = ModalPresentationStyle.UNKNOWN,
     val modalScreenSize: ModalScreenSize = ModalScreenSize.UNKNOWN,
 ) {
-    val currentPageBlock: PageBlockData?
+    val currentEntry: ModalEntry?
         get() = modalStack.getOrNull(displayedModalIndex)
+
+    val currentPageBlock: PageBlockData?
+        get() = currentEntry?.page
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +41,7 @@ internal class ModalStateHolder(
 ) {
     var modalState by mutableStateOf(ModalState())
         private set
+    private var nextEntryId = 0L
 
     fun show(
         block: PageBlockData,
@@ -43,7 +49,7 @@ internal class ModalStateHolder(
         modalScreenSize: ModalScreenSize,
     ) {
         modalState = modalState.copy(
-            modalStack = modalState.modalStack + block,
+            modalStack = modalState.modalStack + ModalEntry(nextEntryId++, block),
             displayedModalIndex = modalState.modalStack.size,
             modalVisibility = true,
             modalPresentationStyle = if (modalState.modalVisibility) modalState.modalPresentationStyle else modalPresentationStyle,
@@ -55,7 +61,10 @@ internal class ModalStateHolder(
         if (index < 0 || index >= modalState.modalStack.size) {
             return
         }
-        modalState = modalState.copy(displayedModalIndex = index)
+        modalState = modalState.copy(
+            modalStack = modalState.modalStack.take(index + 1),
+            displayedModalIndex = index,
+        )
     }
 
     fun back(data: JsonElement) {
@@ -74,8 +83,7 @@ internal class ModalStateHolder(
             close()
             return
         }
-        // pop the stack
-        modalState = modalState.copy(displayedModalIndex = index - 1)
+        backTo(index - 1)
     }
 
     fun close(forceReset: Boolean = false, emitDispatch: Boolean = true) {
