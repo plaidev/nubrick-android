@@ -101,6 +101,39 @@ class ModalStateHolderTest {
     }
 
     @Test
+    fun backPopsPageBeforeOpeningAnotherBranch() {
+        val modal = holder()
+        modal.show(page("A"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+        modal.show(page("B"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+        modal.back(JsonNull)
+        assertEquals(listOf("A"), modal.modalState.modalStack.map { it.page.block.id })
+        modal.show(page("C"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+
+        assertEquals("C", modal.modalState.currentPageBlock?.block?.id)
+        assertEquals(listOf("A", "C"), modal.modalState.modalStack.map { it.page.block.id })
+        modal.back(JsonNull)
+        assertEquals("A", modal.modalState.currentPageBlock?.block?.id)
+    }
+
+    @Test
+    fun backToPopsAllPagesAboveDestinationBeforeOpeningAnotherBranch() {
+        val modal = holder()
+        for (id in listOf("A", "B", "C", "D")) {
+            modal.show(page(id), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+        }
+        modal.backTo(1)
+        assertEquals(listOf("A", "B"), modal.modalState.modalStack.map { it.page.block.id })
+        modal.show(page("E"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+
+        assertEquals("E", modal.modalState.currentPageBlock?.block?.id)
+        assertEquals(listOf("A", "B", "E"), modal.modalState.modalStack.map { it.page.block.id })
+        modal.back(JsonNull)
+        assertEquals("B", modal.modalState.currentPageBlock?.block?.id)
+        modal.back(JsonNull)
+        assertEquals("A", modal.modalState.currentPageBlock?.block?.id)
+    }
+
+    @Test
     fun backToJumpsWithinStackWithoutThrowing() {
         val modal = holder()
         modal.show(page("m1"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)

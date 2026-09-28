@@ -148,6 +148,30 @@ class RootStateHolderTest {
     }
 
     @Test
+    fun navigatingToAbandonedPageStartsNewBranch() {
+        val modal = modalHolder()
+        val holder = RootStateHolder(
+            root = UIRootBlock(
+                id = "root",
+                data = UIRootBlockData(
+                    pages = listOf("A", "B", "C").map { id ->
+                        UIPageBlock(id = id, data = UIPageBlockData(kind = PageKind.MODAL))
+                    },
+                ),
+            ),
+            modalStateHolder = modal,
+        )
+        for (id in listOf("A", "B", "C", "A", "C")) {
+            holder.handleNavigate(UIBlockAction(destinationPageId = id), JsonNull)
+        }
+
+        assertEquals("C", modal.modalState.currentPageBlock?.block?.id)
+        assertEquals(listOf("A", "C"), modal.modalState.modalStack.map { it.page.block.id })
+        modal.back(JsonNull)
+        assertEquals("A", modal.modalState.currentPageBlock?.block?.id)
+    }
+
+    @Test
     fun initializeOpensModalDestinationWithoutThrowing() {
         val modal = modalHolder()
         val holder = RootStateHolder(

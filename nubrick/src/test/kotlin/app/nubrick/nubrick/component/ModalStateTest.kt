@@ -20,7 +20,7 @@ class ModalStateTest {
             block = UIPageBlock(id = "m1", data = UIPageBlockData(kind = PageKind.MODAL)),
         )
         val state = ModalState(
-            modalStack = listOf(page),
+            modalStack = listOf(ModalEntry(id = 0, page = page)),
             displayedModalIndex = 0,
             modalVisibility = true,
         )

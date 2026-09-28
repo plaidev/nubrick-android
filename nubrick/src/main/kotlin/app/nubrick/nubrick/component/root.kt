@@ -251,10 +251,9 @@ internal class RootStateHolder(
 
         if (destBlock.data?.kind == PageKind.MODAL) {
             val index = modalStateHolder.modalState.modalStack.indexOfFirst {
-                it.block.id == destId
+                it.page.block.id == destId
             }
             if (index >= 0) {
-                // if it's already in modal stack, jump to the target stack
                 modalStateHolder.backTo(index)
                 return
             }
@@ -301,7 +300,7 @@ internal fun ModalPage(
     arguments: Any?,
     blockData: PageBlockData,
     eventBridge: UIBlockActionBridge?,
-    currentPageBlock: UIPageBlock?,
+    isCurrentPage: Boolean,
     modifier: Modifier = Modifier,
     onDataChange: (JsonElement) -> Unit = {},
 ) {
@@ -315,7 +314,7 @@ internal fun ModalPage(
             }
             UIBlockActionBridgeCollector(
                 events = eventBridge?.events,
-                isCurrentPage = blockData.block.id == currentPageBlock?.id
+                isCurrentPage = isCurrentPage
             )
             Page(block = blockData.block, modifier = modifier, isModal = true)
         }
@@ -423,16 +422,13 @@ internal fun Root(
     val currentPageBlock = rootStateHolder.currentPageBlock.value
     val displayedPageBlock = rootStateHolder.displayedPageBlock.value
     val modalState = modalStateHolder.modalState
-    val modalDataByIndex = remember(root) { mutableStateMapOf<Int, JsonElement>() }
+    val modalDataByEntry = remember(root) { mutableStateMapOf<Long, JsonElement>() }
     fun currentModalData(): JsonElement {
-        return modalDataByIndex[modalStateHolder.modalState.displayedModalIndex] ?: JsonNull
+        return modalStateHolder.modalState.currentEntry?.let { modalDataByEntry[it.id] } ?: JsonNull
     }
-    LaunchedEffect(modalState.modalStack.size) {
-        if (modalState.modalStack.isEmpty()) {
-            modalDataByIndex.clear()
-        } else {
-            modalDataByIndex.keys.removeAll { it >= modalState.modalStack.size }
-        }
+    LaunchedEffect(modalState.modalStack) {
+        val entryIds = modalState.modalStack.map { it.id }.toSet()
+        modalDataByEntry.keys.removeAll { it !in entryIds }
     }
 
     ContainerProvider(container = rootContainer) {
@@ -501,29 +497,35 @@ internal fun Root(
                             }
                         ) {
                             AnimatedContent(
-                                targetState = modalState.displayedModalIndex,
+                                targetState = modalState.displayedModalIndex to modalState.currentEntry,
+                                contentKey = { it.second?.id },
                                 transitionSpec = {
-                                    if (targetState > initialState) {
+                                    if (targetState.first > initialState.first) {
                                         slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
                                     } else {
                                         slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
                                     }
                                 },
                                 label = "Bottom Sheet"
-                            ) {
-                                val stack = modalState.modalStack.getOrNull(it) ?: return@AnimatedContent
+                            ) { (index, entry) ->
+                                if (entry == null) return@AnimatedContent
                                 NavigationHeader(
-                                    it,
-                                    stack.block,
-                                    onClose = { modalStateHolder.close() },
+                                    index,
+                                    entry.page.block,
+                                    onClose = { modalStateHolder.back(currentModalData()) },
                                     onBack = { modalStateHolder.back(currentModalData()) },
                                 )
                                 ModalPage(
                                     arguments = arguments,
-                                    blockData = stack,
+                                    blockData = entry.page,
                                     eventBridge = eventBridge,
-                                    currentPageBlock = currentPageBlock,
-                                    onDataChange = { data -> modalDataByIndex[it] = data },
+                                    isCurrentPage = entry.id == modalState.currentEntry?.id
+                                        && currentPageBlock?.data?.kind == PageKind.MODAL,
+                                    onDataChange = { data ->
+                                        if (modalStateHolder.modalState.modalStack.any { it.id == entry.id }) {
+                                            modalDataByEntry[entry.id] = data
+                                        }
+                                    },
                                 )
                             }
                         }
