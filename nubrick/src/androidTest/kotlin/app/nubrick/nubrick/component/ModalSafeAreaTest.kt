@@ -153,17 +153,28 @@ class ModalSafeAreaTest {
 
     private fun assertContentBox(left: Int, top: Int, right: Int, bottom: Int) {
         val pixels = composeRule.onNodeWithTag("viewport").captureToImage().toPixelMap()
+        fun assertPixelColor(expected: Color, x: Int, y: Int) {
+            val actual = pixels[x, y]
+            // Allow one 8-bit color level of screenshot rendering variation at boundaries.
+            // Keep the sampled positions exact so a one-pixel layout shift still fails.
+            val tolerance = 1f / 255f
+            assertEquals("Red at ($x, $y)", expected.red, actual.red, tolerance)
+            assertEquals("Green at ($x, $y)", expected.green, actual.green, tolerance)
+            assertEquals("Blue at ($x, $y)", expected.blue, actual.blue, tolerance)
+            assertEquals("Alpha at ($x, $y)", expected.alpha, actual.alpha, 0f)
+        }
+
         val centerX = (left + right) / 2
         val centerY = (top + bottom) / 2
-        assertEquals(Color.Blue, pixels[left, centerY])
-        assertEquals(Color.Red, pixels[left - 1, centerY])
-        assertEquals(Color.Blue, pixels[right - 1, centerY])
-        assertEquals(Color.Red, pixels[right, centerY])
-        assertEquals(Color.Blue, pixels[centerX, top])
-        assertEquals(Color.Red, pixels[centerX, top - 1])
-        assertEquals(Color.Blue, pixels[centerX, bottom - 1])
-        assertEquals(Color.Red, pixels[centerX, bottom])
-        assertEquals(Color.Red, pixels[0, 0])
-        assertEquals(Color.Red, pixels[239, 299])
+        assertPixelColor(Color.Blue, left, centerY)
+        assertPixelColor(Color.Red, left - 1, centerY)
+        assertPixelColor(Color.Blue, right - 1, centerY)
+        assertPixelColor(Color.Red, right, centerY)
+        assertPixelColor(Color.Blue, centerX, top)
+        assertPixelColor(Color.Red, centerX, top - 1)
+        assertPixelColor(Color.Blue, centerX, bottom - 1)
+        assertPixelColor(Color.Red, centerX, bottom)
+        assertPixelColor(Color.Red, 0, 0)
+        assertPixelColor(Color.Red, 239, 299)
     }
 }
