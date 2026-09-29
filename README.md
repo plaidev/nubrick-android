@@ -4,7 +4,7 @@
 
 - Runtime: Android `minSdk 26+`
 - Build: Android `compileSdk 36+`
-- Android Gradle Plugin `8.9.1+`
+- Android Gradle Plugin `8.9.1+`1
 
 ## Samples
 
