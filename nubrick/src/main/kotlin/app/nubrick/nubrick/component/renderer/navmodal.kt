@@ -1,8 +1,7 @@
 package app.nubrick.nubrick.component.renderer
 
-import android.os.Build
-import android.window.OnBackInvokedCallback
-import android.window.OnBackInvokedDispatcher
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.findViewTreeOnBackPressedDispatcherOwner
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -19,7 +18,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -31,27 +29,19 @@ internal val ModalNavigationHeaderHeight = 60.dp
 
 @Composable
 internal fun ModalBottomSheetBackHandler(handler: () -> Unit) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        return
-    }
-
     val currentHandler = rememberUpdatedState(handler)
     val view = LocalView.current
-    val callback = remember {
-        OnBackInvokedCallback {
-            currentHandler.value()
+    DisposableEffect(view) {
+        // The sheet has its own dialog window. The composition can inherit the
+        // Activity's dispatcher, so resolve the dialog's owner from its view tree.
+        val dispatcher = view.findViewTreeOnBackPressedDispatcherOwner()?.onBackPressedDispatcher
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = currentHandler.value()
         }
-    }
-
-    DisposableEffect(view, callback) {
-        val dispatcher = view.findOnBackInvokedDispatcher()
-        dispatcher?.registerOnBackInvokedCallback(
-            OnBackInvokedDispatcher.PRIORITY_OVERLAY,
-            callback
-        )
+        dispatcher?.addCallback(callback)
 
         onDispose {
-            dispatcher?.unregisterOnBackInvokedCallback(callback)
+            callback.remove()
         }
     }
 }

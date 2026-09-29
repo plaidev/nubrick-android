@@ -83,29 +83,129 @@ class LinkNavigationTest {
         val firstLaunch = stateHolder.webviewData.value
             ?: error("Expected the first browser launch")
 
-        val completed = stateHolder.handleWebviewDismiss(firstLaunch.launchId)
+        val completed = stateHolder.handleWebviewDismiss(firstLaunch.launchId) { trigger ->
+            assertEquals(visiblePage.id, stateHolder.currentPageBlock.value?.id)
+            assertNull(stateHolder.webviewData.value)
+            stateHolder.handleNavigate(trigger, JsonNull)
+        }
 
         assertEquals(firstWebPage.id, completed?.pageBlock?.id)
-        assertEquals(visiblePage.id, stateHolder.currentPageBlock.value?.id)
-        assertNull(stateHolder.webviewData.value)
-
-        stateHolder.handleNavigate(
-            action = completed?.trigger ?: error("Expected a chained trigger"),
-            rootData = JsonNull,
-        )
         val secondLaunch = stateHolder.webviewData.value
             ?: error("Expected the chained browser launch")
 
         assertNotEquals(firstLaunch.launchId, secondLaunch.launchId)
         assertEquals(secondWebPage.id, stateHolder.currentPageBlock.value?.id)
-        assertNull(stateHolder.handleWebviewDismiss(firstLaunch.launchId))
+        assertNull(stateHolder.handleWebviewDismiss(firstLaunch.launchId) { error("Stale launch") })
         assertEquals(secondLaunch.launchId, stateHolder.webviewData.value?.launchId)
 
-        stateHolder.handleWebviewDismiss(secondLaunch.launchId)
+        stateHolder.handleWebviewDismiss(secondLaunch.launchId) { error("No return action") }
 
         assertEquals(visiblePage.id, stateHolder.currentPageBlock.value?.id)
         assertNull(stateHolder.webviewData.value)
     }
+
+    @Test
+    fun standaloneWebModalDismissesOnceAndCanStartAgain() {
+        var dismissed = 0
+        val holder = standaloneWebHolder { dismissed++ }
+        repeat(2) {
+            holder.initialize(JsonNull)
+            val launchId = holder.webviewData.value!!.launchId
+            holder.handleWebviewDismiss(launchId) { error("No return action") }
+            assertNull(holder.currentPageBlock.value)
+            assertNull(holder.webviewData.value)
+            assertEquals(it + 1, dismissed)
+            assertNull(holder.handleWebviewDismiss(launchId) { error("Duplicate completion") })
+            assertEquals(it + 1, dismissed)
+        }
+    }
+
+    @Test
+    fun eventOnlyWebReturnActionRunsBeforeRootIsReleased() {
+        val events = mutableListOf<String>()
+        val holder = standaloneWebHolder(UIBlockAction(eventName = "returned")) { events += "dismissed" }
+        holder.initialize(JsonNull)
+        holder.handleWebviewDismiss(holder.webviewData.value!!.launchId) { events += it.eventName!! }
+        assertEquals(listOf("returned", "dismissed"), events)
+    }
+
+    @Test
+    fun standaloneWebReturnCanNavigateWithoutDismissingRoot() {
+        var dismissed = 0
+        val next = UIPageBlock(id = "next", data = UIPageBlockData(kind = PageKind.COMPONENT))
+        val holder = standaloneWebHolder(UIBlockAction(destinationPageId = "next"), listOf(next)) { dismissed++ }
+        holder.initialize(JsonNull)
+        holder.handleWebviewDismiss(holder.webviewData.value!!.launchId) {
+            holder.handleNavigate(it, JsonNull)
+        }
+        assertEquals("next", holder.currentPageBlock.value?.id)
+        assertEquals(0, dismissed)
+    }
+
+    @Test
+    fun standaloneBrowserChainIsReleasedOnlyAfterLastBrowserCloses() {
+        var dismissed = 0
+        val next = UIPageBlock(
+            id = "next",
+            data = UIPageBlockData(kind = PageKind.WEBVIEW_MODAL, webviewUrl = "https://example.com/next"),
+        )
+        val holder = standaloneWebHolder(UIBlockAction(destinationPageId = "next"), listOf(next)) { dismissed++ }
+        holder.initialize(JsonNull)
+        val firstLaunchId = holder.webviewData.value!!.launchId
+        holder.handleWebviewDismiss(firstLaunchId) { holder.handleNavigate(it, JsonNull) }
+        assertEquals(0, dismissed)
+        val lastLaunchId = holder.webviewData.value!!.launchId
+        assertNotEquals(firstLaunchId, lastLaunchId)
+        holder.handleWebviewDismiss(lastLaunchId) { error("No return action") }
+        assertEquals(1, dismissed)
+        assertNull(holder.currentPageBlock.value)
+    }
+
+    @Test
+    fun navigationAwayWhileBrowserIsOpenIsNotDismissedOnReturn() {
+        var dismissed = 0
+        val next = UIPageBlock(id = "next", data = UIPageBlockData(kind = PageKind.COMPONENT))
+        val holder = standaloneWebHolder(extraPages = listOf(next)) { dismissed++ }
+        holder.initialize(JsonNull)
+        val launchId = holder.webviewData.value!!.launchId
+        holder.handleNavigate(UIBlockAction(destinationPageId = "next"), JsonNull)
+        holder.handleWebviewDismiss(launchId) { error("No return action") }
+        assertEquals("next", holder.currentPageBlock.value?.id)
+        assertEquals(0, dismissed)
+    }
+
+    private fun standaloneWebHolder(
+        returnAction: UIBlockAction? = null,
+        extraPages: List<UIPageBlock> = emptyList(),
+        onDismiss: () -> Unit,
+    ) = RootStateHolder(
+        root = UIRootBlock(
+            id = "root",
+            data = UIRootBlockData(
+                pages = listOf(
+                    UIPageBlock(
+                        id = "trigger",
+                        data = UIPageBlockData(
+                            kind = PageKind.TRIGGER,
+                            triggerSetting = TriggerSetting(
+                                onTrigger = UIBlockAction(destinationPageId = "web"),
+                            ),
+                        ),
+                    ),
+                    UIPageBlock(
+                        id = "web",
+                        data = UIPageBlockData(
+                            kind = PageKind.WEBVIEW_MODAL,
+                            webviewUrl = "https://example.com",
+                            triggerSetting = returnAction?.let { TriggerSetting(onTrigger = it) },
+                        ),
+                    ),
+                ) + extraPages,
+            ),
+        ),
+        modalStateHolder = mock(ModalStateHolder::class.java),
+        onDismiss = { onDismiss() },
+    )
 
     @Test
     fun emptyDeepLinkStillNavigatesToDestination() {
