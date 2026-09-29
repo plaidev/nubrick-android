@@ -6,6 +6,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridge
 import app.nubrick.nubrick.data.NotFoundException
@@ -57,6 +60,26 @@ class ModalNavigationTest {
         composeRule.onNodeWithContentDescription("Close").performClick()
         composeRule.onNodeWithText("Page A").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(1, dismissed) }
+    }
+
+    @Test
+    fun closeDismissesExpandedResizableSheetInOneTap() {
+        var dismissed = 0
+        render(
+            modalPages = listOf(page("A", screenSize = ModalScreenSize.UNKNOWN)),
+            onDismiss = { dismissed++ },
+        )
+        expandSheet()
+
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithText("Page A").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
+    }
+
+    private fun expandSheet() {
+        composeRule.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand))
+            .performSemanticsAction(SemanticsActions.Expand) { it() }
+        composeRule.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Collapse)).assertExists()
     }
 
     @Test
@@ -136,11 +159,15 @@ class ModalNavigationTest {
         composeRule.waitForIdle()
     }
 
-    private fun page(id: String, backAction: UIBlockAction? = null) = UIPageBlock(
+    private fun page(
+        id: String,
+        backAction: UIBlockAction? = null,
+        screenSize: ModalScreenSize = ModalScreenSize.LARGE,
+    ) = UIPageBlock(
         id = id,
         data = UIPageBlockData(
             kind = PageKind.MODAL,
-            modalScreenSize = ModalScreenSize.LARGE,
+            modalScreenSize = screenSize,
             triggerSetting = backAction?.let { TriggerSetting(onTrigger = it) },
             renderAs = UIBlock.UnionUITextBlock(
                 UITextBlock(data = UITextBlockData(value = "Page $id")),

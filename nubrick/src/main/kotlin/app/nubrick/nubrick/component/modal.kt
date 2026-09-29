@@ -67,7 +67,7 @@ internal class ModalStateHolder(
         )
     }
 
-    fun back(data: JsonElement) {
+    fun back(data: JsonElement, collapseExpandedSheet: Boolean = true) {
         val currentPageBlock = modalState.currentPageBlock
         if (currentPageBlock == null) {
             close(forceReset = true, emitDispatch = false)
@@ -80,7 +80,7 @@ internal class ModalStateHolder(
 
         val index = modalState.displayedModalIndex
         if (index <= 0) {
-            close()
+            close(forceReset = !collapseExpandedSheet)
             return
         }
         backTo(index - 1)

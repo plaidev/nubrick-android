@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.util.Log
-import androidx.activity.compose.BackHandler
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
@@ -283,13 +282,22 @@ internal class RootStateHolder(
         modalStateHolder.close(forceReset = true, emitDispatch = emitDispatch)
     }
 
-    fun handleWebviewDismiss(launchId: Long): WebviewData? {
+    fun handleWebviewDismiss(launchId: Long, onTrigger: (UIBlockAction) -> Unit): WebviewData? {
         val dismissedData = this.webviewData.value?.takeIf { it.launchId == launchId }
             ?: return null
 
         this.webviewData.value = null
         if (this.currentPageBlock.value?.id == dismissedData.pageBlock.id) {
             this.currentPageBlock.value = dismissedData.previousPageBlock
+        }
+        dismissedData.trigger?.let(onTrigger)
+        // Finish a standalone browser flow after its return action. A navigation
+        // destination (including DISMISSED) owns its own presentation/cleanup.
+        if (dismissedData.trigger?.destinationPageId.isNullOrEmpty()
+            && this.currentPageBlock.value == null
+            && this.webviewData.value == null
+        ) {
+            onDismiss(root)
         }
         return dismissedData
     }
@@ -454,9 +462,6 @@ internal fun Root(
                 }
 
                 if (modalState.modalVisibility) {
-                    BackHandler(true) {
-                        modalStateHolder.back(currentModalData())
-                    }
                     val isLarge =
                         modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
                                 || modalState.modalScreenSize == ModalScreenSize.LARGE
@@ -512,7 +517,9 @@ internal fun Root(
                                 NavigationHeader(
                                     index,
                                     entry.page.block,
-                                    onClose = { modalStateHolder.back(currentModalData()) },
+                                    onClose = {
+                                        modalStateHolder.back(currentModalData(), collapseExpandedSheet = false)
+                                    },
                                     onBack = { modalStateHolder.back(currentModalData()) },
                                 )
                                 ModalPage(
@@ -537,9 +544,7 @@ internal fun Root(
                     WebLinkReturnTracker()
                 }
                 val currentWebLinkCompletion = rememberUpdatedState<(Long) -> Unit> { launchId ->
-                    val dismissedData = rootStateHolder.handleWebviewDismiss(launchId)
-                        ?: return@rememberUpdatedState
-                    dismissedData.trigger?.let { trigger ->
+                    rootStateHolder.handleWebviewDismiss(launchId) { trigger ->
                         listener(trigger, latestRootData.value)
                     }
                 }
