@@ -24,6 +24,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -293,7 +294,7 @@ class ContainerSurveyResponseTest {
     }
 
     @Test
-    fun `fetchTriggerContent tracks user event and appends popup history`() = runBlocking {
+    fun `trigger event recording is separate from fetching and popup exposure`() = runBlocking {
         val trackRepository = FakeTrackRepository()
         val databaseRepository = FakeDatabaseRepository()
         val container = newContainer(
@@ -307,20 +308,24 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        container.fetchTriggerContent(
-            "open", listOf(ExperimentKind.POPUP), sourceExperimentId = "source-exp",
-        ).getOrThrow()
+        assertTrue(container.recordTriggerEvent("open", sourceExperimentId = "source-exp"))
+        container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP)).getOrThrow()
 
         assertEquals("source-exp", trackRepository.userEvents.single().experimentId)
         assertEquals(listOf("open"), trackRepository.userEvents.map { it.name })
         assertEquals(listOf("open"), databaseRepository.userEvents)
+        assertTrue(trackRepository.experimentEvents.isEmpty())
+        assertTrue(databaseRepository.experimentHistories.isEmpty())
+
+        container.recordDisplayedTriggerContent("trigger-exp", "trigger-var")
+
         assertEquals(1, trackRepository.experimentEvents.size)
         assertEquals("trigger-exp", trackRepository.experimentEvents.single().experimentId)
         assertEquals(listOf("trigger-exp"), databaseRepository.experimentHistories)
     }
 
     @Test
-    fun `fetchTriggerContent skips experiment history for TOOLTIP`() = runBlocking {
+    fun `trigger content fetch defers tooltip exposure and history until display`() = runBlocking {
         val trackRepository = FakeTrackRepository()
         val databaseRepository = FakeDatabaseRepository()
         val container = newContainer(
@@ -343,6 +348,7 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
+        assertTrue(container.recordTriggerEvent("open"))
         val (_, kind) = container.fetchTriggerContent(
             "open",
             listOf(ExperimentKind.TOOLTIP),
@@ -350,13 +356,18 @@ class ContainerSurveyResponseTest {
 
         assertEquals(ExperimentKind.TOOLTIP, kind)
         assertNull(trackRepository.userEvents.single().experimentId)
-        assertEquals(1, trackRepository.experimentEvents.size)
+        assertTrue(trackRepository.experimentEvents.isEmpty())
         assertTrue(databaseRepository.experimentHistories.isEmpty())
         assertEquals(listOf("open"), databaseRepository.userEvents)
+
+        container.recordDisplayedTriggerContent("tooltip-exp", "tooltip-var")
+
+        assertEquals("tooltip-exp", trackRepository.experimentEvents.single().experimentId)
+        assertEquals(listOf("tooltip-exp"), databaseRepository.experimentHistories)
     }
 
     @Test
-    fun `fetchTriggerContent records user event even when config fetch fails`() = runBlocking {
+    fun `trigger event remains recorded when content fetch fails`() = runBlocking {
         val trackRepository = FakeTrackRepository()
         val databaseRepository = FakeDatabaseRepository()
         val container = newContainer(
@@ -367,9 +378,8 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        val result = container.fetchTriggerContent(
-            "open", listOf(ExperimentKind.POPUP), sourceExperimentId = "source-exp",
-        )
+        assertTrue(container.recordTriggerEvent("open", sourceExperimentId = "source-exp"))
+        val result = container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP))
 
         assertEquals("source-exp", trackRepository.userEvents.single().experimentId)
         assertTrue(result.isFailure)
@@ -429,6 +439,64 @@ class ContainerSurveyResponseTest {
         assertEquals(ExperimentKind.POPUP, kind)
         assertEquals("newer", content.experimentId)
         assertEquals("newer-variant", content.variantId)
+    }
+
+    @Test
+    fun `trigger events can be recorded without selecting an experiment`() = runBlocking {
+        val track = FakeTrackRepository()
+        val database = FakeDatabaseRepository()
+        val container = newContainer(trackRepository = track, databaseRepository = database)
+        assertTrue(container.recordTriggerEvent("one", "source"))
+        assertTrue(container.recordTriggerEvent("two", "source"))
+        assertEquals(listOf("one", "two"), database.userEvents)
+        assertEquals(listOf("source", "source"), track.userEvents.map { it.experimentId })
+        assertTrue(database.frequencyChecks.isEmpty())
+        assertTrue(database.experimentHistories.isEmpty())
+        assertTrue(track.experimentEvents.isEmpty())
+    }
+
+    @Test
+    fun `recordTriggerEvent reports local persistence failure`() = runBlocking {
+        val track = FakeTrackRepository()
+        val database = FakeDatabaseRepository(writesSucceed = false)
+        val container = newContainer(trackRepository = track, databaseRepository = database)
+
+        assertFalse(container.recordTriggerEvent("open", "source"))
+
+        assertEquals(listOf("open"), database.userEvents)
+        assertEquals(listOf("open"), track.userEvents.map { it.name })
+        assertEquals("source", track.userEvents.single().experimentId)
+    }
+
+    @Test
+    fun `batch continues config selection but never falls back after winner content fails`() = runBlocking {
+        val track = FakeTrackRepository()
+        val database = FakeDatabaseRepository()
+        val container = newContainer(
+            experimentRepository = FakeExperimentRepository(
+                triggerConfigsByName = mapOf(
+                    "fallback" to ExperimentConfigs(configs = listOf(popupConfig())),
+                    "winner" to ExperimentConfigs(configs = listOf(ExperimentConfig(
+                        id = "winner", kind = ExperimentKind.POPUP, priority = 10,
+                        baseline = ExperimentVariant(id = "winner-var", configs = listOf(VariantConfig(value = "missing"))),
+                    ))),
+                )
+            ),
+            componentRepository = FakeComponentRepository(mapOf(
+                ("trigger-exp" to "component-1") to UIBlock.UnionUIRootBlock(UIRootBlock(id = "fallback"))
+            )),
+            trackRepository = track,
+            databaseRepository = database,
+        )
+        val recordedTriggers = listOf("missing", "fallback", "winner").filter {
+            container.recordTriggerEvent(it)
+        }
+        val result = container.fetchTriggerContent(recordedTriggers, listOf(ExperimentKind.POPUP))
+        assertTrue(result.isFailure)
+        assertEquals(listOf("missing", "fallback", "winner"), database.userEvents)
+        assertEquals(listOf("trigger-exp", "winner"), database.frequencyChecks.map { it.first })
+        assertTrue(track.experimentEvents.isEmpty())
+        assertTrue(database.experimentHistories.isEmpty())
     }
 
     @Test

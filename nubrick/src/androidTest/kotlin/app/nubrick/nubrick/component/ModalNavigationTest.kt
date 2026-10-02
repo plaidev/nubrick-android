@@ -37,6 +37,60 @@ class ModalNavigationTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun displayCallbackFiresAfterPresentationAndNotForInternalNavigation() {
+        var shown = 0
+        render(
+            backAction = UIBlockAction(destinationPageId = "B"),
+            onShown = { shown++ },
+        )
+        composeRule.runOnIdle { assertEquals(1, shown) }
+        composeRule.onNodeWithContentDescription("Close").performClick()
+        composeRule.onNodeWithText("Page B").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(1, shown) }
+    }
+
+    @Test
+    fun nonPresentingTriggerRootCompletesWithoutDisplay() {
+        var shown = 0
+        var dismissed = 0
+        composeRule.setContent {
+            Root(
+                container = FakeContainer(Result.failure(NotFoundException())),
+                root = UIRootBlock(id = "empty"),
+                embeddingVisibility = false,
+                onShown = { shown++ },
+                onDismiss = { dismissed++ },
+            )
+        }
+        composeRule.runOnIdle {
+            assertEquals(0, shown)
+            assertEquals(1, dismissed)
+        }
+    }
+
+    @Test
+    fun triggerRootCompletesWhenNavigationLeavesPresentedModal() {
+        val bridge = UIBlockActionBridge()
+        var dismissed = 0
+        render(
+            modalPages = listOf(
+                page("A"),
+                UIPageBlock(
+                    id = "B",
+                    data = UIPageBlockData(kind = PageKind.COMPONENT),
+                ),
+            ),
+            eventBridge = bridge,
+            embeddingVisibility = false,
+            onDismiss = { dismissed++ },
+        )
+
+        composeRule.onNodeWithText("Page A").assertIsDisplayed()
+        runBlocking { bridge.dispatch("""{"destinationPageId":"B"}""") }
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
+    }
+
+    @Test
     fun firstPageCloseRunsConfiguredBackAction() {
         var dismissed = 0
         render(
@@ -129,8 +183,10 @@ class ModalNavigationTest {
     private fun render(
         backAction: UIBlockAction? = null,
         onDismiss: () -> Unit = {},
+        onShown: () -> Unit = {},
         modalPages: List<UIPageBlock> = listOf(page("A", backAction), page("B")),
         eventBridge: UIBlockActionBridge? = null,
+        embeddingVisibility: Boolean = true,
     ) {
         val root = UIRootBlock(
             id = "root",
@@ -152,7 +208,9 @@ class ModalNavigationTest {
             Root(
                 container = FakeContainer(Result.failure(NotFoundException())),
                 root = root,
+                embeddingVisibility = embeddingVisibility,
                 onDismiss = { onDismiss() },
+                onShown = onShown,
                 eventBridge = eventBridge,
             )
         }

@@ -271,10 +271,10 @@ private class NubrickRuntime(
         this.container.sendFlutterCrash(crashEvent)
     }
 
-    fun appendTooltipExperimentHistory(experimentId: String) {
-        if (experimentId.isEmpty()) return
+    fun appendTooltipExperimentHistory(experimentId: String, variantId: String) {
+        if (experimentId.isEmpty() || variantId.isEmpty()) return
         this.sdkScope.launch {
-            this@NubrickRuntime.container.appendExperimentHistory(experimentId)
+            this@NubrickRuntime.container.recordDisplayedTriggerContent(experimentId, variantId)
         }
     }
 
@@ -526,9 +526,9 @@ object NubrickSDK {
     }
 
     @FlutterBridgeApi
-    fun appendTooltipExperimentHistory(experimentId: String) {
+    fun appendTooltipExperimentHistory(experimentId: String, variantId: String) {
         val current = runtimeOrNull(throwInDebug = true) ?: return
-        current.appendTooltipExperimentHistory(experimentId)
+        current.appendTooltipExperimentHistory(experimentId, variantId)
     }
 
     @JvmStatic
