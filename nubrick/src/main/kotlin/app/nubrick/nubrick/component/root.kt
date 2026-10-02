@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -70,6 +71,7 @@ import app.nubrick.nubrick.schema.UIPageBlock
 import app.nubrick.nubrick.schema.UIRootBlock
 import app.nubrick.nubrick.template.compile
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 
@@ -197,6 +199,7 @@ internal class RootStateHolder(
             throw e
         } catch (e: Throwable) {
             Log.w("NubrickSDK", "Failed to initialize root", e)
+            onDismiss(root)
         }
     }
 
@@ -223,6 +226,7 @@ internal class RootStateHolder(
             it.id == destId
         }
         if (destBlock == null) {
+            if (currentPageBlock.value == null) onDismiss(root)
             return
         }
 
@@ -350,6 +354,7 @@ internal fun Root(
     embeddingVisibility: Boolean = true,
     onEvent: (event: Event) -> Unit = {},
     onNextTooltip: (pageId: String) -> Unit = {},
+    onShown: () -> Unit = {},
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
     eventBridge: UIBlockActionBridge? = null,
     onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
@@ -363,6 +368,7 @@ internal fun Root(
             variantId = variantId ?: container.variantId,
         )
     }
+    val currentOnShown = rememberUpdatedState(onShown)
     val currentOnEvent = rememberUpdatedState(onEvent)
     val currentOnNextTooltip = rememberUpdatedState(onNextTooltip)
     val currentOnDismiss = rememberUpdatedState(onDismiss)
@@ -439,6 +445,25 @@ internal fun Root(
     val currentPageBlock = rootStateHolder.currentPageBlock.value
     val displayedPageBlock = rootStateHolder.displayedPageBlock.value
     val modalState = modalStateHolder.modalState
+    val webviewData = rootStateHolder.webviewData.value
+    LaunchedEffect(
+        rootStateHolder,
+        embeddingVisibility,
+        currentPageBlock,
+        modalState.modalVisibility,
+        webviewData,
+    ) {
+        // Trigger roots have no embedded surface. Release them whenever navigation
+        // leaves both the modal and browser presentation paths, not only at startup.
+        if (!embeddingVisibility &&
+            currentPageBlock != null &&
+            currentPageBlock.data?.kind != PageKind.MODAL &&
+            !modalState.modalVisibility &&
+            webviewData == null
+        ) {
+            currentOnDismiss.value(root)
+        }
+    }
     val modalDataByEntry = remember(root) { mutableStateMapOf<Long, JsonElement>() }
     fun currentModalData(): JsonElement {
         return modalStateHolder.modalState.currentEntry?.let { modalDataByEntry[it.id] } ?: JsonNull
@@ -479,6 +504,13 @@ internal fun Root(
                         ?.block
                         ?.let(::modalContainerColor)
                         ?: MaterialTheme.colorScheme.surface
+                    LaunchedEffect(activeSheetState) {
+                        snapshotFlow {
+                            activeSheetState.isVisible && !activeSheetState.isAnimationRunning &&
+                                activeSheetState.currentValue == activeSheetState.targetValue
+                        }.first { it }
+                        currentOnShown.value()
+                    }
                     ModalBottomSheet(
                         sheetState = activeSheetState,
                         sheetGesturesEnabled = !isFullScreen,
@@ -567,7 +599,6 @@ internal fun Root(
                     }
                 }
 
-                val webviewData = rootStateHolder.webviewData.value
                 val webLinkReturnTracker = remember(rootStateHolder) {
                     WebLinkReturnTracker()
                 }
@@ -605,6 +636,7 @@ internal fun Root(
                     try {
                         val customTabsIntent = CustomTabsIntent.Builder().build()
                         customTabsIntent.launchUrl(context, data.url.toUri())
+                        currentOnShown.value()
                     } catch (_: Throwable) {
                         webLinkReturnTracker.cancel(data.launchId)
                         currentWebLinkCompletion.value(data.launchId)

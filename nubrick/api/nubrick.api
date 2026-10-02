@@ -107,7 +107,7 @@ public final class app/nubrick/nubrick/NubrickSDK {
 	public static final field INSTANCE Lapp/nubrick/nubrick/NubrickSDK;
 	public final fun Embedding (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public final fun RemoteConfig (Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
-	public final fun appendTooltipExperimentHistory (Ljava/lang/String;)V
+	public final fun appendTooltipExperimentHistory (Ljava/lang/String;Ljava/lang/String;)V
 	public static final fun createConfig (Ljava/lang/String;)Lapp/nubrick/nubrick/Config;
 	public static final fun createConfig (Ljava/lang/String;Lapp/nubrick/nubrick/NubrickGlobalEventListener;)Lapp/nubrick/nubrick/Config;
 	public static final fun createConfig (Ljava/lang/String;Lapp/nubrick/nubrick/NubrickGlobalEventListener;Lapp/nubrick/nubrick/NubrickDispatchListener;)Lapp/nubrick/nubrick/Config;

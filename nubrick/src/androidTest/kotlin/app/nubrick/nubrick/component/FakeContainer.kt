@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonObject
  * Minimal [Container] for Compose Embedding smoke tests.
  * Only [fetchEmbedding] is meaningful; other members are stubs.
  */
-internal class FakeContainer(
+internal open class FakeContainer(
     private val embeddingResult: Result<ExperimentContent>,
 ) : Container {
     override val experimentId: String? = null
@@ -78,19 +78,21 @@ internal class FakeContainer(
     override suspend fun fetchTriggerContent(
         trigger: String,
         kinds: List<ExperimentKind>,
-        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> =
         Result.failure(UnsupportedOperationException("not used in smoke test"))
 
     override suspend fun fetchTriggerContent(
         triggers: List<String>,
         kinds: List<ExperimentKind>,
-        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> =
         Result.failure(UnsupportedOperationException("not used in smoke test"))
 
     override suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant> =
         Result.failure(UnsupportedOperationException("not used in smoke test"))
+
+    override suspend fun recordTriggerEvent(name: String, sourceExperimentId: String?): Boolean = true
+
+    override suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String) {}
 
     override suspend fun appendExperimentHistory(experimentId: String) {}
 

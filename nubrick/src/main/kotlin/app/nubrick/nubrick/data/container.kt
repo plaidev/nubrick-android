@@ -95,14 +95,14 @@ internal interface Container {
     suspend fun fetchTriggerContent(
         trigger: String,
         kinds: List<ExperimentKind>,
-        sourceExperimentId: String? = null,
     ): Result<Pair<ExperimentContent, ExperimentKind>>
     suspend fun fetchTriggerContent(
         triggers: List<String>,
         kinds: List<ExperimentKind>,
-        sourceExperimentId: String? = null,
     ): Result<Pair<ExperimentContent, ExperimentKind>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
+    suspend fun recordTriggerEvent(name: String, sourceExperimentId: String? = null): Boolean
+    suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String)
     suspend fun appendExperimentHistory(experimentId: String)
 
     fun storeNativeCrash(throwable: Throwable)
@@ -275,23 +275,17 @@ internal class ContainerImpl(
     override suspend fun fetchTriggerContent(
         trigger: String,
         kinds: List<ExperimentKind>,
-        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> = fetchTriggerContent(
         triggers = listOf(trigger),
         kinds = kinds,
-        sourceExperimentId = sourceExperimentId,
     )
 
     override suspend fun fetchTriggerContent(
         triggers: List<String>,
         kinds: List<ExperimentKind>,
-        sourceExperimentId: String?,
     ): Result<Pair<ExperimentContent, ExperimentKind>> {
         var selected: ExtractedVariant? = null
         for (trigger in triggers) {
-            this.trackRepository.trackEvent(TrackUserEvent(trigger, experimentId = sourceExperimentId))
-            if (!this.databaseRepository.appendUserEvent(trigger)) continue
-
             val configs = this.experimentRepository.fetchTriggerExperimentConfigs(trigger).getOrNull()
                 ?: continue
             val extracted = this.extractVariant(configs = configs, kinds).getOrNull() ?: continue
@@ -301,19 +295,6 @@ internal class ContainerImpl(
         }
         val extracted = selected ?: return Result.failure(NotFoundException())
         val variantId = extracted.variant.id ?: return Result.failure(NotFoundException())
-        this.trackRepository.trackExperimentEvent(
-            TrackExperimentEvent(
-                experimentId = extracted.experimentId,
-                variantId = variantId,
-            )
-        )
-        // Tooltip is a Flutter-only flow. Persist tooltip history only after
-        // Flutter confirms the tooltip actually started rendering.
-        if (extracted.kind != ExperimentKind.TOOLTIP &&
-            !this.databaseRepository.appendExperimentHistory(extracted.experimentId)
-        ) {
-            return Result.failure(IllegalStateException("Couldn't save experiment history"))
-        }
         val componentId = extractComponentId(extracted.variant) ?: return Result.failure(NotFoundException())
         val component =
             this.componentRepository.fetchComponent(extracted.experimentId, componentId).getOrElse {
@@ -347,6 +328,16 @@ internal class ContainerImpl(
             return Result.failure(IllegalStateException("Couldn't save experiment history"))
         }
         return Result.success(extracted.variant)
+    }
+
+    override suspend fun recordTriggerEvent(name: String, sourceExperimentId: String?): Boolean {
+        trackRepository.trackEvent(TrackUserEvent(name, experimentId = sourceExperimentId))
+        return databaseRepository.appendUserEvent(name)
+    }
+
+    override suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String) {
+        trackRepository.trackExperimentEvent(TrackExperimentEvent(experimentId, variantId))
+        appendExperimentHistory(experimentId)
     }
 
     override suspend fun appendExperimentHistory(experimentId: String) {
