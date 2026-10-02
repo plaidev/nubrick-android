@@ -79,9 +79,11 @@ class TriggerDispatchAndroidTest {
                         handled.countDown()
                         null
                     }
-                    // Avoid NPE after the callback: production continues to fetchTriggerContent.
+                    "recordTriggerEvent" -> {
+                        sourceExperimentId.set(invocation.getArgument<String?>(1))
+                        true
+                    }
                     "fetchTriggerContent" -> {
-                        sourceExperimentId.set(invocation.getArgument<String?>(2))
                         fetched.countDown()
                         Result.failure<Any>(UnsupportedOperationException("unused"))
                     }
@@ -123,6 +125,7 @@ class TriggerDispatchAndroidTest {
                         }
                         null
                     }
+                    "recordTriggerEvent" -> true
                     "fetchTriggerContent" -> {
                         fetched.countDown()
                         Result.failure<Any>(UnsupportedOperationException("unused"))
