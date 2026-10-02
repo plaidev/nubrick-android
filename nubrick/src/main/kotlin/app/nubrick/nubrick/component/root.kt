@@ -471,9 +471,9 @@ internal fun Root(
                 }
 
                 if (modalState.modalVisibility) {
-                    val isLarge =
-                        modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
-                                || modalState.modalScreenSize == ModalScreenSize.LARGE
+                    val isFullScreen = modalState.modalPresentationStyle ==
+                        ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
+                    val isLarge = isFullScreen || modalState.modalScreenSize == ModalScreenSize.LARGE
                     val activeSheetState = if (isLarge) largeSheetState else sheetState
                     val sheetContainerColor = modalState.currentPageBlock
                         ?.block
@@ -481,6 +481,7 @@ internal fun Root(
                         ?: MaterialTheme.colorScheme.surface
                     ModalBottomSheet(
                         sheetState = activeSheetState,
+                        sheetGesturesEnabled = !isFullScreen,
                         onDismissRequest = {
                             modalStateHolder.close()
                         },
@@ -501,21 +502,19 @@ internal fun Root(
                             val statusBarTop = with(density) {
                                 WindowInsets.statusBars.getTop(this).toDp()
                             }
-                            val fullScreen = modalState.modalPresentationStyle ==
-                                ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
                             val contentHeight = if (modalState.modalScreenSize == ModalScreenSize.MEDIUM) {
                                 LocalConfiguration.current.screenHeightDp.dp * 0.5f
                             } else {
                                 LocalConfiguration.current.screenHeightDp.dp - statusBarTop
                             }
-                            val contentSizeModifier = if (fullScreen) {
+                            val contentSizeModifier = if (isFullScreen) {
                                 Modifier.fillMaxSize()
                             } else {
                                 Modifier.height(contentHeight)
                             }
                             // This scope has the sheet's layout constraints before its content is
                             // composed. Use the expanded anchor, not the animated current offset.
-                            val sheetHeightPx = if (fullScreen) {
+                            val sheetHeightPx = if (isFullScreen) {
                                 constraints.maxHeight
                             } else {
                                 with(density) { contentHeight.roundToPx() }
