@@ -1,11 +1,12 @@
 package app.nubrick.nubrick.component.renderer
 
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import app.nubrick.nubrick.schema.UIPageBlock
 
 @Composable
@@ -14,10 +15,16 @@ internal fun Page(
     modifier: Modifier = Modifier,
     isModal: Boolean = false,
     safeAreaInsets: WindowInsets = WindowInsets.safeDrawing,
+    fixedTopInset: Dp? = null,
 ) {
     val renderAs = block.data?.renderAs ?: return
     val contentModifier = if (isModal && block.data.modalRespectSafeArea == true) {
-        Modifier.windowInsetsPadding(safeAreaInsets).then(
+        val safeAreaModifier = Modifier.modalSafeAreaPadding(
+            insets = safeAreaInsets,
+            nonTopSides = WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+            fixedTopInset = fixedTopInset,
+        )
+        safeAreaModifier.then(
             if (block.data.modalNavigationBackButton?.visible != false) {
                 Modifier.padding(top = ModalNavigationHeaderHeight)
             } else {

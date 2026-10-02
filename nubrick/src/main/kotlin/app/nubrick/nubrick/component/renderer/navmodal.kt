@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
@@ -21,6 +19,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.nubrick.nubrick.schema.UIPageBlock
@@ -50,18 +49,22 @@ internal fun ModalBottomSheetBackHandler(handler: () -> Unit) {
 internal fun NavigationHeader(
     index: Int,
     block: UIPageBlock,
+    fixedTopInset: Dp? = null,
     onClose: () -> Unit,
     onBack: () -> Unit,
 ) {
     val visibility = block.data?.modalNavigationBackButton?.visible ?: true
     if (!visibility) return
 
+    val safeAreaModifier = Modifier.modalSafeAreaPadding(
+        insets = WindowInsets.safeDrawing,
+        nonTopSides = WindowInsetsSides.Horizontal,
+        fixedTopInset = fixedTopInset,
+    )
+
     Box(
-        modifier = Modifier
+        modifier = safeAreaModifier
             .zIndex(10f)
-            .windowInsetsPadding(
-                WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
-            )
             .height(ModalNavigationHeaderHeight)
             .padding(top = 8.dp)
     ) {

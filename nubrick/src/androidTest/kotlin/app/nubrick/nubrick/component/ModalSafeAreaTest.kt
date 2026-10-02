@@ -1,15 +1,29 @@
 package app.nubrick.nubrick.component
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.captureToImage
@@ -19,15 +33,18 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.nubrick.nubrick.component.renderer.Page
+import app.nubrick.nubrick.component.renderer.modalSafeAreaPadding
 import app.nubrick.nubrick.schema.UIPageBlock
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlin.math.roundToInt
 
 class ModalSafeAreaTest {
     @get:Rule
@@ -69,6 +86,124 @@ class ModalSafeAreaTest {
         // Material's sheet consumes its top offset and keyboard padding before its content.
         render(consumedInsets = WindowInsets(top = 100, bottom = 32))
         assertContentBox(left = 17, top = 65, right = 217, bottom = 295)
+    }
+
+    @Test
+    fun fixedTopInsetDoesNotChangeWithParentConsumption() {
+        render(consumedInsets = WindowInsets(top = 100), fixedTopInset = 7.dp)
+        assertContentBox(left = 17, top = 72, right = 217, bottom = 263)
+    }
+
+    @Test
+    fun freezingTheAppliedTopInsetKeepsPositionAndChildConsumption() {
+        val parentConsumedTop = mutableStateOf(17)
+        val fixedTopInset = mutableStateOf<Dp?>(null)
+        var childConsumedTop = -1
+        composeRule.setContent {
+            val density = LocalDensity.current
+            Box(
+                Modifier
+                    .size(240.dp, 300.dp)
+                    .consumeWindowInsets(WindowInsets(top = parentConsumedTop.value))
+                    .modalSafeAreaPadding(
+                        insets = WindowInsets(top = 24),
+                        nonTopSides = WindowInsetsSides.Horizontal,
+                        fixedTopInset = fixedTopInset.value,
+                    )
+            ) {
+                Box(
+                    Modifier
+                        .size(20.dp)
+                        .testTag("content")
+                        .onConsumedWindowInsetsChanged {
+                            childConsumedTop = it.getTop(density)
+                        }
+                )
+            }
+        }
+
+        val initialTop = composeRule.onNodeWithTag("content").fetchSemanticsNode().boundsInRoot.top
+        composeRule.runOnIdle { assertEquals(24, childConsumedTop) }
+        composeRule.runOnIdle {
+            fixedTopInset.value = with(composeRule.density) { 7.toDp() }
+        }
+        val frozenTop = composeRule.onNodeWithTag("content").fetchSemanticsNode().boundsInRoot.top
+        assertEquals(initialTop, frozenTop, 0f)
+        composeRule.runOnIdle { assertEquals(24, childConsumedTop) }
+
+        composeRule.runOnIdle { parentConsumedTop.value = 10 }
+        val overscrolledTop = composeRule.onNodeWithTag("content").fetchSemanticsNode().boundsInRoot.top
+        assertEquals(initialTop, overscrolledTop, 0f)
+        composeRule.runOnIdle { assertEquals(24, childConsumedTop) }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun measuredExpandedAnchorMatchesMaterialSheetAnchor() {
+        lateinit var sheetState: SheetState
+        var predictedExpandedTopPx = -1
+        composeRule.setContent {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = {},
+                sheetState = sheetState,
+                dragHandle = {},
+                contentWindowInsets = { WindowInsets(0) },
+            ) {
+                BoxWithConstraints {
+                    val density = LocalDensity.current
+                    val statusTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+                    val contentHeight = LocalConfiguration.current.screenHeightDp.dp - statusTop
+                    val sheetHeightPx = with(density) { contentHeight.roundToPx() }
+                        .coerceIn(0, constraints.maxHeight)
+                    predictedExpandedTopPx = constraints.maxHeight - sheetHeightPx
+                    Box(Modifier.height(contentHeight))
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(SheetValue.Expanded, sheetState.currentValue)
+            assertEquals(predictedExpandedTopPx, sheetState.requireOffset().roundToInt())
+        }
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun fullScreenSheetExpandsToTheTopOfItsLayout() {
+        lateinit var sheetState: SheetState
+        lateinit var dialogInsets: WindowInsets
+        lateinit var dialogDensity: Density
+        var availableHeightPx = -1
+        var capturedSafeTopPx = -1
+        composeRule.setContent {
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = {},
+                sheetState = sheetState,
+                dragHandle = {},
+                contentWindowInsets = { WindowInsets(0) },
+            ) {
+                BoxWithConstraints {
+                    availableHeightPx = constraints.maxHeight
+                    dialogDensity = LocalDensity.current
+                    dialogInsets = WindowInsets.safeDrawing
+                    capturedSafeTopPx = remember(sheetState) {
+                        dialogInsets.getTop(dialogDensity)
+                    }
+                    Box(Modifier.fillMaxSize())
+                }
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertTrue(availableHeightPx > 0)
+            assertEquals(SheetValue.Expanded, sheetState.currentValue)
+            assertEquals(0, sheetState.requireOffset().roundToInt())
+            assertEquals(dialogInsets.getTop(dialogDensity), capturedSafeTopPx)
+        }
     }
 
     @Test
@@ -114,6 +249,7 @@ class ModalSafeAreaTest {
         isModal: Boolean = true,
         showNavigation: Boolean = true,
         consumedInsets: WindowInsets = WindowInsets(0),
+        fixedTopInset: Dp? = null,
         overflow: String = "VISIBLE",
         children: String = """
             { "__typename": "UIFlexContainerBlock", "data": {
@@ -144,7 +280,12 @@ class ModalSafeAreaTest {
                               "renderAs": $renderAs
                             } }
                         """.trimIndent())))
-                        Page(page, isModal = isModal, safeAreaInsets = insets.value)
+                        Page(
+                            page,
+                            isModal = isModal,
+                            safeAreaInsets = insets.value,
+                            fixedTopInset = fixedTopInset,
+                        )
                     }
                 }
             }

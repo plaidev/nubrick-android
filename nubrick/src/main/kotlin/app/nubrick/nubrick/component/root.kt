@@ -11,10 +11,12 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -310,6 +313,7 @@ internal fun ModalPage(
     eventBridge: UIBlockActionBridge?,
     isCurrentPage: Boolean,
     modifier: Modifier = Modifier,
+    fixedTopInset: Dp? = null,
     onDataChange: (JsonElement) -> Unit = {},
 ) {
     PageBlockProvider(
@@ -324,7 +328,12 @@ internal fun ModalPage(
                 events = eventBridge?.events,
                 isCurrentPage = isCurrentPage
             )
-            Page(block = blockData.block, modifier = modifier, isModal = true)
+            Page(
+                block = blockData.block,
+                modifier = modifier,
+                isModal = true,
+                fixedTopInset = fixedTopInset,
+            )
         }
     }
 }
@@ -465,15 +474,13 @@ internal fun Root(
                     val isLarge =
                         modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
                                 || modalState.modalScreenSize == ModalScreenSize.LARGE
-                    val insetTop = with(LocalDensity.current) {
-                        WindowInsets.statusBars.getTop(this).toDp()
-                    }
+                    val activeSheetState = if (isLarge) largeSheetState else sheetState
                     val sheetContainerColor = modalState.currentPageBlock
                         ?.block
                         ?.let(::modalContainerColor)
                         ?: MaterialTheme.colorScheme.surface
                     ModalBottomSheet(
-                        sheetState = if (isLarge) largeSheetState else sheetState,
+                        sheetState = activeSheetState,
                         onDismissRequest = {
                             modalStateHolder.close()
                         },
@@ -488,52 +495,74 @@ internal fun Root(
                         ModalBottomSheetBackHandler {
                             modalStateHolder.back(currentModalData())
                         }
-                        Column(
-                            modifier = if (modalState.modalPresentationStyle == ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN) {
+                        BoxWithConstraints {
+                            val density = LocalDensity.current
+                            val safeDrawingInsets = WindowInsets.safeDrawing
+                            val statusBarTop = with(density) {
+                                WindowInsets.statusBars.getTop(this).toDp()
+                            }
+                            val fullScreen = modalState.modalPresentationStyle ==
+                                ModalPresentationStyle.DEPENDS_ON_CONTEXT_OR_FULL_SCREEN
+                            val contentHeight = if (modalState.modalScreenSize == ModalScreenSize.MEDIUM) {
+                                LocalConfiguration.current.screenHeightDp.dp * 0.5f
+                            } else {
+                                LocalConfiguration.current.screenHeightDp.dp - statusBarTop
+                            }
+                            val contentSizeModifier = if (fullScreen) {
                                 Modifier.fillMaxSize()
                             } else {
-                                if (modalState.modalScreenSize == ModalScreenSize.MEDIUM) {
-                                    Modifier.height(LocalConfiguration.current.screenHeightDp.dp * 0.5f)
-                                } else {
-                                    Modifier.height(
-                                        LocalConfiguration.current.screenHeightDp.dp - insetTop
-                                    )
-                                }
+                                Modifier.height(contentHeight)
                             }
-                        ) {
-                            AnimatedContent(
-                                targetState = modalState.displayedModalIndex to modalState.currentEntry,
-                                contentKey = { it.second?.id },
-                                transitionSpec = {
-                                    if (targetState.first > initialState.first) {
-                                        slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
-                                    } else {
-                                        slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
-                                    }
-                                },
-                                label = "Bottom Sheet"
-                            ) { (index, entry) ->
-                                if (entry == null) return@AnimatedContent
-                                NavigationHeader(
-                                    index,
-                                    entry.page.block,
-                                    onClose = {
-                                        modalStateHolder.back(currentModalData(), collapseExpandedSheet = false)
-                                    },
-                                    onBack = { modalStateHolder.back(currentModalData()) },
-                                )
-                                ModalPage(
-                                    arguments = arguments,
-                                    blockData = entry.page,
-                                    eventBridge = eventBridge,
-                                    isCurrentPage = entry.id == modalState.currentEntry?.id
-                                        && currentPageBlock?.data?.kind == PageKind.MODAL,
-                                    onDataChange = { data ->
-                                        if (modalStateHolder.modalState.modalStack.any { it.id == entry.id }) {
-                                            modalDataByEntry[entry.id] = data
+                            // This scope has the sheet's layout constraints before its content is
+                            // composed. Use the expanded anchor, not the animated current offset.
+                            val sheetHeightPx = if (fullScreen) {
+                                constraints.maxHeight
+                            } else {
+                                with(density) { contentHeight.roundToPx() }
+                                    .coerceIn(0, constraints.maxHeight)
+                            }
+                            val expandedTopPx = constraints.maxHeight - sheetHeightPx
+                            val fixedTopInset = with(density) {
+                                (safeDrawingInsets.getTop(this) - expandedTopPx)
+                                    .coerceAtLeast(0).toDp()
+                            }
+                            Column(modifier = contentSizeModifier) {
+                                AnimatedContent(
+                                    targetState = modalState.displayedModalIndex to modalState.currentEntry,
+                                    contentKey = { it.second?.id },
+                                    transitionSpec = {
+                                        if (targetState.first > initialState.first) {
+                                            slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
+                                        } else {
+                                            slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
                                         }
                                     },
-                                )
+                                    label = "Bottom Sheet"
+                                ) { (index, entry) ->
+                                    if (entry == null) return@AnimatedContent
+                                    NavigationHeader(
+                                        index,
+                                        entry.page.block,
+                                        fixedTopInset = fixedTopInset,
+                                        onClose = {
+                                            modalStateHolder.back(currentModalData(), collapseExpandedSheet = false)
+                                        },
+                                        onBack = { modalStateHolder.back(currentModalData()) },
+                                    )
+                                    ModalPage(
+                                        arguments = arguments,
+                                        blockData = entry.page,
+                                        eventBridge = eventBridge,
+                                        isCurrentPage = entry.id == modalState.currentEntry?.id
+                                            && currentPageBlock?.data?.kind == PageKind.MODAL,
+                                        fixedTopInset = fixedTopInset,
+                                        onDataChange = { data ->
+                                            if (modalStateHolder.modalState.modalStack.any { it.id == entry.id }) {
+                                                modalDataByEntry[entry.id] = data
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
