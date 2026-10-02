@@ -195,4 +195,32 @@ class ModalStateHolderTest {
         assertFalse(modal.modalState.modalVisibility)
         assertEquals(1, dismissed)
     }
+
+    @Test
+    fun closeIsIdempotentWhileDismissCallbackRuns() {
+        var dismissed = 0
+        lateinit var modal: ModalStateHolder
+        modal = holder(onDismiss = {
+            dismissed++
+            modal.close(forceReset = true)
+        })
+        modal.show(page("m1"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+
+        modal.close(forceReset = true)
+        assertEquals(1, dismissed)
+    }
+
+    @Test
+    fun showDuringDismissCallbackDoesNotRestartModal() {
+        lateinit var modal: ModalStateHolder
+        modal = holder(onDismiss = {
+            modal.show(page("m2"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+        })
+        modal.show(page("m1"), ModalPresentationStyle.UNKNOWN, ModalScreenSize.UNKNOWN)
+
+        modal.close(forceReset = true)
+
+        assertFalse(modal.modalState.modalVisibility)
+        assertNull(modal.modalState.currentPageBlock)
+    }
 }

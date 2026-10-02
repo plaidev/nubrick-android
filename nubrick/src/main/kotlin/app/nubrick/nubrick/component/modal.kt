@@ -42,12 +42,15 @@ internal class ModalStateHolder(
     var modalState by mutableStateOf(ModalState())
         private set
     private var nextEntryId = 0L
+    private var closeInProgress = false
 
     fun show(
         block: PageBlockData,
         modalPresentationStyle: ModalPresentationStyle,
         modalScreenSize: ModalScreenSize,
     ) {
+        if (closeInProgress) return
+
         modalState = modalState.copy(
             modalStack = modalState.modalStack + ModalEntry(nextEntryId++, block),
             displayedModalIndex = modalState.modalStack.size,
@@ -87,20 +90,32 @@ internal class ModalStateHolder(
     }
 
     fun close(forceReset: Boolean = false, emitDispatch: Boolean = true) {
+        if (closeInProgress) return
+
+        closeInProgress = true
         scope.launch {
-            if (!forceReset && sheetState.currentValue == SheetValue.Expanded && sheetState.hasPartiallyExpandedState) {
-                // shrink form large to medium
-                sheetState.partialExpand()
-                return@launch
-            }
-
-            // hide and reset state
-            sheetState.hide()
-            largeSheetState.hide()
-            modalState = ModalState()
-
-            if (emitDispatch) {
-                onDismiss()
+            var shouldDismiss = false
+            try {
+                if (!forceReset && sheetState.currentValue == SheetValue.Expanded && sheetState.hasPartiallyExpandedState) {
+                    // shrink form large to medium
+                    sheetState.partialExpand()
+                } else {
+                    shouldDismiss = true
+                    sheetState.hide()
+                    largeSheetState.hide()
+                }
+            } finally {
+                try {
+                    // A cancelled hide must not leave a trigger experiment reserved forever.
+                    if (shouldDismiss) {
+                        modalState = ModalState()
+                        if (emitDispatch) {
+                            onDismiss()
+                        }
+                    }
+                } finally {
+                    closeInProgress = false
+                }
             }
         }
     }

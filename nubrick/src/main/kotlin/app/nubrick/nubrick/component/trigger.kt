@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -293,6 +294,9 @@ internal fun Trigger(trigger: TriggerStateHolder) {
     if (trigger.modalContents.isNotEmpty()) {
         for (content in trigger.modalContents) {
             key(content.root.id) {
+                DisposableEffect(trigger, content) {
+                    onDispose { trigger.handleDismiss(content.root) }
+                }
                 Root(
                     container = trigger.container,
                     modifier = Modifier.fillMaxSize(),
