@@ -228,15 +228,15 @@ class ModalSafeAreaTest {
     }
 
     @Test
-    fun unexpectedNonFlexModalRootStillRendersWithoutInsets() {
+    fun nonFlexModalRootIsCenteredWithoutInsets() {
         render(renderAs = """
             { "__typename": "UITextBlock", "data": { "value": "Fallback content" } }
         """.trimIndent())
         composeRule.onNodeWithText("Fallback content").assertIsDisplayed()
         val viewport = composeRule.onNodeWithTag("viewport").fetchSemanticsNode().boundsInRoot
         val text = composeRule.onNodeWithText("Fallback content").fetchSemanticsNode().boundsInRoot
-        assertEquals(viewport.left, text.left, 1f)
-        assertEquals(viewport.top, text.top, 1f)
+        assertEquals(viewport.center.x, text.center.x, 1f)
+        assertEquals(viewport.center.y, text.center.y, 1f)
     }
 
     @Test
