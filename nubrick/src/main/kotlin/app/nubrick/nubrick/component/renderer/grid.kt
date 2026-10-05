@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -74,7 +75,7 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
                 .height(gridHeight.dp)
         ) {
             items(children.size) {
-                Box(Modifier.size(size)) {
+                Box(Modifier.size(size), contentAlignment = Alignment.Center) {
                     NestedDataProvider(data = if (arrayData != null) arrayData[it] else dataState.data) {
                         Block(block = children[it])
                     }
@@ -100,7 +101,7 @@ internal fun Grid(block: UICollectionBlock, modifier: Modifier = Modifier) {
                 .width(gridWidth.dp)
         ) {
             items(children.size) {
-                Box(Modifier.size(size)) {
+                Box(Modifier.size(size), contentAlignment = Alignment.Center) {
                     NestedDataProvider(data = if (arrayData != null) arrayData[it] else dataState.data) {
                         Block(block = children[it])
                     }
