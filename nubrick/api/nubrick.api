@@ -69,14 +69,15 @@ public final class app/nubrick/nubrick/EventPropertyType : java/lang/Enum {
 public final class app/nubrick/nubrick/FlutterBridge {
 	public static final field $stable I
 	public static final field INSTANCE Lapp/nubrick/nubrick/FlutterBridge;
-	public final fun buildExperimentContent-0E7RQCE (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+	public final fun buildExperimentContent-BWLJW6A (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+	public static synthetic fun buildExperimentContent-BWLJW6A$default (Lapp/nubrick/nubrick/FlutterBridge;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun clearCallbacks ()V
 	public final fun computeInitialSize (Lapp/nubrick/nubrick/data/ExperimentContent;)Lkotlin/Pair;
 	public final fun connectEmbedding-BWLJW6A (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun connectEmbedding-BWLJW6A$default (Lapp/nubrick/nubrick/FlutterBridge;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun render (Landroidx/compose/ui/Modifier;Ljava/lang/Object;Lapp/nubrick/nubrick/data/ExperimentContent;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lapp/nubrick/nubrick/component/bridge/UIBlockActionBridge;Landroidx/compose/runtime/Composer;II)V
-	public final fun updateCallbacks (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;)V
-	public static synthetic fun updateCallbacks$default (Lapp/nubrick/nubrick/FlutterBridge;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;ILjava/lang/Object;)V
+	public final fun updateCallbacks (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;)V
+	public static synthetic fun updateCallbacks$default (Lapp/nubrick/nubrick/FlutterBridge;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function4;ILjava/lang/Object;)V
 }
 
 public abstract interface annotation class app/nubrick/nubrick/FlutterBridgeApi : java/lang/annotation/Annotation {
@@ -108,6 +109,7 @@ public final class app/nubrick/nubrick/NubrickSDK {
 	public final fun Embedding (Ljava/lang/String;Landroidx/compose/ui/Modifier;Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V
 	public final fun RemoteConfig (Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
 	public final fun appendTooltipExperimentHistory (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun appendTooltipExperimentHistory (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public static final fun createConfig (Ljava/lang/String;)Lapp/nubrick/nubrick/Config;
 	public static final fun createConfig (Ljava/lang/String;Lapp/nubrick/nubrick/NubrickGlobalEventListener;)Lapp/nubrick/nubrick/Config;
 	public static final fun createConfig (Ljava/lang/String;Lapp/nubrick/nubrick/NubrickGlobalEventListener;Lapp/nubrick/nubrick/NubrickDispatchListener;)Lapp/nubrick/nubrick/Config;
@@ -120,12 +122,13 @@ public final class app/nubrick/nubrick/NubrickSDK {
 	public static final fun getUserProperties ()Ljava/util/Map;
 	public static final fun getUserProperty (Ljava/lang/String;)Ljava/lang/String;
 	public static final fun initialize (Landroid/content/Context;Lapp/nubrick/nubrick/Config;)Z
-	public final fun initialize (Landroid/content/Context;Lapp/nubrick/nubrick/Config;Lkotlin/jvm/functions/Function3;)Z
+	public final fun initialize (Landroid/content/Context;Lapp/nubrick/nubrick/Config;Lkotlin/jvm/functions/Function4;)Z
 	public final fun remoteConfig-IoAF18A (Ljava/lang/String;)Ljava/lang/Object;
 	public final fun sendFlutterCrash (Lapp/nubrick/nubrick/data/TrackCrashEvent;)V
 	public static final fun setUserId (Ljava/lang/String;)V
 	public static final fun setUserProperties (Ljava/util/Map;)V
 	public static final fun setUserProperty (Ljava/lang/String;Ljava/lang/Object;)V
+	public final fun stopTooltipExperiment (Ljava/lang/String;)V
 }
 
 public abstract class app/nubrick/nubrick/NubrickSize {

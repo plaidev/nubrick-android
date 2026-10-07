@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class TriggerOverlapTest {
-    private class Fixture {
+    private class Fixture(onTooltip: ((String, String, String?, String) -> Unit)? = null) {
         val job = SupervisorJob()
         private val starts = ConcurrentHashMap<String, CompletableDeferred<Unit>>()
         private val responses = ConcurrentHashMap<String, CompletableDeferred<Result<Pair<ExperimentContent, ExperimentKind>>>>()
@@ -58,12 +58,76 @@ class TriggerOverlapTest {
         }
         val holder = TriggerStateHolder(container,
             NubrickUser(InstrumentationRegistry.getInstrumentation().targetContext),
-            CoroutineScope(job + Dispatchers.IO))
+            CoroutineScope(job + Dispatchers.IO),
+            onTooltip = onTooltip)
         suspend fun drain() { withTimeout(3000) { job.children.toList().joinAll() } }
         fun content(id: String = "experiment") = ExperimentContent(experimentId = id, variantId = "variant", root = UIRootBlock(id = id))
         suspend fun awaitModal(id: String) = withTimeout(3000) {
             while (!withContext(Dispatchers.Main) { holder.modalContents.any { it.experimentId == id } }) delay(10)
         }
+    }
+
+    @Test
+    fun tooltipBlocksPopupAndOtherTooltipsUntilRecordingAndDismissalFinish() = runBlocking {
+        val f = Fixture()
+        try {
+            assertTrue(f.holder.startExperiment("tooltip"))
+            assertFalse(f.holder.startExperiment("other-tooltip"))
+            f.holder.dispatch(NubrickEvent("blocked"))
+            f.drain()
+            assertEquals(listOf("blocked"), f.recorded)
+            assertTrue(f.fetched.isEmpty())
+            val recording = CompletableDeferred<Unit>()
+            f.displayRecordBlocker.set(recording)
+            f.holder.recordDisplay("tooltip", "tooltip-experiment", "variant")
+            f.holder.finishExperiment("tooltip")
+            assertFalse(f.holder.startExperiment("next"))
+            recording.complete(Unit)
+            f.drain()
+            assertEquals(listOf("tooltip-experiment"), f.shown)
+            f.response("popup").complete(Result.success(f.content() to ExperimentKind.POPUP))
+            f.holder.dispatch(NubrickEvent("popup"))
+            f.drain()
+            assertFalse(f.holder.startExperiment("next"))
+            withContext(Dispatchers.Main) {
+                f.holder.finishExperiment("tooltip")
+                assertEquals(1, f.holder.modalContents.size)
+                f.holder.handleDismiss(f.holder.modalContents.single())
+            }
+            assertTrue(f.holder.startExperiment("next"))
+            f.holder.finishExperiment("next")
+        } finally { f.job.cancelAndJoin() }
+    }
+
+    @Test
+    fun recordingFailureReleasesDismissedTooltip() = runBlocking {
+        val f = Fixture()
+        try {
+            val blocker = CompletableDeferred<Unit>()
+            f.displayRecordBlocker.set(blocker)
+            assertTrue(f.holder.startExperiment("tooltip"))
+            f.holder.recordDisplay("tooltip", "experiment", "variant")
+            f.holder.finishExperiment("tooltip")
+            blocker.completeExceptionally(IllegalStateException("storage failed"))
+            f.drain()
+            assertTrue(f.holder.startExperiment("next"))
+        } finally { f.job.cancelAndJoin() }
+    }
+
+    @Test
+    fun tooltipClaimDiscardsPopupFetchThatCompletesLate() = runBlocking {
+        val f = Fixture()
+        try {
+            f.holder.dispatch(NubrickEvent("slow"))
+            f.awaitFetch("slow")
+            assertTrue(f.holder.startExperiment("tooltip"))
+            f.response("slow").complete(Result.success(f.content() to ExperimentKind.POPUP))
+            f.drain()
+            withContext(Dispatchers.Main) { assertTrue(f.holder.modalContents.isEmpty()) }
+            assertTrue(f.shown.isEmpty())
+            f.holder.finishExperiment("tooltip")
+            assertTrue(f.holder.startExperiment("next"))
+        } finally { f.job.cancelAndJoin() }
     }
 
     @Test
@@ -103,7 +167,7 @@ class TriggerOverlapTest {
             withContext(Dispatchers.Main) {
                 val winner = f.holder.modalContents.single()
                 f.holder.handleShown(winner)
-                f.holder.handleDismiss(winner.root)
+                f.holder.handleDismiss(winner)
                 assertTrue(f.holder.modalContents.isEmpty())
             }
             f.drain()
@@ -125,13 +189,14 @@ class TriggerOverlapTest {
             f.holder.dispatch(NubrickEvent("overlap"))
             f.drain()
             assertEquals(listOf("first"), f.fetched)
+            val presented = withContext(Dispatchers.Main) { f.holder.modalContents.single() }
             withContext(Dispatchers.Main) {
-                f.holder.handleShown(content)
-                f.holder.handleShown(content)
+                f.holder.handleShown(presented)
+                f.holder.handleShown(presented)
             }
             f.drain()
             assertEquals(listOf("experiment"), f.shown)
-            withContext(Dispatchers.Main) { f.holder.handleDismiss(content.root) }
+            withContext(Dispatchers.Main) { f.holder.handleDismiss(presented) }
             f.response("fresh").complete(Result.failure(NotFoundException()))
             f.holder.dispatch(NubrickEvent("fresh"))
             f.drain()
@@ -150,8 +215,9 @@ class TriggerOverlapTest {
             f.holder.dispatch(NubrickEvent("first"))
             f.awaitModal("experiment")
             withContext(Dispatchers.Main) {
-                f.holder.handleShown(content)
-                f.holder.handleDismiss(content.root)
+                val presented = f.holder.modalContents.single()
+                f.holder.handleShown(presented)
+                f.holder.handleDismiss(presented)
             }
             withTimeout(3000) {
                 while (f.shown.isEmpty()) delay(10)
@@ -202,4 +268,52 @@ class TriggerOverlapTest {
             assertTrue(f.callbacks.containsAll(listOf("boot", "return")))
         } finally { f.job.cancelAndJoin() }
     }
+    @Test
+    fun staleDismissalCannotFinishAnotherSessionWithTheSameRoot() = runBlocking {
+        val fixture = Fixture()
+        try {
+            val content = fixture.content()
+            fixture.response("first").complete(Result.success(content to ExperimentKind.POPUP))
+            fixture.holder.dispatch(NubrickEvent("first"))
+            fixture.drain()
+            val first = fixture.holder.modalContents.single()
+            assertEquals("experiment", first.root.id)
+            withContext(Dispatchers.Main) { fixture.holder.handleDismiss(first) }
+            fixture.response("second").complete(Result.success(content to ExperimentKind.POPUP))
+            fixture.holder.dispatch(NubrickEvent("second"))
+            fixture.drain()
+            val second = fixture.holder.modalContents.single()
+            assertSame(first.root, second.root)
+            assertNotEquals(first.sessionId, second.sessionId)
+            withContext(Dispatchers.Main) { fixture.holder.handleDismiss(first) }
+            fixture.holder.finishExperiment(first.sessionId!!)
+            assertSame(second, fixture.holder.modalContents.single())
+            assertTrue(fixture.holder.ownsExperiment(second.sessionId!!))
+        } finally { fixture.job.cancelAndJoin() }
+    }
+
+    @Test
+    fun nativeDispatchReservesTooltipBeforeNotifyingFlutter() = runBlocking {
+        var sessionId: String? = null
+        lateinit var fixture: Fixture
+        fixture = Fixture(onTooltip = { data, _, _, id ->
+            sessionId = id
+            assertEquals("experiment", org.json.JSONObject(data).getString("id"))
+            assertTrue(fixture.holder.ownsExperiment(sessionId!!))
+            assertFalse(fixture.holder.startExperiment("overlap"))
+        })
+        try {
+            fixture.response("tooltip").complete(Result.success(fixture.content() to ExperimentKind.TOOLTIP))
+            fixture.holder.dispatch(NubrickEvent("tooltip"))
+            fixture.drain()
+            assertNotNull(sessionId)
+            assertNotEquals("experiment", sessionId)
+            fixture.holder.dispatch(NubrickEvent("blocked"))
+            fixture.drain()
+            assertEquals(listOf("tooltip"), fixture.fetched)
+            fixture.holder.finishExperiment(sessionId!!)
+            assertTrue(fixture.holder.startExperiment("next"))
+        } finally { fixture.job.cancelAndJoin() }
+    }
+
 }

@@ -22,11 +22,11 @@ import app.nubrick.nubrick.data.user.getNubrickUserSharedPreferences
 import app.nubrick.nubrick.schema.ExperimentKind
 import app.nubrick.nubrick.schema.TriggerEventNameDefs
 import app.nubrick.nubrick.schema.UIRootBlock
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -67,13 +67,12 @@ internal class TriggerStateHolder(
     internal val container: Container,
     internal val user: NubrickUser,
     private val scope: CoroutineScope,
-    onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null,
+    onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)? = null,
 ) {
     @Volatile
-    private var onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = onTooltip
+    private var onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)? = onTooltip
 
-    private val hasActiveTriggerExperiment = AtomicBoolean(false)
-    private var displayRecordingJob: Job? = null
+    private val experimentSession = TriggerExperimentSession()
 
     private val isFirstStart = AtomicBoolean(true)
     private val isProcessLifecycleObservationClosed = AtomicBoolean(false)
@@ -89,7 +88,7 @@ internal class TriggerStateHolder(
     private val processLifecycleRegistration = LifecycleObserverRegistration(processLifecycleObserver)
     internal val modalContents = mutableStateListOf<ExperimentContent>()
 
-    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?) {
+    fun updateOnTooltip(onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)?) {
         this.onTooltip = onTooltip
     }
 
@@ -175,7 +174,7 @@ internal class TriggerStateHolder(
                     self.container.handleNubrickEvent(event)
                 }
                 val recorded = self.container.recordTriggerEvent(event.name, sourceExperimentId)
-                if (!recorded || hasActiveTriggerExperiment.get()) {
+                if (!recorded || experimentSession.isActive()) {
                     return@launch
                 }
                 val (content, kind) = self.container.fetchTriggerContent(event.name, kinds).getOrNull()
@@ -216,7 +215,7 @@ internal class TriggerStateHolder(
                         recordedTriggers += event.name
                     }
                 }
-                if (recordedTriggers.isEmpty() || hasActiveTriggerExperiment.get()) {
+                if (recordedTriggers.isEmpty() || experimentSession.isActive()) {
                     return@launch
                 }
                 val (content, kind) = self.container.fetchTriggerContent(
@@ -237,46 +236,69 @@ internal class TriggerStateHolder(
         // before presentation so only one completed popup starts a modal flow.
         withContext(Dispatchers.Main) {
             if (kind == ExperimentKind.TOOLTIP) {
-                if (hasActiveTriggerExperiment.get()) return@withContext
-                onTooltip?.let { callback ->
-                    val jsonString = Json.encodeToString(UIRootBlock.encode(content.root))
-                    callback(jsonString, content.experimentId, content.variantId)
+                val callback = onTooltip ?: return@withContext
+                val sessionId = UUID.randomUUID().toString()
+                if (!startExperiment(sessionId)) return@withContext
+                try {
+                    callback(Json.encodeToString(UIRootBlock.encode(content.root)), content.experimentId, content.variantId, sessionId)
+                } catch (error: Throwable) {
+                    finishExperiment(sessionId)
+                    throw error
                 }
             } else {
-                if (!hasActiveTriggerExperiment.compareAndSet(false, true)) return@withContext
+                val sessionId = UUID.randomUUID().toString()
+                if (!startExperiment(sessionId)) return@withContext
                 try {
-                    modalContents.add(content)
+                    modalContents.add(ExperimentContent(
+                        experimentId = content.experimentId,
+                        variantId = content.variantId,
+                        root = content.root,
+                        sessionId = sessionId,
+                    ))
                 } catch (error: Throwable) {
-                    hasActiveTriggerExperiment.set(false)
+                    finishExperiment(sessionId)
                     throw error
                 }
             }
         }
     }
 
-    fun handleShown(content: ExperimentContent) {
-        if (modalContents.singleOrNull() !== content || displayRecordingJob != null) return
-        val variantId = content.variantId ?: return
-        displayRecordingJob = scope.launch {
+    // Called by native dispatch before notifying Flutter, never by Flutter.
+    fun startExperiment(sessionId: String): Boolean = experimentSession.start(sessionId)
+
+    fun ownsExperiment(sessionId: String): Boolean = experimentSession.owns(sessionId)
+
+    fun finishExperiment(sessionId: String) {
+        experimentSession.finish(sessionId)
+    }
+
+    fun recordDisplay(sessionId: String, experimentId: String, variantId: String) {
+        if (experimentId.isEmpty() || variantId.isEmpty()) return
+        if (!experimentSession.beginRecording(sessionId)) return
+        // Register completion even if the scope was already cancelled before launch.
+        scope.launch {
             try {
-                container.recordDisplayedTriggerContent(content.experimentId, variantId)
+                container.recordDisplayedTriggerContent(experimentId, variantId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
                 Log.w("NubrickSDK", "Failed to record displayed trigger content", e)
             }
+        }.invokeOnCompletion {
+            experimentSession.finishRecording(sessionId)
         }
     }
 
-    fun handleDismiss(root: UIRootBlock) {
-        if (modalContents.removeIf { it.root === root }) {
-            val recordingJob = displayRecordingJob
-            displayRecordingJob = null
-            if (recordingJob == null) {
-                hasActiveTriggerExperiment.set(false)
-            } else {
-                recordingJob.invokeOnCompletion { hasActiveTriggerExperiment.set(false) }
-            }
+    fun handleShown(content: ExperimentContent) {
+        if (modalContents.singleOrNull() !== content) return
+        val sessionId = content.sessionId ?: return
+        val variantId = content.variantId ?: return
+        recordDisplay(sessionId, content.experimentId, variantId)
+    }
+
+    fun handleDismiss(content: ExperimentContent) {
+        if (modalContents.remove(content)) {
+            content.sessionId?.let(::finishExperiment)
         }
     }
 
@@ -293,20 +315,21 @@ internal fun Trigger(trigger: TriggerStateHolder) {
 
     if (trigger.modalContents.isNotEmpty()) {
         for (content in trigger.modalContents) {
-            key(content.root.id) {
+            key(content.sessionId) {
                 DisposableEffect(trigger, content) {
-                    onDispose { trigger.handleDismiss(content.root) }
+                    onDispose { trigger.handleDismiss(content) }
                 }
                 Root(
                     container = trigger.container,
                     modifier = Modifier.fillMaxSize(),
                     root = content.root,
+                    sessionId = content.sessionId,
                     experimentId = content.experimentId,
                     variantId = content.variantId,
                     embeddingVisibility = false,
                     onShown = { trigger.handleShown(content) },
                     onDismiss = {
-                        trigger.handleDismiss(it)
+                        trigger.handleDismiss(content)
                     }
                 )
             }

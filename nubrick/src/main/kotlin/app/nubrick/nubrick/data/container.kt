@@ -45,6 +45,7 @@ class ExperimentContent internal constructor(
     internal val experimentId: String,
     internal val variantId: String?,
     internal val root: UIRootBlock,
+    internal val sessionId: String? = null,
 )
 
 @FlutterBridgeApi
