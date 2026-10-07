@@ -137,7 +137,7 @@ private class NubrickUninitializedException : IllegalStateException(
 private class NubrickRuntime(
     config: Config,
     context: Context,
-    onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null,
+    onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)? = null,
 ) {
     @Volatile private var onEvent: ((event: Event) -> Unit)? = null
     @Volatile private var onDispatch: ((event: NubrickEvent) -> Unit)? = null
@@ -271,6 +271,14 @@ private class NubrickRuntime(
         this.container.sendFlutterCrash(crashEvent)
     }
 
+    fun stopTooltipExperiment(sessionId: String) = trigger.finishExperiment(sessionId)
+
+    fun ownsTriggerExperiment(sessionId: String): Boolean = trigger.ownsExperiment(sessionId)
+
+    fun appendTooltipExperimentHistory(experimentId: String, variantId: String, sessionId: String) {
+        trigger.recordDisplay(sessionId, experimentId, variantId)
+    }
+
     fun appendTooltipExperimentHistory(experimentId: String, variantId: String) {
         if (experimentId.isEmpty() || variantId.isEmpty()) return
         this.sdkScope.launch {
@@ -308,7 +316,7 @@ private class NubrickRuntime(
     fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)?,
         onDispatch: ((event: NubrickEvent) -> Unit)?,
-        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
+        onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)?
     ) {
         if (onEvent != null) this.onEvent = onEvent
         if (onDispatch != null) this.onDispatch = onDispatch
@@ -393,6 +401,11 @@ private class NubrickRuntime(
 }
 
 object NubrickSDK {
+    internal fun ownsTriggerExperiment(sessionId: String?): Boolean {
+        if (sessionId == null) return true
+        return runtimeOrNull(throwInDebug = false)?.ownsTriggerExperiment(sessionId) == true
+    }
+
     @Volatile
     private var runtime: NubrickRuntime? = null
 
@@ -421,7 +434,7 @@ object NubrickSDK {
     private fun initializeInternal(
         context: Context,
         config: Config,
-        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
+        onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)?
     ): Boolean {
         if (runtime != null) {
             warn("NubrickSDK.initialize(...) called more than once. Subsequent calls are ignored.")
@@ -487,7 +500,7 @@ object NubrickSDK {
     fun initialize(
         context: Context,
         config: Config,
-        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)?
+        onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)?
     ): Boolean {
         return initializeInternal(context = context, config = config, onTooltip = onTooltip)
     }
@@ -508,7 +521,7 @@ object NubrickSDK {
     internal fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)? = null,
         onDispatch: ((event: NubrickEvent) -> Unit)? = null,
-        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null
+        onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)? = null
     ) {
         val current = runtimeOrNull(throwInDebug = false) ?: return
         current.updateCallbacks(onEvent, onDispatch, onTooltip)
@@ -523,6 +536,18 @@ object NubrickSDK {
     fun sendFlutterCrash(crashEvent: TrackCrashEvent) {
         val current = runtimeOrNull(throwInDebug = true) ?: return
         current.sendFlutterCrash(crashEvent)
+    }
+
+    /** Flutter reports that it could not display or has stopped its tooltip UI. */
+    @FlutterBridgeApi
+    fun stopTooltipExperiment(sessionId: String) {
+        runtimeOrNull(throwInDebug = false)?.stopTooltipExperiment(sessionId)
+    }
+
+    @FlutterBridgeApi
+    fun appendTooltipExperimentHistory(experimentId: String, variantId: String, sessionId: String) {
+        val current = runtimeOrNull(throwInDebug = true) ?: return
+        current.appendTooltipExperimentHistory(experimentId, variantId, sessionId)
     }
 
     @FlutterBridgeApi
@@ -649,7 +674,7 @@ object FlutterBridge {
     fun updateCallbacks(
         onEvent: ((event: Event) -> Unit)? = null,
         onDispatch: ((event: NubrickEvent) -> Unit)? = null,
-        onTooltip: ((data: String, experimentId: String, variantId: String?) -> Unit)? = null
+        onTooltip: ((data: String, experimentId: String, variantId: String?, sessionId: String) -> Unit)? = null
     ) {
         NubrickSDK.updateCallbacks(onEvent, onDispatch, onTooltip)
     }
@@ -676,6 +701,7 @@ object FlutterBridge {
         experimentId: String,
         variantId: String?,
         rootJson: String,
+        sessionId: String? = null,
     ): Result<ExperimentContent> {
         val root = runCatching {
             UIRootBlock.decode(Json.decodeFromString(rootJson))
@@ -684,6 +710,7 @@ object FlutterBridge {
             experimentId = experimentId,
             variantId = variantId,
             root = root,
+            sessionId = sessionId,
         ))
     }
 
@@ -737,11 +764,17 @@ object FlutterBridge {
                     modifier = widthModifier.then(heightModifier),
                     arguments = arguments,
                     root = rootBlock,
+                    sessionId = data.sessionId,
                     experimentId = data.experimentId,
                     variantId = data.variantId,
                     onEvent = onEvent,
                     onNextTooltip = onNextTooltip,
-                    onDismiss = { onDismiss() },
+                    onDismiss = {
+                        if (NubrickSDK.ownsTriggerExperiment(data.sessionId)) {
+                            data.sessionId?.let(NubrickSDK::stopTooltipExperiment)
+                            onDismiss()
+                        }
+                    },
                     eventBridge = eventBridge,
                     onSizeChange = { newWidth, newHeight ->
                         width = newWidth

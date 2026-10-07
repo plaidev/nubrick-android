@@ -45,6 +45,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import app.nubrick.nubrick.Event
+import app.nubrick.nubrick.NubrickSDK
 import app.nubrick.nubrick.NubrickSize
 import app.nubrick.nubrick.remoteNubrickSize
 import app.nubrick.nubrick.component.bridge.UIBlockActionBridgeCollector
@@ -163,6 +164,7 @@ internal class RootStateHolder(
     private val onOpenDeepLink: ((link: String) -> Unit) = {},
     private val onTrigger: ((trigger: UIBlockAction, data: JsonElement) -> Unit) = { _, _ -> },
     private val onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
+    private val sessionId: String? = null,
 ) {
     private val pages: List<UIPageBlock> = root.data?.pages ?: emptyList()
     val displayedPageBlock = mutableStateOf<PageBlockData?>(null)
@@ -174,6 +176,7 @@ internal class RootStateHolder(
     var currentTooltipAnchorId = mutableStateOf("")
 
     fun initialize(data: JsonElement) {
+        if (!NubrickSDK.ownsTriggerExperiment(sessionId)) return
         try {
             val trigger = pages.firstOrNull {
                 it.data?.kind == PageKind.TRIGGER
@@ -204,6 +207,7 @@ internal class RootStateHolder(
     }
 
     fun handleNavigate(action: UIBlockAction, rootData: JsonElement) {
+        if (!NubrickSDK.ownsTriggerExperiment(sessionId)) return
         try {
             val deepLink = action.deepLink ?: ""
             if (deepLink.isNotEmpty()) {
@@ -290,6 +294,7 @@ internal class RootStateHolder(
     }
 
     fun handleWebviewDismiss(launchId: Long, onTrigger: (UIBlockAction) -> Unit): WebviewData? {
+        if (!NubrickSDK.ownsTriggerExperiment(sessionId)) return null
         val dismissedData = this.webviewData.value?.takeIf { it.launchId == launchId }
             ?: return null
 
@@ -358,6 +363,7 @@ internal fun Root(
     onDismiss: ((root: UIRootBlock) -> Unit) = {},
     eventBridge: UIBlockActionBridge? = null,
     onSizeChange: ((width: NubrickSize, height: NubrickSize) -> Unit)? = null,
+    sessionId: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val largeSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -377,10 +383,11 @@ internal fun Root(
         ModalStateHolder(sheetState, largeSheetState, scope, onDismiss = { currentOnDismiss.value(root) })
     }
     val context = LocalContext.current
-    val rootStateHolder = remember(root, rootContainer, modalStateHolder, context) {
+    val rootStateHolder = remember(root, rootContainer, modalStateHolder, context, sessionId) {
         RootStateHolder(
             root,
             modalStateHolder,
+            sessionId = sessionId,
             onNextTooltip = { pageId -> currentOnNextTooltip.value(pageId) },
             onDismiss = { dismissedRoot -> currentOnDismiss.value(dismissedRoot) },
             onOpenDeepLink = { link ->

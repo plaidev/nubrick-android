@@ -26,11 +26,13 @@ class FlutterBridgeUnitTest {
             experimentId = "experiment",
             variantId = "variant",
             rootJson = rootJson,
+            sessionId = "session",
         ).getOrThrow()
 
         assertEquals("experiment", content.experimentId)
         assertEquals("variant", content.variantId)
         assertEquals("tooltip-root", content.root.id)
+        assertEquals("session", content.sessionId)
         assertEquals("tooltip-page", content.root.data?.currentPageId)
     }
 
