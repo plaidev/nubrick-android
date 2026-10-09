@@ -2,6 +2,9 @@ package app.nubrick.nubrick.data
 
 import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.Event
+import app.nubrick.nubrick.ExperimentalEventPropertiesApi
+import app.nubrick.nubrick.NubrickEvent
+import app.nubrick.nubrick.encodeEventProperties
 import app.nubrick.nubrick.data.database.DatabaseRepository
 import app.nubrick.nubrick.data.user.NubrickUser
 import app.nubrick.nubrick.data.user.getCurrentDate
@@ -308,7 +311,7 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        assertTrue(container.recordTriggerEvent("open", sourceExperimentId = "source-exp"))
+        assertTrue(container.recordTriggerEvent(NubrickEvent("open"), sourceExperimentId = "source-exp"))
         container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP)).getOrThrow()
 
         assertEquals("source-exp", trackRepository.userEvents.single().experimentId)
@@ -348,7 +351,7 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        assertTrue(container.recordTriggerEvent("open"))
+        assertTrue(container.recordTriggerEvent(NubrickEvent("open")))
         val (_, kind) = container.fetchTriggerContent(
             "open",
             listOf(ExperimentKind.TOOLTIP),
@@ -367,6 +370,7 @@ class ContainerSurveyResponseTest {
     }
 
     @Test
+    @OptIn(ExperimentalEventPropertiesApi::class)
     fun `trigger event remains recorded when content fetch fails`() = runBlocking {
         val trackRepository = FakeTrackRepository()
         val databaseRepository = FakeDatabaseRepository()
@@ -378,8 +382,16 @@ class ContainerSurveyResponseTest {
             databaseRepository = databaseRepository,
         )
 
-        assertTrue(container.recordTriggerEvent("open", sourceExperimentId = "source-exp"))
+        val event = NubrickEvent("open", mapOf("amount" to 12.5))
+        assertTrue(container.recordTriggerEvent(event, sourceExperimentId = "source-exp"))
         val result = container.fetchTriggerContent("open", listOf(ExperimentKind.POPUP))
+        assertEquals(
+            JsonObject(mapOf("amount" to JsonObject(mapOf(
+                "type" to JsonPrimitive("float"),
+                "value" to JsonPrimitive(12.5),
+            )))),
+            trackRepository.userEvents.single().properties,
+        )
 
         assertEquals("source-exp", trackRepository.userEvents.single().experimentId)
         assertTrue(result.isFailure)
@@ -442,14 +454,18 @@ class ContainerSurveyResponseTest {
     }
 
     @Test
+    @OptIn(ExperimentalEventPropertiesApi::class)
     fun `trigger events can be recorded without selecting an experiment`() = runBlocking {
         val track = FakeTrackRepository()
         val database = FakeDatabaseRepository()
         val container = newContainer(trackRepository = track, databaseRepository = database)
-        assertTrue(container.recordTriggerEvent("one", "source"))
-        assertTrue(container.recordTriggerEvent("two", "source"))
+        val event = NubrickEvent("one", mapOf("amount" to 12.5))
+        assertTrue(container.recordTriggerEvent(event, "source"))
+        assertTrue(container.recordTriggerEvent(NubrickEvent("two"), "source"))
         assertEquals(listOf("one", "two"), database.userEvents)
         assertEquals(listOf("source", "source"), track.userEvents.map { it.experimentId })
+        assertEquals(encodeEventProperties(event.properties), track.userEvents.first().properties)
+        assertNull(track.userEvents.last().properties)
         assertTrue(database.frequencyChecks.isEmpty())
         assertTrue(database.experimentHistories.isEmpty())
         assertTrue(track.experimentEvents.isEmpty())
@@ -461,7 +477,7 @@ class ContainerSurveyResponseTest {
         val database = FakeDatabaseRepository(writesSucceed = false)
         val container = newContainer(trackRepository = track, databaseRepository = database)
 
-        assertFalse(container.recordTriggerEvent("open", "source"))
+        assertFalse(container.recordTriggerEvent(NubrickEvent("open"), "source"))
 
         assertEquals(listOf("open"), database.userEvents)
         assertEquals(listOf("open"), track.userEvents.map { it.name })
@@ -489,7 +505,7 @@ class ContainerSurveyResponseTest {
             databaseRepository = database,
         )
         val recordedTriggers = listOf("missing", "fallback", "winner").filter {
-            container.recordTriggerEvent(it)
+            container.recordTriggerEvent(NubrickEvent(it))
         }
         val result = container.fetchTriggerContent(recordedTriggers, listOf(ExperimentKind.POPUP))
         assertTrue(result.isFailure)

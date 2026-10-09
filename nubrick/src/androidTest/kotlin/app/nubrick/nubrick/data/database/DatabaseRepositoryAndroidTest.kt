@@ -1,6 +1,11 @@
 package app.nubrick.nubrick.data.database
 
 import android.database.sqlite.SQLiteDatabase
+import app.nubrick.nubrick.EventPropertyValue
+import app.nubrick.nubrick.ExperimentalEventPropertiesApi
+import app.nubrick.nubrick.NubrickEvent
+import app.nubrick.nubrick.encodeEventProperties
+import app.nubrick.nubrick.data.TrackUserEvent
 import app.nubrick.nubrick.data.user.DATETIME_OFFSET
 import app.nubrick.nubrick.data.user.formatISO8601
 import app.nubrick.nubrick.data.user.getCurrentDate
@@ -232,6 +237,33 @@ class DatabaseRepositoryAndroidTest {
         } finally {
             DATETIME_OFFSET = originalOffset
         }
+    }
+
+    @Test
+    @OptIn(ExperimentalEventPropertiesApi::class)
+    fun trackOutboxAppliesExistingEventSizeLimitToProperties() = runBlocking {
+        val outbox = TrackOutbox(databaseProvider = { db })
+        val key = "escaped\"🙂"
+        val timestamp = getCurrentDate()
+        fun payload(event: NubrickEvent) = TrackUserEvent(
+            event.name, timestamp = timestamp, properties = encodeEventProperties(event.properties),
+        ).encode().toString()
+        val overhead = payload(NubrickEvent("purchase", mapOf(key to "", "count" to 0)))
+            .toByteArray(Charsets.UTF_8).size
+        val available = 500 * 1024 - overhead
+        val value = "\"".repeat(available / 2) + "x".repeat(available % 2)
+        val event = NubrickEvent("purchase", mapOf(key to value, "count" to 0))
+        val encoded = payload(event)
+        Assert.assertEquals(500 * 1024, encoded.toByteArray(Charsets.UTF_8).size)
+        Assert.assertNotNull(outbox.insertEvent("accepted", createdAt = 1, payload = encoded))
+        Assert.assertEquals(encoded, outbox.nextBatch(50, 512 * 1024).single().payload)
+
+        val oversized = NubrickEvent("purchase", mapOf(key to value + "x", "count" to 0))
+        Assert.assertEquals(EventPropertyValue.String(value + "x"), oversized.properties[key])
+        val oversizedPayload = payload(oversized)
+        Assert.assertEquals(500 * 1024 + 1, oversizedPayload.toByteArray(Charsets.UTF_8).size)
+        Assert.assertNull(outbox.insertEvent("rejected", createdAt = 2, payload = oversizedPayload))
+        Assert.assertEquals(listOf("accepted"), outbox.nextBatch(50, 512 * 1024).map { it.eventId })
     }
 
     @Test

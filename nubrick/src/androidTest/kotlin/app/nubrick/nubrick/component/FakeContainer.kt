@@ -90,7 +90,7 @@ internal open class FakeContainer(
     override suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant> =
         Result.failure(UnsupportedOperationException("not used in smoke test"))
 
-    override suspend fun recordTriggerEvent(name: String, sourceExperimentId: String?): Boolean = true
+    override suspend fun recordTriggerEvent(event: NubrickEvent, sourceExperimentId: String?): Boolean = true
 
     override suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String) {}
 

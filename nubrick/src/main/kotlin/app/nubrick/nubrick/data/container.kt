@@ -4,6 +4,8 @@ import app.nubrick.nubrick.Config
 import app.nubrick.nubrick.Event
 import app.nubrick.nubrick.EventProperty
 import app.nubrick.nubrick.EventPropertyType
+import app.nubrick.nubrick.ExperimentalEventPropertiesApi
+import app.nubrick.nubrick.encodeEventProperties
 import app.nubrick.nubrick.FlutterBridgeApi
 import app.nubrick.nubrick.NubrickEvent
 import app.nubrick.nubrick.data.database.DatabaseRepository
@@ -102,7 +104,7 @@ internal interface Container {
         kinds: List<ExperimentKind>,
     ): Result<Pair<ExperimentContent, ExperimentKind>>
     suspend fun fetchRemoteConfig(experimentId: String): Result<ExperimentVariant>
-    suspend fun recordTriggerEvent(name: String, sourceExperimentId: String? = null): Boolean
+    suspend fun recordTriggerEvent(event: NubrickEvent, sourceExperimentId: String? = null): Boolean
     suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String)
     suspend fun appendExperimentHistory(experimentId: String)
 
@@ -331,9 +333,14 @@ internal class ContainerImpl(
         return Result.success(extracted.variant)
     }
 
-    override suspend fun recordTriggerEvent(name: String, sourceExperimentId: String?): Boolean {
-        trackRepository.trackEvent(TrackUserEvent(name, experimentId = sourceExperimentId))
-        return databaseRepository.appendUserEvent(name)
+    @OptIn(ExperimentalEventPropertiesApi::class)
+    override suspend fun recordTriggerEvent(event: NubrickEvent, sourceExperimentId: String?): Boolean {
+        trackRepository.trackEvent(TrackUserEvent(
+            name = event.name,
+            experimentId = sourceExperimentId,
+            properties = encodeEventProperties(event.properties),
+        ))
+        return databaseRepository.appendUserEvent(event.name)
     }
 
     override suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String) {

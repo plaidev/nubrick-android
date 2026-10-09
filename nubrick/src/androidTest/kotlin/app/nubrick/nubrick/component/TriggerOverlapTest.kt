@@ -3,6 +3,7 @@ package app.nubrick.nubrick.component
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.nubrick.nubrick.NubrickEvent
+import app.nubrick.nubrick.ExperimentalEventPropertiesApi
 import app.nubrick.nubrick.data.ExperimentContent
 import app.nubrick.nubrick.data.NotFoundException
 import app.nubrick.nubrick.data.user.NubrickUser
@@ -37,6 +38,7 @@ class TriggerOverlapTest {
         }
         val fetched = CopyOnWriteArrayList<String>()
         val recorded = CopyOnWriteArrayList<String>()
+        val recordedEvents = CopyOnWriteArrayList<NubrickEvent>()
         val shown = CopyOnWriteArrayList<String>()
         val callbacks = CopyOnWriteArrayList<String>()
         val displayRecordBlocker = AtomicReference<CompletableDeferred<Unit>?>(null)
@@ -47,8 +49,9 @@ class TriggerOverlapTest {
                 starts.getOrPut(trigger) { CompletableDeferred() }.complete(Unit)
                 return response(trigger).await()
             }
-            override suspend fun recordTriggerEvent(name: String, sourceExperimentId: String?): Boolean {
-                recorded.add(name)
+            override suspend fun recordTriggerEvent(event: NubrickEvent, sourceExperimentId: String?): Boolean {
+                recorded.add(event.name)
+                recordedEvents.add(event)
                 return true
             }
             override suspend fun recordDisplayedTriggerContent(experimentId: String, variantId: String) {
@@ -68,14 +71,17 @@ class TriggerOverlapTest {
     }
 
     @Test
+    @OptIn(ExperimentalEventPropertiesApi::class)
     fun tooltipBlocksPopupAndOtherTooltipsUntilRecordingAndDismissalFinish() = runBlocking {
         val f = Fixture()
         try {
             assertTrue(f.holder.startExperiment("tooltip"))
             assertFalse(f.holder.startExperiment("other-tooltip"))
-            f.holder.dispatch(NubrickEvent("blocked"))
+            val blockedEvent = NubrickEvent("blocked", mapOf("amount" to 12.5))
+            f.holder.dispatch(blockedEvent)
             f.drain()
             assertEquals(listOf("blocked"), f.recorded)
+            assertEquals(listOf(blockedEvent), f.recordedEvents)
             assertTrue(f.fetched.isEmpty())
             val recording = CompletableDeferred<Unit>()
             f.displayRecordBlocker.set(recording)

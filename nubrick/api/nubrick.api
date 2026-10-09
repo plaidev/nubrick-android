@@ -66,6 +66,73 @@ public final class app/nubrick/nubrick/EventPropertyType : java/lang/Enum {
 	public static fun values ()[Lapp/nubrick/nubrick/EventPropertyType;
 }
 
+public abstract class app/nubrick/nubrick/EventPropertyValue {
+	public static final field $stable I
+}
+
+public final class app/nubrick/nubrick/EventPropertyValue$Boolean : app/nubrick/nubrick/EventPropertyValue {
+	public static final field $stable I
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Lapp/nubrick/nubrick/EventPropertyValue$Boolean;
+	public static synthetic fun copy$default (Lapp/nubrick/nubrick/EventPropertyValue$Boolean;ZILjava/lang/Object;)Lapp/nubrick/nubrick/EventPropertyValue$Boolean;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class app/nubrick/nubrick/EventPropertyValue$Float : app/nubrick/nubrick/EventPropertyValue {
+	public static final field $stable I
+	public fun <init> (D)V
+	public final fun component1 ()D
+	public final fun copy (D)Lapp/nubrick/nubrick/EventPropertyValue$Float;
+	public static synthetic fun copy$default (Lapp/nubrick/nubrick/EventPropertyValue$Float;DILjava/lang/Object;)Lapp/nubrick/nubrick/EventPropertyValue$Float;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class app/nubrick/nubrick/EventPropertyValue$Integer : app/nubrick/nubrick/EventPropertyValue {
+	public static final field $stable I
+	public fun <init> (J)V
+	public final fun component1 ()J
+	public final fun copy (J)Lapp/nubrick/nubrick/EventPropertyValue$Integer;
+	public static synthetic fun copy$default (Lapp/nubrick/nubrick/EventPropertyValue$Integer;JILjava/lang/Object;)Lapp/nubrick/nubrick/EventPropertyValue$Integer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class app/nubrick/nubrick/EventPropertyValue$String : app/nubrick/nubrick/EventPropertyValue {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lapp/nubrick/nubrick/EventPropertyValue$String;
+	public static synthetic fun copy$default (Lapp/nubrick/nubrick/EventPropertyValue$String;Ljava/lang/String;ILjava/lang/Object;)Lapp/nubrick/nubrick/EventPropertyValue$String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class app/nubrick/nubrick/EventPropertyValue$Timestamp : app/nubrick/nubrick/EventPropertyValue {
+	public static final field $stable I
+	public fun <init> (Ljava/time/Instant;)V
+	public final fun component1 ()Ljava/time/Instant;
+	public final fun copy (Ljava/time/Instant;)Lapp/nubrick/nubrick/EventPropertyValue$Timestamp;
+	public static synthetic fun copy$default (Lapp/nubrick/nubrick/EventPropertyValue$Timestamp;Ljava/time/Instant;ILjava/lang/Object;)Lapp/nubrick/nubrick/EventPropertyValue$Timestamp;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ljava/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface annotation class app/nubrick/nubrick/ExperimentalEventPropertiesApi : java/lang/annotation/Annotation {
+}
+
 public final class app/nubrick/nubrick/FlutterBridge {
 	public static final field $stable I
 	public static final field INSTANCE Lapp/nubrick/nubrick/FlutterBridge;
@@ -90,11 +157,13 @@ public abstract interface class app/nubrick/nubrick/NubrickDispatchListener {
 public final class app/nubrick/nubrick/NubrickEvent {
 	public static final field $stable I
 	public fun <init> (Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun copy (Ljava/lang/String;)Lapp/nubrick/nubrick/NubrickEvent;
 	public static synthetic fun copy$default (Lapp/nubrick/nubrick/NubrickEvent;Ljava/lang/String;ILjava/lang/Object;)Lapp/nubrick/nubrick/NubrickEvent;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getName ()Ljava/lang/String;
+	public final fun getProperties ()Ljava/util/Map;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

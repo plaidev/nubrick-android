@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.nubrick.nubrick.NubrickEvent
+import app.nubrick.nubrick.ExperimentalEventPropertiesApi
 import app.nubrick.nubrick.data.Container
 import app.nubrick.nubrick.data.user.NubrickUser
 import java.util.concurrent.CountDownLatch
@@ -65,21 +66,26 @@ class TriggerDispatchAndroidTest {
     }
 
     @Test
+    @OptIn(ExperimentalEventPropertiesApi::class)
     fun dispatchCallsHandleNubrickEventOnMainThread() {
         val handled = CountDownLatch(1)
         val dispatchThread = AtomicReference<Thread>()
         val fetched = CountDownLatch(1)
         val sourceExperimentId = AtomicReference<String?>()
+        val callbackEvent = AtomicReference<NubrickEvent>()
+        val trackedEvent = AtomicReference<NubrickEvent>()
         val container = mock(
             Container::class.java,
             withSettings().defaultAnswer(Answer { invocation ->
                 when (invocation.method.name.substringBefore('-')) {
                     "handleNubrickEvent" -> {
+                        callbackEvent.set(invocation.getArgument<NubrickEvent>(0))
                         dispatchThread.set(Thread.currentThread())
                         handled.countDown()
                         null
                     }
                     "recordTriggerEvent" -> {
+                        trackedEvent.set(invocation.getArgument<NubrickEvent>(0))
                         sourceExperimentId.set(invocation.getArgument<String?>(1))
                         true
                     }
@@ -99,12 +105,15 @@ class TriggerDispatchAndroidTest {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
         )
 
-        holder.dispatch(NubrickEvent("test"), sourceExperimentId = "source-exp")
+        val event = NubrickEvent("test", mapOf("amount" to 12.5))
+        holder.dispatch(event, sourceExperimentId = "source-exp")
 
         assertTrue(handled.await(2, TimeUnit.SECONDS))
         assertTrue(fetched.await(2, TimeUnit.SECONDS))
         assertEquals(Looper.getMainLooper().thread, dispatchThread.get())
         assertEquals("source-exp", sourceExperimentId.get())
+        assertEquals(mapOf("amount" to app.nubrick.nubrick.EventPropertyValue.Float(12.5)), callbackEvent.get().properties)
+        assertEquals(event, trackedEvent.get())
     }
 
     @Test
