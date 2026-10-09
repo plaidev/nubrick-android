@@ -173,7 +173,7 @@ internal class TriggerStateHolder(
                 withContext(Dispatchers.Main) {
                     self.container.handleNubrickEvent(event)
                 }
-                val recorded = self.container.recordTriggerEvent(event.name, sourceExperimentId)
+                val recorded = self.container.recordTriggerEvent(event, sourceExperimentId)
                 if (!recorded || experimentSession.isActive()) {
                     return@launch
                 }
@@ -211,7 +211,7 @@ internal class TriggerStateHolder(
                 }
                 val recordedTriggers = mutableListOf<String>()
                 for (event in events) {
-                    if (self.container.recordTriggerEvent(event.name)) {
+                    if (self.container.recordTriggerEvent(event)) {
                         recordedTriggers += event.name
                     }
                 }

@@ -116,9 +116,58 @@ data class Config @JvmOverloads constructor(
     val trackCrashes: Boolean = true,
 )
 
-data class NubrickEvent(
-    val name: String
+/** Event properties are in development and may change before their official release. */
+@RequiresOptIn(
+    message = "Event properties are experimental and may change before their official release.",
+    level = RequiresOptIn.Level.ERROR,
 )
+@MustBeDocumented
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.CLASS, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY)
+annotation class ExperimentalEventPropertiesApi
+
+/** A dispatched event with an immutable snapshot of canonical, typed properties. */
+@OptIn(ExperimentalEventPropertiesApi::class)
+class NubrickEvent {
+    val name: String
+
+    @ExperimentalEventPropertiesApi
+    val properties: Map<String, EventPropertyValue>
+
+    constructor(name: String) {
+        this.name = name
+        this.properties = emptyMap()
+    }
+
+    /**
+     * Accepts native scalar and timestamp values and exposes canonical [EventPropertyValue] properties.
+     * Supports Byte/Short/Int/Long, UByte/UShort/UInt/ULong, Float/Double, String, Boolean,
+     * Instant/ZonedDateTime/OffsetDateTime, java.util.Date, Calendar, and EventPropertyValue.
+     * java.sql.Date/Time/Timestamp are unsupported; convert them to a supported type first.
+     * Integers must fit Long; floats must be finite. BigInteger/BigDecimal and other types are omitted.
+     * Unsupported, non-finite, or lossy conversions are omitted without dropping the event.
+     */
+    @ExperimentalEventPropertiesApi
+    constructor(name: String, properties: Map<String, Any?>) {
+        this.name = name
+        // Tracking enforces the encoded event size limit before queueing; no size check is needed here.
+        this.properties = normalizeEventProperties(properties)
+    }
+
+    // Keep the original data-class destructuring and copy API.
+    operator fun component1(): String = name
+    fun copy(name: String = this.name): NubrickEvent = NubrickEvent(name, properties)
+
+    override fun equals(other: Any?): Boolean =
+        other is NubrickEvent && name == other.name && properties == other.properties
+
+    override fun hashCode(): Int =
+        if (properties.isEmpty()) name.hashCode() else 31 * name.hashCode() + properties.hashCode()
+
+    override fun toString(): String =
+        if (properties.isEmpty()) "NubrickEvent(name=$name)"
+        else "NubrickEvent(name=$name, properties=$properties)"
+}
 
 sealed class NubrickSize {
     data class Fixed(val value: Int) : NubrickSize()

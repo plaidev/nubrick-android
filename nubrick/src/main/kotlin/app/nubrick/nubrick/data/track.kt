@@ -176,6 +176,7 @@ internal data class TrackUserEvent(
     val name: String,
     val timestamp: ZonedDateTime = getCurrentDate(),
     val experimentId: String? = null,
+    val properties: JsonObject? = null,
 ) {
     fun encode(): JsonObject {
         return JsonObject(buildMap {
@@ -183,6 +184,7 @@ internal data class TrackUserEvent(
             put("name", JsonPrimitive(name))
             put("timestamp", JsonPrimitive(formatISO8601(timestamp)))
             experimentId?.let { put("experimentId", JsonPrimitive(it)) }
+            properties?.let { put("properties", it) }
         })
     }
 }
